@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SychBoard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a0f;--surface:#111118;--surface2:#1a1a24;--surface3:#22222e;
+  --border:#2a2a3a;--border2:#3a3a50;
+  --text:#e8eaf0;--text2:#8890a8;--text3:#4a5068;
+  --accent:#3d8ef0;--accent2:#5ba3ff;--accent-glow:rgba(61,142,240,0.15);
+  --green:#2ecc8a;--green-light:rgba(46,204,138,0.12);
+  --amber:#f0a832;--amber-light:rgba(240,168,50,0.12);
+  --red:#f05050;--red-light:rgba(240,80,80,0.12);
+  --radius:14px;--radius-sm:8px;--radius-lg:20px;
+}
+html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;user-select:none}
+
+/* BOOT */
+#boot{position:fixed;inset:0;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+#boot.out{animation:bootOut 0.8s ease forwards}
+@keyframes bootOut{to{opacity:0;visibility:hidden}}
+.scan-line{position:absolute;top:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scan 1.4s ease-in-out forwards}
+@keyframes scan{0%{top:-2px;opacity:0}15%{opacity:1}85%{opacity:1}100%{top:100%;opacity:0}}
+.boot-center{text-align:center;margin-bottom:40px}
+.boot-logo{font-size:44px;font-weight:800;letter-spacing:-1px;opacity:0;transform:scale(0.92);transition:opacity 0.7s,transform 0.7s}
+.boot-logo span{color:var(--accent);text-shadow:0 0 30px rgba(61,142,240,0.5)}
+.boot-hello{font-size:17px;color:var(--text2);opacity:0;transition:opacity 0.5s;margin-top:8px;letter-spacing:0.04em}
+.boot-chat{width:100%;max-width:500px;padding:0 24px;opacity:0;transform:translateY(24px);transition:opacity 0.5s,transform 0.5s}
+.boot-ai-box{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:14px;position:relative;overflow:hidden}
+.boot-ai-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.boot-ai-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:aidot 2s infinite}
+@keyframes aidot{0%,100%{opacity:1}50%{opacity:0.3}}
+.boot-ai-text{font-size:14px;color:var(--text);line-height:1.6;min-height:20px}
+.cursor{display:inline-block;width:2px;height:15px;background:var(--accent);margin-left:1px;animation:cur 1s infinite;vertical-align:text-bottom}
+@keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
+.boot-bullets{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.boot-bullet{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);opacity:0;transform:translateX(-8px);transition:opacity 0.4s,transform 0.4s}
+.bullet-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 6px var(--accent)}
+.boot-btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;opacity:0;transition:opacity 0.4s,background 0.2s}
+.boot-btn:hover{background:var(--accent2)}
+
+/* ONBOARDING */
+#onboarding{position:fixed;inset:0;background:var(--bg);z-index:900;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+#onboarding.show{display:flex}
+#onboarding.out{animation:bootOut 0.5s ease forwards}
+.ob-wrap{width:100%;max-width:500px}
+.ob-step{display:none}
+.ob-step.active{display:block;animation:fadeIn 0.3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ob-progress{display:flex;gap:6px;margin-bottom:32px;justify-content:center}
+.ob-pip{height:3px;border-radius:2px;background:var(--border2);transition:all 0.3s;flex:1}
+.ob-pip.done{background:var(--accent)}
+.ob-pip.active{background:var(--accent2)}
+.ob-title{font-size:26px;font-weight:700;color:var(--text);margin-bottom:8px}
+.ob-sub{font-size:14px;color:var(--text2);margin-bottom:28px;line-height:1.6}
+.ob-input{font-size:18px;padding:14px 16px;border:2px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);width:100%;outline:none;font-family:inherit;transition:border 0.2s;margin-bottom:16px}
+.ob-input:focus{border-color:var(--accent)}
+.ob-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}
+.ob-option{padding:14px;background:var(--surface2);border:2px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);text-align:center;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ob-option span:first-child{font-size:22px}
+.ob-option:hover{border-color:var(--border2);color:var(--text)}
+.ob-option.selected{border-color:var(--accent);background:rgba(61,142,240,0.1);color:var(--text)}
+.ob-colors{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.ob-color{width:44px;height:44px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all 0.15s}
+.ob-color.selected{border-color:#fff;transform:scale(1.15)}
+.ob-next{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:background 0.2s}
+.ob-next:hover{background:var(--accent2)}
+.ob-back{background:none;border:none;color:var(--text2);font-size:14px;cursor:pointer;font-family:inherit;margin-top:12px;width:100%;padding:8px}
+.ob-back:hover{color:var(--text)}
+
+/* APP */
+#app{opacity:0;transition:opacity 0.5s;min-height:100vh}
+#app.show{opacity:1}
+.app-inner{max-width:760px;margin:0 auto;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;position:sticky;top:0;z-index:10;background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);-webkit-app-region:drag}
+.topbar-logo{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+.topbar-logo span{color:var(--accent)}
+.topbar-actions{display:flex;gap:6px;-webkit-app-region:no-drag}
+.icon-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.page{display:none;padding:0 20px 100px;animation:fadeIn 0.2s ease}
+.page.active{display:block}
+.home-header{padding:20px 20px 0}
+.home-greeting{font-size:24px;font-weight:700;margin-bottom:3px}
+.home-date{font-size:13px;color:var(--text2)}
+.overview-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:18px;margin:14px 20px 0;position:relative;overflow:hidden}
+.overview-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.ov-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px}
+.ov-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ov-stat{background:var(--surface2);border-radius:10px;padding:10px;text-align:center;border:1px solid var(--border)}
+.ov-val{font-size:18px;font-weight:700;color:var(--text)}
+.ov-lbl{font-size:9px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:0.04em}
+.ai-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:14px 18px;margin:12px 20px 0;position:relative;overflow:hidden}
+.ai-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.ai-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ai-suggestion{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+.ai-input-row{display:flex;gap:8px}
+.ai-input{flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:9px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border 0.15s}
+.ai-input:focus{border-color:var(--accent)}
+.ai-input::placeholder{color:var(--text3)}
+.send-btn{width:36px;height:36px;border-radius:var(--radius-sm);background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:background 0.15s}
+.send-btn:hover{background:var(--accent2)}
+.sec-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin:18px 20px 10px}
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px}
+.home-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden}
+.home-card:hover{border-color:var(--accent);background:var(--surface2);transform:translateY(-1px)}
+.home-card:active{transform:scale(0.97)}
+.home-card.wide{grid-column:span 2}
+.hc-icon{font-size:20px;margin-bottom:7px;display:block}
+.hc-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.hc-value{font-size:11px;color:var(--text2);line-height:1.4}
+.hc-arrow{position:absolute;top:12px;right:12px;color:var(--text3);font-size:18px}
+.home-actions{display:flex;gap:10px;padding:12px 20px 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mr2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.mr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px}
+.metric{background:var(--surface2);border-radius:var(--radius-sm);padding:10px;text-align:center;border:1px solid var(--border)}
+.ml{font-size:9px;color:var(--text2);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em}
+.mv{font-size:18px;font-weight:700;color:var(--text)}
+.mv.blue{color:var(--accent2)}
+.mv.green{color:var(--green)}
+.mv.sm{font-size:12px;font-weight:500}
+.row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.rl{font-size:13px;color:var(--text2)}
+.rv{font-size:13px;font-weight:500;color:var(--text);text-align:right}
+input[type=text],input[type=number],input[type=password],textarea,select{font-size:13px;padding:9px 11px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);width:100%;outline:none;transition:border 0.15s;font-family:inherit}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:80px;line-height:1.6}
+select option{background:var(--surface2)}
+.btn{font-size:13px;font-weight:500;padding:9px 14px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;transition:all 0.15s;font-family:inherit;white-space:nowrap}
+.btn-p{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-p:hover{background:var(--accent2)}
+.btn-d{background:var(--red-light);color:var(--red);border-color:var(--red)}
+.btn:hover{background:var(--surface3)}
+.btn-sm{padding:6px 10px;font-size:12px;border-radius:6px}
+.btn-full{width:100%}
+.pb{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;margin:5px 0}
+.pf{height:100%;border-radius:2px;background:var(--accent);transition:width 0.4s}
+.pf.g{background:var(--green)}
+.hg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.hi{display:flex;align-items:center;gap:9px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;font-weight:500;border:1px solid var(--border);transition:all 0.15s;user-select:none}
+.hi.done{background:var(--green-light);border-color:var(--green);color:var(--green)}
+.hck{width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all 0.15s}
+.hi.done .hck{background:var(--green);border-color:var(--green);color:#fff}
+.todo-item{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.todo-item:last-child{border-bottom:none}
+.todo-item input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+.todo-item.checked span{text-decoration:line-through;color:var(--text3)}
+.del-btn{margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0}
+.del-btn:hover{color:var(--red)}
+.chip{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px}
+.chip-b{background:rgba(61,142,240,0.15);color:var(--accent2)}
+.chip-g{background:var(--green-light);color:var(--green)}
+.chip-a{background:var(--amber-light);color:var(--amber)}
+.sg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.dc{background:var(--surface2);border-radius:8px;padding:5px 2px;min-height:70px;border:1px solid var(--border)}
+.dc.today{border-color:var(--accent);background:rgba(61,142,240,0.08)}
+.dn{font-size:8px;font-weight:700;color:var(--text2);text-align:center;margin-bottom:3px;text-transform:uppercase}
+.de{font-size:7px;padding:2px;border-radius:3px;margin-bottom:2px;text-align:center;font-weight:600;line-height:1.3}
+.eu{background:rgba(61,142,240,0.2);color:var(--accent2)}
+.ew{background:var(--amber-light);color:var(--amber)}
+.es{background:var(--green-light);color:var(--green)}
+.shi{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;gap:6px}
+.shi:last-child{border-bottom:none}
+.ptb{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;position:sticky;top:0;z-index:9;background:rgba(10,10,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);-webkit-app-region:drag}
+.ptb-title{font-size:16px;font-weight:700;color:var(--text)}
+.back-btn{display:flex;align-items:center;gap:3px;font-size:14px;font-weight:600;color:var(--accent);cursor:pointer;border:none;background:none;font-family:inherit;-webkit-app-region:no-drag}
+.back-btn:hover{opacity:0.75}
+.sc{padding:14px 20px 100px}
+.gi{display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:7px;border:1px solid var(--border)}
+.gi.done .gt{text-decoration:line-through;color:var(--text3)}
+.gc{width:20px;height:20px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;font-size:10px}
+.gi.done .gc{background:var(--accent);border-color:var(--accent);color:#fff}
+.gt{font-size:13px;color:var(--text);flex:1}
+.chat-messages{min-height:160px;margin-bottom:14px;display:flex;flex-direction:column;gap:10px}
+.cm{max-width:85%;padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;line-height:1.6}
+.cm.user{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:3px}
+.cm.ai{background:var(--surface2);color:var(--text);align-self:flex-start;border-bottom-left-radius:3px;border:1px solid var(--border2)}
+.typing{display:flex;gap:4px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);align-self:flex-start;border:1px solid var(--border2)}
+.typing span{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:td 1.2s infinite}
+.typing span:nth-child(2){animation-delay:0.2s}
+.typing span:nth-child(3){animation-delay:0.4s}
+@keyframes td{0%,100%{opacity:0.3;transform:scale(0.8)}50%{opacity:1;transform:scale(1)}}
+.chat-input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;resize:none;transition:border 0.15s;line-height:1.5}
+.chat-input:focus{border-color:var(--accent)}
+.chat-input::placeholder{color:var(--text3)}
+.si{padding:14px 0;border-bottom:1px solid var(--border)}
+.si:last-child{border-bottom:none}
+.sl{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.ss{font-size:11px;color:var(--text2);margin-bottom:8px;line-height:1.5}
+.mi{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.mi:last-child{border-bottom:none}
+.mi-actions{display:flex;gap:5px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:22px 20px 36px;width:100%;max-width:760px;animation:slideUp 0.25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.mh{width:38px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 16px}
+.mt{font-size:17px;font-weight:700;color:var(--text);margin-bottom:14px}
+.mb{font-size:13px;color:var(--text2);margin-bottom:4px;line-height:1.5}
+.mbtns{display:flex;gap:8px;margin-top:14px}
+.fl{font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.fg{margin-bottom:10px}
+.ir2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ir3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.ta-row{display:flex;gap:8px;margin-top:8px}
+.empty{font-size:12px;color:var(--text3);padding:10px 0;text-align:center}
+</style>
+</head>
+<body>
+
+<!-- BOOT -->
+<div id="boot">
+  <div class="scan-line"></div>
+  <div class="boot-center">
+    <div class="boot-logo" id="bl">Sych<span>Board</span></div>
+    <div class="boot-hello" id="bh"></div>
+  </div>
+  <div class="boot-chat" id="bc">
+    <div class="boot-ai-box">
+      <div class="boot-ai-label"><span class="ai-dot"></span>AI Assistant</div>
+      <div class="boot-ai-text" id="bat"></div>
+    </div>
+    <div class="boot-bullets" id="bbl"></div>
+    <button class="boot-btn" id="bbn" onclick="enterApp()">Enter SychBoard →</button>
+  </div>
+</div>
+
+<!-- ONBOARDING -->
+<div id="onboarding">
+  <div class="ob-wrap">
+    <div class="ob-progress" id="ob-prog"></div>
+    <!-- Step 1: Name -->
+    <div class="ob-step active" id="ob-1">
+      <div class="ob-title">Welcome to SychBoard 👋</div>
+      <div class="ob-sub">Your personal AI-powered life dashboard. Let's set it up for you in 3 quick steps.</div>
+      <input type="text" class="ob-input" id="ob-name" placeholder="What's your name?" maxlength="30">
+      <button class="ob-next" onclick="obNext(1)">Continue →</button>
+    </div>
+    <!-- Step 2: Focus areas -->
+    <div class="ob-step" id="ob-2">
+      <div class="ob-title">What are you working on?</div>
+      <div class="ob-sub">Select everything that applies — we'll build your dashboard around it.</div>
+      <div class="ob-options" id="ob-options">
+        <div class="ob-option" onclick="toggleOb(this,'youtube')" data-val="youtube"><span>📺</span><span>YouTube / Content</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'uni')" data-val="uni"><span>🎓</span><span>University / Study</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'fitness')" data-val="fitness"><span>💪</span><span>Fitness & Health</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'finance')" data-val="finance"><span>💰</span><span>Finance & Savings</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'work')" data-val="work"><span>💼</span><span>Work / Job</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'dev')" data-val="dev"><span>🤖</span><span>Side Projects / Dev</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'travel')" data-val="travel"><span>✈️</span><span>Travel / Holidays</span></div>
+        <div class="ob-option" onclick="toggleOb(this,'habits')" data-val="habits"><span>✅</span><span>Habits & Goals</span></div>
+      </div>
+      <button class="ob-next" onclick="obNext(2)">Continue →</button>
+      <button class="ob-back" onclick="obBack(2)">← Back</button>
+    </div>
+    <!-- Step 3: Accent colour -->
+    <div class="ob-step" id="ob-3">
+      <div class="ob-title">Pick your accent colour</div>
+      <div class="ob-sub">This sets the vibe of your whole dashboard.</div>
+      <div class="ob-colors" id="ob-colors">
+        <div class="ob-color selected" style="background:#3d8ef0" onclick="pickColor(this,'#3d8ef0','rgba(61,142,240,0.15)')"></div>
+        <div class="ob-color" style="background:#2ecc8a" onclick="pickColor(this,'#2ecc8a','rgba(46,204,138,0.12)')"></div>
+        <div class="ob-color" style="background:#f05090" onclick="pickColor(this,'#f05090','rgba(240,80,144,0.12)')"></div>
+        <div class="ob-color" style="background:#f0a832" onclick="pickColor(this,'#f0a832','rgba(240,168,50,0.12)')"></div>
+        <div class="ob-color" style="background:#a855f7" onclick="pickColor(this,'#a855f7','rgba(168,85,247,0.12)')"></div>
+        <div class="ob-color" style="background:#f05050" onclick="pickColor(this,'#f05050','rgba(240,80,80,0.12)')"></div>
+      </div>
+      <button class="ob-next" onclick="obFinish()">Let's go 🚀</button>
+      <button class="ob-back" onclick="obBack(3)">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div id="modal-confirm" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt" id="mc-t">Are you sure?</div>
+    <div class="mb" id="mc-b"></div>
+    <div class="mbtns"><button class="btn btn-full" onclick="closeModal('modal-confirm')">Cancel</button><button class="btn btn-d btn-full" id="mc-ok">Delete</button></div>
+  </div>
+</div>
+<div id="modal-add" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt">Add section</div>
+    <div class="fg"><div class="fl">Name</div><input type="text" id="add-name" placeholder="e.g. Fitness..."></div>
+    <div class="fg"><div class="fl">Type</div><select id="add-type"><option value="notes">Notes + todos</option><option value="tracker">Number tracker</option><option value="freeform">Freeform</option></select></div>
+    <div class="fg"><div class="fl">Icon</div><input type="text" id="add-icon" placeholder="💪" maxlength="2" style="width:64px"></div>
+    <div class="mbtns"><button class="btn btn-full" onclick="closeModal('modal-add')">Cancel</button><button class="btn btn-p btn-full" onclick="doAddSec()">Add</button></div>
+  </div>
+</div>
+<div id="modal-rename" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt">Rename section</div>
+    <input type="text" id="rename-val" placeholder="New name">
+    <div class="mbtns" style="margin-top:10px"><button class="btn btn-full" onclick="closeModal('modal-rename')">Cancel</button><button class="btn btn-p btn-full" onclick="doRename()">Save</button></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+<div class="app-inner">
+
+<div id="page-home" class="page active">
+  <div class="topbar">
+    <div class="topbar-logo">Sych<span>Board</span></div>
+    <div class="topbar-actions">
+      <button class="icon-btn" onclick="goPage('ai')" title="AI Chat">💬</button>
+      <button class="icon-btn" onclick="goPage('settings')" title="Settings">⚙</button>
+    </div>
+  </div>
+  <div class="home-header"><div class="home-greeting" id="hg"></div><div class="home-date" id="hd"></div></div>
+  <div id="home-ov"></div>
+  <div class="ai-card">
+    <div class="ai-label"><span class="ai-dot"></span>AI Assistant</div>
+    <div class="ai-suggestion" id="ai-sug">Add your Groq API key in Settings to enable AI suggestions.</div>
+    <div class="ai-input-row"><input type="text" class="ai-input" id="ai-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')homeAI()"><button class="send-btn" onclick="homeAI()">→</button></div>
+  </div>
+  <div class="sec-label">YOUR SECTIONS</div>
+  <div class="home-grid" id="home-grid"></div>
+  <div class="home-actions"><button class="btn btn-p btn-full" onclick="openModal('modal-add')">+ Add section</button><button class="btn" onclick="goPage('manage')">Manage</button></div>
+</div>
+
+<div id="page-finance" class="page">
+  <div class="ptb" style="-webkit-app-region:drag"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Finance</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title">Balances</div>
+      <div class="mr2" id="fm1"></div><div class="mr2" id="fm2"></div>
+      <div class="ir3" style="gap:8px"><select id="bal-sel"><option value="bank">Bank</option><option value="savings">Savings</option><option value="trading">Trading 212</option></select><input type="number" id="bal-amt" placeholder="£ amount"><button class="btn btn-p" onclick="updateBal()">Save</button></div>
+    </div>
+    <div class="card"><div class="card-title" id="h1-title"></div><div id="h1-detail"></div></div>
+    <div class="card"><div class="card-title" id="h2-title"></div><div id="h2-detail"></div></div>
+    <div class="card"><div class="card-title">Shift tracker</div>
+      <div class="ir2" style="gap:8px;margin-bottom:8px"><div><div class="fl">Date</div><input type="text" id="sh-d" placeholder="18 Apr"></div><div><div class="fl">Hours</div><input type="number" id="sh-h" placeholder="5" step="0.5"></div></div>
+      <div class="ir2" style="gap:8px;margin-bottom:10px"><div><div class="fl">Wage £/hr</div><input type="number" id="sh-w" placeholder="10.00" step="0.01"></div><div style="display:flex;align-items:flex-end"><button class="btn btn-p btn-full" onclick="addShift()">Add shift</button></div></div>
+      <div id="shift-list"></div><div class="mr2" style="margin-top:8px" id="shift-totals"></div>
+    </div>
+    <div class="card"><div class="card-title">Finance todos</div><div id="todos-finance"></div><div class="ta-row"><input type="text" id="ti-finance" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('finance')">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-uni" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Uni</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title" id="uni-mod-title">Module</div>
+      <div class="row"><span class="rl">First exam</span><span class="rv">22% <span class="chip chip-a">20% weighted</span></span></div>
+      <div class="row"><span class="rl">Next exam</span><span class="rv">60% <span class="chip chip-b">Open book · 48h</span></span></div>
+      <div class="row"><span class="rl">Exam date</span><span class="rv" id="exam-date-disp">TBC</span></div>
+      <div class="row"><span class="rl">Last assignment</span><span class="rv">End of May</span></div>
+      <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="exam-in" placeholder="Update exam date..." style="flex:1"><button class="btn btn-p btn-sm" onclick="updateExamDate()">Save</button></div>
+    </div>
+    <div class="card"><div class="card-title">Notes</div><textarea id="uni-notes" placeholder="Topics, reminders..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.uniNotes=document.getElementById('uni-notes').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Uni todos</div><div id="todos-uni"></div><div class="ta-row"><input type="text" id="ti-uni" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('uni')">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-youtube" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">YouTube</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title" id="yt-chan-title">Channel stats</div>
+      <div class="mr2" id="yt-m1"></div><div class="mr2" id="yt-m2"></div>
+      <div class="ir3" style="gap:8px;margin-top:4px"><input type="number" id="yt-si" placeholder="Subs"><input type="number" id="yt-vi" placeholder="Views"><input type="number" id="yt-hi" placeholder="Hours"></div>
+      <button class="btn btn-p btn-sm btn-full" style="margin-top:8px" onclick="updateYT()">Update</button>
+    </div>
+    <div class="card"><div class="card-title">Monetisation progress</div><div id="yt-goals"></div></div>
+    <div class="card"><div class="card-title">Weekly checklist</div><div id="yt-checklist"></div></div>
+    <div class="card"><div class="card-title">YouTube todos</div><div id="todos-youtube"></div><div class="ta-row"><input type="text" id="ti-youtube" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('youtube')">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-dev" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title" id="dev-title">Side Project</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title">Stats</div>
+      <div class="mr2" id="dev-m"></div>
+      <div class="ir2" style="gap:8px;margin-top:8px"><input type="number" id="dev-m1i" placeholder="Stat 1"><input type="text" id="dev-s1i" placeholder="Status"><select id="dev-si"><option>In development</option><option>Awaiting verification</option><option>Live</option><option>Growing</option><option>Monetised</option></select></div>
+      <button class="btn btn-p btn-sm btn-full" style="margin-top:8px" onclick="updateDev()">Update</button>
+    </div>
+    <div class="card"><div class="card-title">Project todos</div><div id="dev-todos"></div><div class="ta-row"><input type="text" id="dev-ti" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addDevTodo()">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-schedule" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Schedule</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title">This week</div><div class="sg" id="sched-grid"></div></div>
+    <div class="card"><div class="card-title">Today's top 3</div><textarea id="today-focus" placeholder="What are your 3 priorities today?"></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.todayFocus=document.getElementById('today-focus').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Schedule todos</div><div id="todos-schedule"></div><div class="ta-row"><input type="text" id="ti-schedule" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('schedule')">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-habits" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Habits</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card">
+      <div class="card-header"><div class="card-title" id="habit-date" style="margin-bottom:0"></div><button class="btn btn-sm" onclick="resetHabits()">Reset day</button></div>
+      <div class="hg" id="habit-grid"></div>
+      <div class="ta-row"><input type="text" id="new-habit-in" placeholder="Add habit..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addHabit()">Add</button></div>
+    </div>
+    <div class="card"><div class="card-title">Summary</div><div class="mr2" id="habit-stats"></div></div>
+  </div>
+</div>
+
+<div id="page-fitness" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Fitness</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title">Goals</div><div id="fitness-goals-list"></div>
+      <div class="ta-row"><input type="text" id="fg-in" placeholder="New fitness goal..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addFitnessGoal()">Add</button></div>
+    </div>
+    <div class="card"><div class="card-title">Fitness todos</div><div id="todos-fitness"></div><div class="ta-row"><input type="text" id="ti-fitness" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('fitness')">Add</button></div></div>
+    <div class="card"><div class="card-title">Notes</div><textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.fitnessNotes=document.getElementById('fitness-notes').value;save()">Save</button></div>
+  </div>
+</div>
+
+<div id="page-travel" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Travel</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title">Trips</div><div id="trips-list"></div>
+      <div style="margin-top:12px">
+        <div class="ir3" style="gap:8px;margin-bottom:8px"><div><div class="fl">Destination</div><input type="text" id="trip-dest" placeholder="Faro"></div><div><div class="fl">Date</div><input type="text" id="trip-date" placeholder="August"></div><div><div class="fl">Budget (£)</div><input type="number" id="trip-budget" placeholder="800"></div></div>
+        <button class="btn btn-p btn-sm btn-full" onclick="addTrip()">Add trip</button>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">Travel todos</div><div id="todos-travel"></div><div class="ta-row"><input type="text" id="ti-travel" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('travel')">Add</button></div></div>
+  </div>
+</div>
+
+<div id="page-goals" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Goals</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card">
+      <div class="card-header"><div class="card-title" style="margin-bottom:0">My goals</div><span class="chip chip-b" id="goals-count"></span></div>
+      <div id="goals-list"></div>
+      <div style="margin-top:12px">
+        <div class="ir2" style="gap:8px;margin-bottom:8px"><input type="text" id="goal-in" placeholder="New goal..."><select id="goal-cat"><option value="life">Life</option><option value="fitness">Fitness</option><option value="finance">Finance</option><option value="youtube">YouTube</option><option value="uni">Uni</option><option value="dev">Dev</option></select></div>
+        <button class="btn btn-p btn-full" onclick="addGoal()">Add goal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="page-todos" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">All todos</div><div style="width:34px"></div></div>
+  <div class="sc" id="master-todos"></div>
+</div>
+
+<div id="page-journal" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Journal</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card"><div class="card-title" id="journal-title"></div><textarea id="journal-text" style="min-height:180px" placeholder="Dump your thoughts..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveJournal()">Save entry</button></div>
+    <div class="card"><div class="card-title">Past entries</div><div id="past-journals"></div></div>
+  </div>
+</div>
+
+<div id="page-ai" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">AI Assistant</div><div style="width:34px"></div></div>
+  <div class="sc">
+    <div class="card">
+      <div class="chat-messages" id="chat-msgs"></div>
+      <div style="display:flex;gap:8px"><textarea class="chat-input" id="chat-in" placeholder="Ask anything, add a task..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea><button class="send-btn" onclick="sendChat()">→</button></div>
+    </div>
+    <div class="card"><div class="card-title" style="font-size:12px;margin-bottom:8px">Try saying...</div>
+      ${["Add a todo to review my Python notes","What should I focus on today?","Give me a tip to stay consistent","How close am I to YouTube monetisation?"].map(s=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);cursor:pointer" onclick="document.getElementById('chat-in').value='${s}'">${s}</div>`).join('')}
+    </div>
+  </div>
+</div>
+
+<div id="page-manage" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Manage sections</div><div style="width:34px"></div></div>
+  <div class="sc"><div class="card"><p style="font-size:12px;color:var(--text2);margin-bottom:12px">Hide, rename or delete sections.</p><div id="manage-list"></div><button class="btn btn-p btn-full" style="margin-top:10px" onclick="openModal('modal-add')">+ Add section</button></div></div>
+</div>
+
+<div id="page-settings" class="page">
+  <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Settings</div><div style="width:34px"></div></div>
+  <div class="sc"><div class="card">
+    <div class="si"><div class="sl">Groq API key</div><div class="ss">Free at console.groq.com — powers all AI features. Stays on your device only.</div><input type="password" id="groq-in" placeholder="gsk_..."><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroq()">Save key</button><div id="groq-st" style="font-size:11px;margin-top:5px"></div></div>
+    <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=document.getElementById('name-in').value||st.userName;save()">Save</button></div>
+    <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.defaultWage=parseFloat(document.getElementById('wage-in').value)||st.defaultWage;save()">Save</button></div>
+    <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        ${['#3d8ef0','#2ecc8a','#f05090','#f0a832','#a855f7','#f05050'].map(c=>`<div style="width:32px;height:32px;border-radius:50%;background:${c};cursor:pointer;border:2px solid transparent;transition:all 0.15s" onclick="applyColor('${c}');this.style.borderColor='#fff'" title="${c}"></div>`).join('')}
+      </div>
+    </div>
+    <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
+    <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>
+  </div></div>
+</div>
+
+<div id="page-custom" class="page"></div>
+
+</div>
+</div>
+
+<script>
+const S={get(k){try{return JSON.parse(localStorage.getItem('sb4_'+k))}catch{return null}},set(k,v){try{localStorage.setItem('sb4_'+k,JSON.stringify(v))}catch{}}};
+
+const CORE_SECTIONS=[
+  {id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
+  {id:'uni',label:'Uni',icon:'🎓',core:true,visible:true},
+  {id:'youtube',label:'YouTube',icon:'📺',core:true,visible:true},
+  {id:'dev',label:'Chuck Bot',icon:'🤖',core:true,visible:true},
+  {id:'schedule',label:'Schedule',icon:'📅',core:true,visible:true},
+  {id:'habits',label:'Habits',icon:'✅',core:true,visible:true},
+  {id:'goals',label:'Goals',icon:'🎯',core:true,visible:true},
+  {id:'todos',label:'All Todos',icon:'📋',core:true,visible:true},
+  {id:'journal',label:'Journal',icon:'📓',core:true,visible:true}
+];
+
+let st={
+  onboarded:false,userName:'',accentColor:'#3d8ef0',accentGlow:'rgba(61,142,240,0.15)',
+  focusAreas:[],sections:[...CORE_SECTIONS],
+  groqKey:'',defaultWage:10,
+  balances:{bank:0,savings:0,trading:0},
+  holidays:[{name:'Holiday 1',date:'',target:500,saved:0},{name:'Holiday 2',date:'',target:1000,saved:0}],
+  trips:[],
+  shifts:[],examDate:'TBC',uniNotes:'',
+  yt:{subs:0,views:0,hours:0,channelName:'My Channel'},
+  dev:{members:0,status:'In development',name:'Side Project'},
+  devTodos:[],
+  habits:[{label:'Workout',done:false},{label:'Drink water',done:false},{label:'Good sleep',done:false}],
+  fitnessGoals:[],fitnessNotes:'',
+  goals:[],
+  secTodos:{finance:[],uni:[],youtube:[],schedule:[],fitness:[],travel:[]},
+  setupTodos:[],genTodos:[],todayFocus:'',journals:{},
+  customSecs:{},chatHistory:[]
+};
+
+let confirmCb=null,renamingId=null,obSelections=[],obColor='#3d8ef0',obColorGlow='rgba(61,142,240,0.15)';
+
+function load(){
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory'];
+  keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
+  if(!st.secTodos)st.secTodos={};
+  ['finance','uni','youtube','schedule','fitness','travel'].forEach(k=>{if(!st.secTodos[k])st.secTodos[k]=[];});
+  if(!st.goals)st.goals=[];
+  if(!st.chatHistory)st.chatHistory=[];
+  if(!st.holidays||st.holidays.length<2)st.holidays=[{name:'Holiday 1',date:'',target:500,saved:0},{name:'Holiday 2',date:'',target:1000,saved:0}];
+}
+function save(){
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory'];
+  keys.forEach(k=>S.set(k,st[k]));
+}
+
+const fmt=n=>'£'+Number(n).toFixed(2);
+const fmtK=n=>n>=1000?(n/1000).toFixed(1)+'k':String(n);
+function satDays(){const d=new Date().getDay();return d===6?7:(6-d)||7;}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModal('modal-confirm');confirmCb=null;};
+function showConfirm(t,b,cb){document.getElementById('mc-t').textContent=t;document.getElementById('mc-b').textContent=b;confirmCb=cb;openModal('modal-confirm');}
+
+function applyColor(hex){
+  const map={'#3d8ef0':'rgba(61,142,240,0.15)','#2ecc8a':'rgba(46,204,138,0.12)','#f05090':'rgba(240,80,144,0.12)','#f0a832':'rgba(240,168,50,0.12)','#a855f7':'rgba(168,85,247,0.12)','#f05050':'rgba(240,80,80,0.12)'};
+  st.accentColor=hex;st.accentGlow=map[hex]||'rgba(61,142,240,0.15)';
+  document.documentElement.style.setProperty('--accent',hex);
+  document.documentElement.style.setProperty('--accent2',hex);
+  document.documentElement.style.setProperty('--accent-glow',st.accentGlow);
+  save();
+}
+
+// ═══ ONBOARDING ═══
+let obStep=1;
+const OB_STEPS=3;
+function updateObProgress(){
+  const prog=document.getElementById('ob-prog');
+  prog.innerHTML=Array.from({length:OB_STEPS},(_,i)=>`<div class="ob-pip ${i+1<obStep?'done':i+1===obStep?'active':''}"></div>`).join('');
+}
+function toggleOb(el,val){
+  el.classList.toggle('selected');
+  const idx=obSelections.indexOf(val);
+  if(idx>-1)obSelections.splice(idx,1);else obSelections.push(val);
+}
+function pickColor(el,color,glow){
+  document.querySelectorAll('.ob-color').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+  obColor=color;obColorGlow=glow;
+  document.documentElement.style.setProperty('--accent',color);
+  document.documentElement.style.setProperty('--accent2',color);
+}
+function obNext(step){
+  if(step===1){
+    const name=document.getElementById('ob-name').value.trim();
+    if(!name){document.getElementById('ob-name').focus();return;}
+    st.userName=name;
+  }
+  if(step===2&&obSelections.length===0){obSelections=['habits'];}
+  document.getElementById('ob-'+step).classList.remove('active');
+  obStep=step+1;
+  document.getElementById('ob-'+obStep).classList.add('active');
+  updateObProgress();
+}
+function obBack(step){
+  document.getElementById('ob-'+step).classList.remove('active');
+  obStep=step-1;
+  document.getElementById('ob-'+obStep).classList.add('active');
+  updateObProgress();
+}
+function obFinish(){
+  st.accentColor=obColor;st.accentGlow=obColorGlow;
+  st.focusAreas=obSelections;
+  // Build sections based on selections
+  const sectionMap={
+    finance:{id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
+    uni:{id:'uni',label:'Uni',icon:'🎓',core:true,visible:true},
+    youtube:{id:'youtube',label:'YouTube',icon:'📺',core:true,visible:true},
+    dev:{id:'dev',label:'Side Project',icon:'🤖',core:true,visible:true},
+    schedule:{id:'schedule',label:'Schedule',icon:'📅',core:true,visible:true},
+    habits:{id:'habits',label:'Habits',icon:'✅',core:true,visible:true},
+    fitness:{id:'fitness',label:'Fitness',icon:'💪',core:true,visible:true},
+    travel:{id:'travel',label:'Travel',icon:'✈️',core:true,visible:true},
+    goals:{id:'goals',label:'Goals',icon:'🎯',core:true,visible:true},
+    todos:{id:'todos',label:'All Todos',icon:'📋',core:true,visible:true},
+    journal:{id:'journal',label:'Journal',icon:'📓',core:true,visible:true}
+  };
+  const always=['schedule','habits','goals','todos','journal'];
+  const areaToSection={youtube:'youtube',uni:'uni',fitness:'fitness',finance:'finance',work:'schedule',dev:'dev',travel:'travel'};
+  const toShow=new Set(always);
+  obSelections.forEach(a=>{if(areaToSection[a])toShow.add(areaToSection[a]);});
+  if(obSelections.includes('finance'))toShow.add('finance');
+  st.sections=Array.from(toShow).map(id=>sectionMap[id]).filter(Boolean);
+  st.onboarded=true;
+  save();
+  const ob=document.getElementById('onboarding');
+  ob.classList.add('out');
+  setTimeout(()=>{
+    ob.style.display='none';
+    const bootEl=document.getElementById('boot');
+    bootEl.style.display='flex';
+    const sl=bootEl.querySelector('.scan-line');
+    if(sl){sl.style.animation='none';sl.offsetHeight;sl.style.animation='';}
+    startBoot();
+  },500);
+}
+
+// ═══ BOOT ═══
+function startBoot(){
+  const bl=document.getElementById('bl');
+  const bh=document.getElementById('bh');
+  const bc=document.getElementById('bc');
+  const bat=document.getElementById('bat');
+  const bbl=document.getElementById('bbl');
+  const bbn=document.getElementById('bbn');
+  bl.style.opacity='0';bl.style.transform='scale(0.92)';
+  bh.style.opacity='0';bc.style.opacity='0';bc.style.transform='translateY(24px)';bbn.style.opacity='0';
+  bbl.innerHTML='';
+  // Double rAF ensures the browser paints the initial hidden state before transitions start
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    setTimeout(()=>{bl.style.opacity='1';bl.style.transform='scale(1)';},300);
+    setTimeout(()=>{bh.style.opacity='1';bh.textContent='Hello, '+st.userName;},1000);
+    setTimeout(()=>{bc.style.opacity='1';bc.style.transform='translateY(0)';},1600);
+    const msg=getBootMsg();
+    setTimeout(()=>typeWrite(bat,msg,0,()=>{
+      const bulls=getBootBullets();
+      bulls.forEach((b,i)=>{
+        const el=document.createElement('div');
+        el.className='boot-bullet';
+        el.innerHTML=`<div class="bullet-dot"></div><span>${b}</span>`;
+        bbl.appendChild(el);
+        setTimeout(()=>{el.style.opacity='1';el.style.transform='translateX(0)';},150+i*150);
+      });
+      setTimeout(()=>{bbn.style.opacity='1';},150+bulls.length*150+200);
+    }),2200);
+  }));
+}
+
+function typeWrite(el,text,i,cb){
+  if(i===0)el.innerHTML='<span class="cursor"></span>';
+  if(i<=text.length){el.innerHTML=text.slice(0,i)+'<span class="cursor"></span>';setTimeout(()=>typeWrite(el,text,i+1,cb),25);}
+  else{el.innerHTML=text;if(cb)setTimeout(cb,200);}
+}
+
+function getBootMsg(){
+  const hr=new Date().getHours();
+  const g=hr<12?'Morning':hr<17?'Afternoon':'Evening';
+  const days=satDays();
+  const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
+  const done=st.habits.filter(h=>h.done).length;
+  const parts=[];
+  if(wealth>0)parts.push(`total wealth ${fmt(wealth)}`);
+  if(st.habits.length>0)parts.push(`${done}/${st.habits.length} habits done`);
+  if(st.focusAreas.includes('youtube'))parts.push(`stream in ${days} days`);
+  const summary=parts.length?parts.join(', ')+'.':'Let\'s get to work.';
+  return `${g}, ${st.userName}. ${summary} What are we working on today?`;
+}
+
+function getBootBullets(){
+  const b=[];
+  if(st.focusAreas.includes('youtube')){const d=satDays();b.push(`Next stream: Saturday in ${d} day${d!==1?'s':''}`);}
+  const pending=[...st.setupTodos,...st.genTodos].filter(t=>!t.done).length;
+  if(pending>0)b.push(`${pending} pending todo${pending!==1?'s':''} to action`);
+  if(st.focusAreas.includes('uni')&&st.examDate==='TBC')b.push('Coding exam date still TBC — check Canvas');
+  if(st.focusAreas.includes('finance')){const needed=Math.max(0,1000-st.yt.subs);if(needed>0&&st.focusAreas.includes('youtube'))b.push(`${needed} subs until YouTube monetisation`);}
+  const activeGoals=st.goals.filter(g=>!g.done).length;
+  if(activeGoals>0)b.push(`${activeGoals} active goal${activeGoals!==1?'s':''} in progress`);
+  return b.slice(0,3);
+}
+
+function enterApp(){
+  const boot=document.getElementById('boot');
+  const app=document.getElementById('app');
+  boot.classList.add('out');
+  app.classList.add('show');
+  applyColor(st.accentColor);
+  setTimeout(()=>{boot.style.display='none';},900);
+  renderHome();
+  if(st.groqKey)loadAISug();
+}
+
+// ═══ NAV ═══
+function goHome(){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-home').classList.add('active');renderHome();}
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const el=document.getElementById('page-'+id)||document.getElementById('page-custom');
+  if(el)el.classList.add('active');
+  const renders={finance:rFinance,uni:rUni,youtube:rYT,dev:rDev,schedule:rSchedule,habits:rHabits,fitness:rFitness,travel:rTravel,goals:rGoals,todos:rMasterTodos,journal:rJournal,ai:rAI,manage:rManage,settings:rSettings};
+  if(renders[id])renders[id]();
+  else rCustom(id);
+}
+
+// ═══ HOME ═══
+function renderHome(){
+  const hr=new Date().getHours();
+  const g=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
+  document.getElementById('hg').textContent=g+', '+st.userName+' 👋';
+  document.getElementById('hd').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const done=st.habits.filter(h=>h.done).length;
+  const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
+  const ovStats=[];
+  if(st.focusAreas.includes('finance')||wealth>0)ovStats.push(`<div class="ov-stat"><div class="ov-val">${fmt(wealth)}</div><div class="ov-lbl">Total wealth</div></div>`);
+  ovStats.push(`<div class="ov-stat"><div class="ov-val">${done}/${st.habits.length}</div><div class="ov-lbl">Habits done</div></div>`);
+  if(st.focusAreas.includes('youtube'))ovStats.push(`<div class="ov-stat"><div class="ov-val">${satDays()}d</div><div class="ov-lbl">Until stream</div></div>`);
+  else ovStats.push(`<div class="ov-stat"><div class="ov-val">${st.goals.filter(g=>!g.done).length}</div><div class="ov-lbl">Active goals</div></div>`);
+  document.getElementById('home-ov').innerHTML=`<div class="overview-card"><div class="ov-label">Today at a glance</div><div class="ov-stats">${ovStats.join('')}</div></div>`;
+  const sums={finance:`${fmt(wealth)} total`,uni:`Exam: ${st.examDate}`,youtube:`${st.yt.subs} subs · ${fmtK(st.yt.views)} views`,dev:`${st.dev.members} members · ${st.dev.status}`,schedule:`Stream in ${satDays()} days`,habits:`${done}/${st.habits.length} done today`,fitness:`${st.fitnessGoals.filter(g=>!g.done).length} goals active`,travel:`${st.trips.length} trip${st.trips.length!==1?'s':''} planned`,goals:`${st.goals.filter(g=>!g.done).length} active goals`,todos:`${[...st.setupTodos,...st.genTodos].filter(t=>!t.done).length} pending`,journal:`${Object.keys(st.journals).length} entries`};
+  const vis=st.sections.filter(s=>s.visible);
+  document.getElementById('home-grid').innerHTML=vis.map((s,i,arr)=>{const w=arr.length%2!==0&&i===arr.length-1;return`<div class="home-card${w?' wide':''}" onclick="goPage('${s.id}')"><span class="hc-icon">${s.icon||'📁'}</span><div class="hc-label">${s.label}</div><div class="hc-value">${sums[s.id]||'Tap to open'}</div><div class="hc-arrow">›</div></div>`;}).join('');
+}
+
+// ═══ AI ═══
+async function callGroq(messages){
+  if(!st.groqKey)return null;
+  const hr=new Date().getHours();
+  const sys=`You are SychBoard AI, a personal assistant for ${st.userName}. Data: wealth ${fmt(st.balances.bank+st.balances.savings+st.balances.trading)}, YouTube ${st.yt.subs} subs / ${fmtK(st.yt.views)} views / ${st.yt.hours} watch hours (needs 1000 subs + 4000h for monetisation), uni exam date ${st.examDate}, ${st.habits.filter(h=>h.done).length}/${st.habits.length} habits done, ${st.goals.filter(g=>!g.done).length} active goals, ${satDays()} days until Saturday stream. Focus areas: ${st.focusAreas.join(', ')||'general'}. Be concise, friendly, specific. Under 120 words unless asked for more.`;
+  try{
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+st.groqKey},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:sys},...messages],max_tokens:400,temperature:0.7})});
+    const d=await res.json();
+    return d.choices?.[0]?.message?.content||null;
+  }catch(e){return null;}
+}
+async function loadAISug(){
+  const el=document.getElementById('ai-sug');if(!el)return;
+  if(!st.groqKey){el.textContent='Add your Groq API key in Settings to enable AI.';return;}
+  el.textContent='Thinking...';
+  const r=await callGroq([{role:'user',content:'Give me one specific actionable suggestion for today based on my data. 2 sentences max.'}]);
+  if(el)el.textContent=r||'Could not load suggestion. Check your API key in Settings.';
+}
+async function homeAI(){
+  const inp=document.getElementById('ai-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
+  const el=document.getElementById('ai-sug');if(!el)return;
+  if(!st.groqKey){el.textContent='Add your Groq API key in Settings.';return;}
+  el.textContent='Thinking...';
+  const r=await callGroq([{role:'user',content:msg}]);
+  if(el)el.textContent=r||'Could not get a response.';
+}
+function rAI(){
+  const msgs=document.getElementById('chat-msgs');if(!msgs)return;
+  if(!st.chatHistory.length){msgs.innerHTML=`<div class="cm ai">Hey ${st.userName}! I know your finances, YouTube goals, uni situation, and more. Ask me anything or tell me what to add to your todos.</div>`;}
+  else msgs.innerHTML=st.chatHistory.map(m=>`<div class="cm ${m.role==='user'?'user':'ai'}">${m.content}</div>`).join('');
+  msgs.scrollTop=msgs.scrollHeight;
+}
+async function sendChat(){
+  const inp=document.getElementById('chat-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
+  if(!st.groqKey){addMsg('ai','Please add your Groq API key in Settings.');return;}
+  addMsg('user',msg);
+  const t=document.createElement('div');t.className='typing';t.innerHTML='<span></span><span></span><span></span>';
+  document.getElementById('chat-msgs').appendChild(t);document.getElementById('chat-msgs').scrollTop=99999;
+  const hist=st.chatHistory.slice(-8).map(m=>({role:m.role,content:m.content}));
+  const r=await callGroq([...hist,{role:'user',content:msg}]);
+  t.remove();
+  addMsg('ai',r||'Sorry, could not get a response.');
+  if(r)processActions(msg,r);
+}
+function addMsg(role,content){
+  st.chatHistory.push({role,content});save();
+  const msgs=document.getElementById('chat-msgs');if(!msgs)return;
+  const el=document.createElement('div');el.className='cm '+role;el.textContent=content;
+  msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+}
+function processActions(msg,reply){
+  const l=msg.toLowerCase();
+  if(l.includes('add')&&(l.includes('todo')||l.includes('task'))){const m=msg.match(/add (?:a |)(?:todo|task)[: ]?(.+)/i);if(m){st.genTodos.push({text:m[1].trim(),done:false});save();}}
+  if(l.includes('add')&&l.includes('habit')){const m=msg.match(/add (?:a |)habit[: ]?(.+)/i);if(m){st.habits.push({label:m[1].trim(),done:false});save();}}
+}
+
+// ═══ SETTINGS ═══
+function rSettings(){
+  const ki=document.getElementById('groq-in');if(ki)ki.value=st.groqKey||'';
+  const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
+  const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
+  const gs=document.getElementById('groq-st');if(gs){gs.textContent=st.groqKey?'✓ API key saved':'No key saved yet';gs.style.color=st.groqKey?'var(--green)':'var(--text3)';}
+}
+function saveGroq(){st.groqKey=document.getElementById('groq-in').value.trim();save();rSettings();}
+
+// ═══ FINANCE ═══
+function rFinance(){
+  const t=st.balances.bank+st.balances.savings+st.balances.trading;
+  document.getElementById('fm1').innerHTML=`<div class="metric"><div class="ml">Total</div><div class="mv">${fmt(t)}</div></div><div class="metric"><div class="ml">Bank</div><div class="mv blue">${fmt(st.balances.bank)}</div></div>`;
+  document.getElementById('fm2').innerHTML=`<div class="metric"><div class="ml">Savings</div><div class="mv green">${fmt(st.balances.savings)}</div></div><div class="metric"><div class="ml">Trading 212</div><div class="mv green">${fmt(st.balances.trading)}</div></div>`;
+  [0,1].forEach(i=>{
+    const h=st.holidays[i];if(!h)return;
+    const pct=h.target>0?Math.min(100,Math.round(h.saved/h.target*100)):0;
+    const ti=document.getElementById(i===0?'h1-title':'h2-title');
+    const di=document.getElementById(i===0?'h1-detail':'h2-detail');
+    if(ti)ti.textContent=h.name+(h.date?' — '+h.date:'');
+    if(di)di.innerHTML=`<div class="row"><span class="rl">Target</span><span class="rv">${fmt(h.target)}</span></div><div class="row"><span class="rl">Saved</span><span class="rv" style="color:var(--green)">${fmt(h.saved)}</span></div><div class="row"><span class="rl">Still needed</span><span class="rv">${fmt(Math.max(0,h.target-h.saved))}</span></div><div class="pb"><div class="pf g" style="width:${pct}%"></div></div><div style="font-size:10px;color:var(--text2);text-align:right;margin-bottom:10px">${pct}% saved</div><div class="ir2" style="gap:8px;margin-bottom:8px"><div><div class="fl">Name</div><input type="text" id="hn-${i}" value="${h.name}" placeholder="Holiday name"></div><div><div class="fl">Date</div><input type="text" id="hd-${i}" value="${h.date}" placeholder="August"></div></div><div class="ir2" style="gap:8px"><div><div class="fl">Target (£)</div><input type="number" id="ht-${i}" value="${h.target}" placeholder="£"></div><div><div class="fl">Saved (£)</div><input type="number" id="hs-${i}" value="${h.saved}" placeholder="£"></div></div><button class="btn btn-p btn-sm btn-full" style="margin-top:8px" onclick="updHol(${i})">Update</button>`;
+  });
+  rShifts();rSecTodos('finance');
+}
+function updHol(i){
+  st.holidays[i]={name:document.getElementById('hn-'+i).value||st.holidays[i].name,date:document.getElementById('hd-'+i).value||'',target:parseFloat(document.getElementById('ht-'+i).value)||0,saved:parseFloat(document.getElementById('hs-'+i).value)||0};
+  save();rFinance();
+}
+function updateBal(){const k=document.getElementById('bal-sel').value;const v=parseFloat(document.getElementById('bal-amt').value)||0;st.balances[k]=v;document.getElementById('bal-amt').value='';save();rFinance();}
+function rShifts(){
+  const el=document.getElementById('shift-list');if(!el)return;
+  if(!st.shifts.length){el.innerHTML='<div class="empty">No shifts logged yet</div>';document.getElementById('shift-totals').innerHTML='';return;}
+  el.innerHTML=st.shifts.map((s,i)=>`<div class="shi"><span style="font-weight:600">${s.date}</span><span style="color:var(--text2)">${s.hours}h @ ${fmt(s.wage)}/hr</span><span style="color:var(--green);font-weight:700">${fmt(s.hours*s.wage)}</span><button class="btn btn-sm" style="color:var(--red);border-color:var(--red);background:var(--red-light)" onclick="rmShift(${i})">✕</button></div>`).join('');
+  const all=st.shifts.reduce((a,s)=>a+s.hours*s.wage,0);
+  const now=new Date();const ms=new Date(now.getFullYear(),now.getMonth(),1);
+  const mon=st.shifts.filter(s=>new Date(s.date+' '+now.getFullYear())>=ms).reduce((a,s)=>a+s.hours*s.wage,0);
+  document.getElementById('shift-totals').innerHTML=`<div class="metric"><div class="ml">All time</div><div class="mv">${fmt(all)}</div></div><div class="metric"><div class="ml">This month</div><div class="mv green">${fmt(mon)}</div></div>`;
+}
+function addShift(){const d=document.getElementById('sh-d').value.trim();const h=parseFloat(document.getElementById('sh-h').value)||0;const w=parseFloat(document.getElementById('sh-w').value)||st.defaultWage;if(!d||!h)return;st.shifts.unshift({date:d,hours:h,wage:w});document.getElementById('sh-d').value='';document.getElementById('sh-h').value='';save();rShifts();}
+function rmShift(i){st.shifts.splice(i,1);save();rShifts();}
+
+// ═══ UNI ═══
+function rUni(){
+  const ed=document.getElementById('exam-date-disp');if(ed)ed.textContent=st.examDate;
+  const un=document.getElementById('uni-notes');if(un)un.value=st.uniNotes||'';
+  rSecTodos('uni');
+}
+function updateExamDate(){st.examDate=document.getElementById('exam-in').value||'TBC';save();rUni();}
+
+// ═══ YOUTUBE ═══
+function rYT(){
+  const ct=document.getElementById('yt-chan-title');if(ct)ct.textContent=st.yt.channelName||'Channel stats';
+  document.getElementById('yt-m1').innerHTML=`<div class="metric"><div class="ml">Subscribers</div><div class="mv">${st.yt.subs}</div></div><div class="metric"><div class="ml">Total views</div><div class="mv blue">${fmtK(st.yt.views)}</div></div>`;
+  document.getElementById('yt-m2').innerHTML=`<div class="metric"><div class="ml">Watch hours</div><div class="mv">${fmtK(st.yt.hours)}</div></div><div class="metric"><div class="ml">Next stream</div><div class="mv green">${satDays()}d</div></div>`;
+  const sp=Math.min(100,Math.round(st.yt.subs/1000*100));
+  const hp=Math.min(100,Math.round(st.yt.hours/4000*100));
+  document.getElementById('yt-goals').innerHTML=`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Subscribers</span><span style="font-weight:700">${st.yt.subs}/1,000</span></div><div class="pb"><div class="pf" style="width:${sp}%"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Watch hours</span><span style="font-weight:700">${st.yt.hours}/4,000</span></div><div class="pb"><div class="pf" style="width:${hp}%"></div></div></div>`;
+  document.getElementById('yt-checklist').innerHTML=['Record Saturday stream','Clip moments for Shorts','Edit long form highlight','Upload long form','Post Shorts (aim 3)','Check analytics'].map((item,i)=>`<div class="todo-item"><input type="checkbox" onchange="this.closest('.todo-item').classList.toggle('checked',this.checked)"><span>${item}</span></div>`).join('');
+  rSecTodos('youtube');
+}
+function updateYT(){const s=parseInt(document.getElementById('yt-si').value);const v=parseInt(document.getElementById('yt-vi').value);const h=parseInt(document.getElementById('yt-hi').value);if(s)st.yt.subs=s;if(v)st.yt.views=v;if(h)st.yt.hours=h;save();rYT();}
+
+// ═══ DEV ═══
+function rDev(){
+  const dt=document.getElementById('dev-title');if(dt)dt.textContent=st.dev.name||'Side Project';
+  document.getElementById('dev-m').innerHTML=`<div class="metric"><div class="ml">Members / Users</div><div class="mv">${st.dev.members}</div></div><div class="metric"><div class="ml">Status</div><div class="mv sm">${st.dev.status}</div></div>`;
+  const si=document.getElementById('dev-si');if(si)si.value=st.dev.status;
+  document.getElementById('dev-todos').innerHTML=st.devTodos.length?st.devTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.devTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.devTodos.splice(${i},1);save();rDev()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
+}
+function updateDev(){const m=parseInt(document.getElementById('dev-m1i').value);if(m)st.dev.members=m;st.dev.status=document.getElementById('dev-si').value;save();rDev();}
+function addDevTodo(){const v=document.getElementById('dev-ti').value.trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
+
+// ═══ SCHEDULE ═══
+function rSchedule(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const evs=[[{t:'Uni 9-5',c:'eu'}],[{t:'Uni 11:30',c:'eu'}],[{t:'Uni 9-12',c:'eu'},{t:'Work 6pm',c:'ew'}],[{t:'Work 6pm',c:'ew'}],[{t:'Work 6pm',c:'ew'}],[{t:'Stream!',c:'es'}],[{t:'Free',c:''}]];
+  const di=new Date().getDay();const ai=di===0?6:di-1;
+  document.getElementById('sched-grid').innerHTML=days.map((d,i)=>`<div class="dc ${i===ai?'today':''}"><div class="dn">${d}</div>${evs[i].map(e=>`<div class="de ${e.c}">${e.t}</div>`).join('')}</div>`).join('');
+  const tf=document.getElementById('today-focus');if(tf)tf.value=st.todayFocus||'';
+  rSecTodos('schedule');
+}
+
+// ═══ HABITS ═══
+function rHabits(){
+  const hd=document.getElementById('habit-date');if(hd)hd.textContent=new Date().toDateString();
+  document.getElementById('habit-grid').innerHTML=st.habits.map((h,i)=>`<div class="hi ${h.done?'done':''}" onclick="togHabit(${i})"><div class="hck">${h.done?'✓':''}</div><span style="flex:1">${h.label}</span><span onclick="event.stopPropagation();rmHabit(${i})" style="font-size:13px;color:var(--text3);cursor:pointer;padding:0 2px">✕</span></div>`).join('');
+  const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;
+  document.getElementById('habit-stats').innerHTML=`<div class="metric"><div class="ml">Done today</div><div class="mv">${done}/${st.habits.length}</div></div><div class="metric"><div class="ml">Completion</div><div class="mv green">${Math.round(done/total*100)}%</div></div>`;
+}
+function togHabit(i){st.habits[i].done=!st.habits[i].done;save();rHabits();}
+function rmHabit(i){st.habits.splice(i,1);save();rHabits();}
+function addHabit(){const v=document.getElementById('new-habit-in').value.trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
+function resetHabits(){st.habits.forEach(h=>h.done=false);save();rHabits();}
+
+// ═══ FITNESS ═══
+function rFitness(){
+  const fn=document.getElementById('fitness-notes');if(fn)fn.value=st.fitnessNotes||'';
+  const fl=document.getElementById('fitness-goals-list');
+  if(fl)fl.innerHTML=st.fitnessGoals.length?st.fitnessGoals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.fitnessGoals[${i}].done=!st.fitnessGoals[${i}].done;save();rFitness()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><button class="del-btn" onclick="st.fitnessGoals.splice(${i},1);save();rFitness()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
+  rSecTodos('fitness');
+}
+function addFitnessGoal(){const v=document.getElementById('fg-in').value.trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
+
+// ═══ TRAVEL ═══
+function rTravel(){
+  const tl=document.getElementById('trips-list');
+  if(tl)tl.innerHTML=st.trips.length?st.trips.map((t,i)=>`<div class="gi"><div class="gc" onclick="st.trips[${i}].done=!st.trips[${i}].done;save();rTravel()">${t.done?'✓':''}</div><div style="flex:1"><div class="gt">${t.dest}</div><div style="font-size:11px;color:var(--text2)">${t.date} · Budget: ${fmt(t.budget)}</div></div><button class="del-btn" onclick="st.trips.splice(${i},1);save();rTravel()">✕</button></div>`).join(''):'<div class="empty">No trips planned yet</div>';
+  rSecTodos('travel');
+}
+function addTrip(){const d=document.getElementById('trip-dest').value.trim();const dt=document.getElementById('trip-date').value.trim();const b=parseFloat(document.getElementById('trip-budget').value)||0;if(!d)return;st.trips.push({dest:d,date:dt,budget:b,done:false});document.getElementById('trip-dest').value='';document.getElementById('trip-date').value='';document.getElementById('trip-budget').value='';save();rTravel();}
+
+// ═══ GOALS ═══
+function rGoals(){
+  const active=st.goals.filter(g=>!g.done).length;
+  const gc=document.getElementById('goals-count');if(gc)gc.textContent=active+' active';
+  const cats={'life':'chip-g','fitness':'chip-g','finance':'chip-b','youtube':'chip-a','uni':'chip-b','dev':'chip-a'};
+  document.getElementById('goals-list').innerHTML=st.goals.length?st.goals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.goals[${i}].done=!st.goals[${i}].done;save();rGoals()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><span class="chip ${cats[g.category]||'chip-b'}">${g.category}</span><button class="del-btn" onclick="st.goals.splice(${i},1);save();rGoals()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
+}
+function addGoal(){const t=document.getElementById('goal-in').value.trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
+
+// ═══ TODOS ═══
+function rSecTodos(sec){
+  if(!st.secTodos[sec])st.secTodos[sec]=[];
+  const el=document.getElementById('todos-'+sec);if(!el)return;
+  el.innerHTML=st.secTodos[sec].length?st.secTodos[sec].map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.secTodos['${sec}'][${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.secTodos['${sec}'].splice(${i},1);save();rSecTodos('${sec}')">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
+}
+function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:inp.value.trim(),done:false});inp.value='';save();rSecTodos(sec);}
+function rMasterTodos(){
+  const secs=['finance','uni','youtube','schedule','fitness','travel'];
+  const labs={finance:'Finance',uni:'Uni',youtube:'YouTube',schedule:'Schedule',fitness:'Fitness',travel:'Travel'};
+  let html='';
+  if(st.setupTodos.length)html+=`<div class="card"><div class="card-title">Setup</div>${st.setupTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.setupTodos[${i}].done=this.checked;save()"><span>${t.text}</span></div>`).join('')}</div>`;
+  secs.forEach(s=>{const todos=st.secTodos[s]||[];if(!todos.length)return;const p=todos.filter(t=>!t.done).length;html+=`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">${labs[s]}</div><span class="chip chip-b">${p} pending</span></div>${todos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.secTodos['${s}'][${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.secTodos['${s}'].splice(${i},1);save();rMasterTodos()">✕</button></div>`).join('')}</div>`;});
+  html+=`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">General</div></div>${st.genTodos.length?st.genTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.genTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.genTodos.splice(${i},1);save();rMasterTodos()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>'}<div class="ta-row"><input type="text" id="gen-ti" placeholder="Add general todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addGenTodo()">Add</button></div></div>`;
+  document.getElementById('master-todos').innerHTML=html||'<div class="card"><div class="empty">No todos yet</div></div>';
+}
+function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:inp.value.trim(),done:false});inp.value='';save();rMasterTodos();}
+
+// ═══ JOURNAL ═══
+function rJournal(){
+  const today=new Date().toDateString();
+  const jt=document.getElementById('journal-title');if(jt)jt.textContent='Today — '+today;
+  const jx=document.getElementById('journal-text');if(jx)jx.value=st.journals[today]||'';
+  const past=Object.entries(st.journals).filter(([k])=>k!==today).reverse().slice(0,7);
+  const pj=document.getElementById('past-journals');
+  if(pj)pj.innerHTML=past.length?past.map(([date,text])=>`<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px">${date}</div><div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5">${text.slice(0,300)}${text.length>300?'...':''}</div></div>`).join(''):'<div class="empty">No past entries yet</div>';
+}
+function saveJournal(){const today=new Date().toDateString();st.journals[today]=document.getElementById('journal-text').value;save();rJournal();}
+
+// ═══ MANAGE ═══
+function rManage(){
+  document.getElementById('manage-list').innerHTML=st.sections.map(s=>{
+    const delBtn=!s.core?`<button class="btn btn-sm btn-d" onclick="promptDelSec('${s.id}')">Delete</button>`:'';
+    return`<div class="mi"><div><div style="font-size:14px;font-weight:600;color:var(--text)">${s.icon||'📁'} ${s.label}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${s.core?'Core':'Custom'} · ${s.visible?'Visible':'Hidden'}</div></div><div class="mi-actions"><button class="btn btn-sm" onclick="openRename('${s.id}')">Rename</button><button class="btn btn-sm" onclick="togVis('${s.id}')">${s.visible?'Hide':'Show'}</button>${delBtn}</div></div>`;
+  }).join('');
+}
+function togVis(id){const s=st.sections.find(x=>x.id===id);if(s)s.visible=!s.visible;save();rManage();}
+function openRename(id){renamingId=id;const s=st.sections.find(x=>x.id===id);document.getElementById('rename-val').value=s?s.label:'';openModal('modal-rename');}
+function doRename(){if(!renamingId)return;const name=document.getElementById('rename-val').value.trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
+function doAddSec(){const name=document.getElementById('add-name').value.trim();const type=document.getElementById('add-type').value;const icon=document.getElementById('add-icon').value||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
+function promptDelSec(id){showConfirm('Delete section?','Permanently deletes this section and all its data.',()=>{st.sections=st.sections.filter(x=>x.id!==id);delete st.customSecs[id];save();rManage();goHome();});}
+
+// ═══ CUSTOM ═══
+function rCustom(id){
+  const cs=st.customSecs[id];const sec=st.sections.find(s=>s.id===id);if(!cs||!sec)return;
+  const pg=document.getElementById('page-custom');
+  const hdr=`<div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">${sec.label}</div><div style="width:34px"></div></div><div class="sc">`;
+  if(cs.type==='notes'||cs.type==='freeform'){
+    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Notes</div><textarea id="cs-n-${id}" style="min-height:160px">${cs.notes||''}</textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.customSecs['${id}'].notes=document.getElementById('cs-n-${id}').value;save()">Save</button></div>`+(cs.type==='notes'?`<div class="card"><div class="card-title">Todos</div><div id="cs-tl-${id}">${(cs.todos||[]).map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.customSecs['${id}'].todos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.customSecs['${id}'].todos.splice(${i},1);save();rCustom('${id}')">✕</button></div>`).join('')||'<div class="empty">No todos yet</div>'}</div><div class="ta-row"><input type="text" id="cs-ti-${id}" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addCsTodo('${id}')">Add</button></div></div>`:'')+`</div>`;
+  } else {
+    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Trackers</div><div class="mr2">${(cs.trackers||[]).map((t,i)=>`<div class="metric" style="position:relative"><div class="ml">${t.label}</div><div class="mv">${t.value}${t.suffix||''}</div><button onclick="st.customSecs['${id}'].trackers.splice(${i},1);save();rCustom('${id}')" style="position:absolute;top:5px;right:5px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px">✕</button></div>`).join('')||'<div style="font-size:12px;color:var(--text2)">No trackers yet</div>'}</div><div class="ir3" style="gap:8px;margin-top:10px"><div><div class="fl">Label</div><input type="text" id="cs-tl-${id}" placeholder="Weight"></div><div><div class="fl">Value</div><input type="text" id="cs-tv-${id}" placeholder="75"></div><div><div class="fl">Suffix</div><input type="text" id="cs-ts-${id}" placeholder="kg"></div></div><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="addCsTracker('${id}')">Add tracker</button></div></div>`;
+  }
+}
+function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:inp.value.trim(),done:false});inp.value='';save();rCustom(id);}
+function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:l.value.trim(),value:v?v.value:'',suffix:s?s.value:''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
+
+// ═══ INIT ═══
+load();
+applyColor(st.accentColor||'#3d8ef0');
+if(!st.onboarded){
+  document.getElementById('boot').style.display='none';
+  document.getElementById('onboarding').classList.add('show');
+  updateObProgress();
+} else {
+  startBoot();
+}
+</script>
+</body>
+</html>
