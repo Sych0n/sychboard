@@ -12,7 +12,10 @@
     "appId": "com.sychboard.app",
     "productName": "SychBoard",
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "assets/icon.ico"
     },
     "nsis": {
@@ -31,5 +34,8 @@
   "devDependencies": {
     "electron": "^31.0.0",
     "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
   }
 }
