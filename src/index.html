@@ -19,27 +19,42 @@
 html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;user-select:none}
 
 /* BOOT */
-#boot{position:fixed;inset:0;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+#boot{position:fixed;inset:0;background:#000;z-index:1000;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #boot.out{animation:bootOut 0.8s ease forwards}
 @keyframes bootOut{to{opacity:0;visibility:hidden}}
-.scan-line{position:absolute;top:-2px;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:scan 1.4s ease-in-out forwards}
-@keyframes scan{0%{top:-2px;opacity:0}15%{opacity:1}85%{opacity:1}100%{top:100%;opacity:0}}
-.boot-center{text-align:center;margin-bottom:40px}
+.jarvis-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.ring{position:absolute;border-radius:50%;border:1px solid var(--accent);opacity:0;animation:ringPulse 3s ease-out infinite}
+.ring:nth-child(1){width:120px;height:120px;animation-delay:0s}
+.ring:nth-child(2){width:240px;height:240px;animation-delay:0.5s}
+.ring:nth-child(3){width:380px;height:380px;animation-delay:1s}
+.ring:nth-child(4){width:540px;height:540px;animation-delay:1.5s}
+.ring:nth-child(5){width:720px;height:720px;animation-delay:2s}
+@keyframes ringPulse{0%{opacity:0;transform:scale(0.88)}20%{opacity:0.55}65%{opacity:0.15}100%{opacity:0;transform:scale(1.06)}}
+.boot-content{position:relative;z-index:2;text-align:center;width:100%;max-width:520px;padding:0 24px}
 .boot-logo{font-size:44px;font-weight:800;letter-spacing:-1px;opacity:0;transform:scale(0.92);transition:opacity 0.7s,transform 0.7s}
 .boot-logo span{color:var(--accent);text-shadow:0 0 30px rgba(61,142,240,0.5)}
-.boot-hello{font-size:17px;color:var(--text2);opacity:0;transition:opacity 0.5s;margin-top:8px;letter-spacing:0.04em}
-.boot-chat{width:100%;max-width:500px;padding:0 24px;opacity:0;transform:translateY(24px);transition:opacity 0.5s,transform 0.5s}
-.boot-ai-box{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:14px;position:relative;overflow:hidden}
+.boot-hello{font-size:18px;color:var(--text2);opacity:0;transition:opacity 0.5s;margin-top:8px;letter-spacing:0.06em;font-weight:300}
+.boot-chat{width:100%;opacity:0;transform:translateY(24px);transition:opacity 0.5s,transform 0.5s;margin-top:28px}
+.boot-ai-box{background:rgba(17,17,24,0.85);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:18px 20px;margin-bottom:14px;position:relative;overflow:hidden;backdrop-filter:blur(12px)}
 .boot-ai-box::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
-.boot-ai-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.boot-ai-label{font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .ai-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:aidot 2s infinite}
 @keyframes aidot{0%,100%{opacity:1}50%{opacity:0.3}}
 .boot-ai-text{font-size:14px;color:var(--text);line-height:1.6;min-height:20px}
 .cursor{display:inline-block;width:2px;height:15px;background:var(--accent);margin-left:1px;animation:cur 1s infinite;vertical-align:text-bottom}
 @keyframes cur{0%,100%{opacity:1}50%{opacity:0}}
-.boot-bullets{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
-.boot-bullet{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);opacity:0;transform:translateX(-8px);transition:opacity 0.4s,transform 0.4s}
-.bullet-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0;box-shadow:0 0 6px var(--accent)}
+.boot-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.boot-tile{background:rgba(17,17,24,0.7);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);text-align:center;transition:all 0.2s;opacity:0;transform:scale(0.9)}
+.boot-tile:hover{border-color:var(--accent);color:var(--accent);background:rgba(61,142,240,0.08);transform:scale(1.04)}
+.boot-tile.visible{opacity:1;transform:scale(1)}
+.boot-tile-icon{font-size:20px;margin-bottom:4px}
+.boot-input-row{display:flex;gap:8px;margin-bottom:12px;opacity:0;transition:opacity 0.4s}
+.boot-input-row.visible{opacity:1}
+.boot-input-row input{flex:1;background:rgba(26,26,36,0.8);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border 0.15s}
+.boot-input-row input:focus{border-color:var(--accent)}
+.boot-input-row input::placeholder{color:var(--text3)}
+.boot-input-row button{width:40px;height:40px;border-radius:var(--radius-sm);background:var(--accent);border:none;color:#fff;cursor:pointer;font-size:17px;flex-shrink:0;transition:background 0.15s}
+.boot-input-row button:hover{background:var(--accent2)}
 .boot-btn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;opacity:0;transition:opacity 0.4s,background 0.2s}
 .boot-btn:hover{background:var(--accent2)}
 
@@ -218,18 +233,25 @@ select option{background:var(--surface2)}
 
 <!-- BOOT -->
 <div id="boot">
-  <div class="scan-line"></div>
-  <div class="boot-center">
+  <div class="jarvis-bg">
+    <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    <div class="ring"></div><div class="ring"></div>
+  </div>
+  <div class="boot-content">
     <div class="boot-logo" id="bl">Sych<span>Board</span></div>
     <div class="boot-hello" id="bh"></div>
-  </div>
-  <div class="boot-chat" id="bc">
-    <div class="boot-ai-box">
-      <div class="boot-ai-label"><span class="ai-dot"></span>AI Assistant</div>
-      <div class="boot-ai-text" id="bat"></div>
+    <div class="boot-chat" id="bc">
+      <div class="boot-ai-box">
+        <div class="boot-ai-label"><span class="ai-dot"></span>SYSTEM</div>
+        <div class="boot-ai-text" id="bat"></div>
+      </div>
+      <div class="boot-tiles" id="bst"></div>
+      <div class="boot-input-row" id="bir">
+        <input type="text" id="boot-ai-in" placeholder="Or ask me anything..." onkeydown="if(event.key==='Enter')bootAsk()">
+        <button onclick="bootAsk()">→</button>
+      </div>
+      <button class="boot-btn" id="bbn" onclick="enterApp()">Launch Dashboard →</button>
     </div>
-    <div class="boot-bullets" id="bbl"></div>
-    <button class="boot-btn" id="bbn" onclick="enterApp()">Enter SychBoard →</button>
   </div>
 </div>
 
@@ -317,10 +339,11 @@ select option{background:var(--surface2)}
     </div>
   </div>
   <div class="home-header"><div class="home-greeting" id="hg"></div><div class="home-date" id="hd"></div></div>
+  <div id="home-sched"></div>
   <div id="home-ov"></div>
   <div class="ai-card">
     <div class="ai-label"><span class="ai-dot"></span>AI Assistant</div>
-    <div class="ai-suggestion" id="ai-sug">Add your Groq API key in Settings to enable AI suggestions.</div>
+    <div class="ai-suggestion" id="ai-sug">Loading AI suggestion...</div>
     <div class="ai-input-row"><input type="text" class="ai-input" id="ai-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')homeAI()"><button class="send-btn" onclick="homeAI()">→</button></div>
   </div>
   <div class="sec-label">YOUR SECTIONS</div>
@@ -480,7 +503,6 @@ select option{background:var(--surface2)}
 <div id="page-settings" class="page">
   <div class="ptb"><button class="back-btn" onclick="goHome()">‹ Back</button><div class="ptb-title">Settings</div><div style="width:34px"></div></div>
   <div class="sc"><div class="card">
-    <div class="si"><div class="sl">Groq API key</div><div class="ss">Free at console.groq.com — powers all AI features. Stays on your device only.</div><input type="password" id="groq-in" placeholder="gsk_..."><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroq()">Save key</button><div id="groq-st" style="font-size:11px;margin-top:5px"></div></div>
     <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=document.getElementById('name-in').value||st.userName;save()">Save</button></div>
     <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.defaultWage=parseFloat(document.getElementById('wage-in').value)||st.defaultWage;save()">Save</button></div>
     <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
@@ -620,8 +642,6 @@ function activateDanielMode(){
     ob.style.display='none';
     const bootEl=document.getElementById('boot');
     bootEl.style.display='flex';
-    const sl=bootEl.querySelector('.scan-line');
-    if(sl){sl.style.animation='none';sl.offsetHeight;sl.style.animation='';}
     startBoot();
   },300);
 }
@@ -675,8 +695,6 @@ function obFinish(){
     ob.style.display='none';
     const bootEl=document.getElementById('boot');
     bootEl.style.display='flex';
-    const sl=bootEl.querySelector('.scan-line');
-    if(sl){sl.style.animation='none';sl.offsetHeight;sl.style.animation='';}
     startBoot();
   },500);
 }
@@ -687,30 +705,43 @@ function startBoot(){
   const bh=document.getElementById('bh');
   const bc=document.getElementById('bc');
   const bat=document.getElementById('bat');
-  const bbl=document.getElementById('bbl');
+  const bst=document.getElementById('bst');
+  const bir=document.getElementById('bir');
   const bbn=document.getElementById('bbn');
   bl.style.opacity='0';bl.style.transform='scale(0.92)';
   bh.style.opacity='0';bc.style.opacity='0';bc.style.transform='translateY(24px)';bbn.style.opacity='0';
-  bbl.innerHTML='';
-  // Double rAF ensures the browser paints the initial hidden state before transitions start
+  if(bst)bst.innerHTML='';if(bir)bir.classList.remove('visible');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    setTimeout(()=>{bl.style.opacity='1';bl.style.transform='scale(1)';},300);
-    setTimeout(()=>{bh.style.opacity='1';bh.textContent='Hello, '+st.userName;},1000);
-    setTimeout(()=>{bc.style.opacity='1';bc.style.transform='translateY(0)';},1600);
-    const msg=getBootMsg();
-    setTimeout(()=>typeWrite(bat,msg,0,()=>{
-      const bulls=getBootBullets();
-      bulls.forEach((b,i)=>{
-        const el=document.createElement('div');
-        el.className='boot-bullet';
-        el.innerHTML=`<div class="bullet-dot"></div><span>${b}</span>`;
-        bbl.appendChild(el);
-        setTimeout(()=>{el.style.opacity='1';el.style.transform='translateX(0)';},150+i*150);
-      });
-      setTimeout(()=>{bbn.style.opacity='1';},150+bulls.length*150+200);
+    setTimeout(()=>{bl.style.opacity='1';bl.style.transform='scale(1)';},400);
+    setTimeout(()=>{bh.style.opacity='1';bh.textContent='Welcome, '+st.userName;},1100);
+    setTimeout(()=>{bc.style.opacity='1';bc.style.transform='translateY(0)';},1700);
+    setTimeout(()=>typeWrite(bat,'What would you like to see today?',0,()=>{
+      if(bst){
+        const tiles=st.sections.filter(s=>s.visible).slice(0,6);
+        bst.innerHTML=tiles.map(s=>`<div class="boot-tile" onclick="enterAppAndGo('${s.id}')"><div class="boot-tile-icon">${s.icon||'📁'}</div><div>${s.label}</div></div>`).join('');
+        const tileEls=bst.querySelectorAll('.boot-tile');
+        tileEls.forEach((t,i)=>setTimeout(()=>t.classList.add('visible'),80+i*80));
+        setTimeout(()=>{
+          if(bir)bir.classList.add('visible');
+          setTimeout(()=>{bbn.style.opacity='1';},300);
+        },80+tileEls.length*80+150);
+      } else {
+        setTimeout(()=>{bbn.style.opacity='1';},400);
+      }
     }),2200);
   }));
 }
+async function bootAsk(){
+  const inp=document.getElementById('boot-ai-in');if(!inp)return;
+  const msg=inp.value.trim();if(!msg)return;inp.value='';
+  const bat=document.getElementById('bat');
+  const key=window.GROQ_API_KEY||st.groqKey;
+  if(!key){if(bat)typeWrite(bat,'No AI key found — launching dashboard...',0,null);setTimeout(enterApp,2000);return;}
+  if(bat)bat.textContent='';if(bat)typeWrite(bat,'Thinking...',0,null);
+  const r=await callGroq([{role:'user',content:msg}]);
+  if(bat)typeWrite(bat,r||'Let me take you to your dashboard.',0,null);
+}
+function enterAppAndGo(sectionId){enterApp();setTimeout(()=>goPage(sectionId),150);}
 
 function typeWrite(el,text,i,cb){
   if(i===0)el.innerHTML='<span class="cursor"></span>';
@@ -752,7 +783,7 @@ function enterApp(){
   applyColor(st.accentColor);
   setTimeout(()=>{boot.style.display='none';},900);
   renderHome();
-  if(st.groqKey)loadAISug();
+  if(window.GROQ_API_KEY||st.groqKey)loadAISug();
 }
 
 // ═══ NAV ═══
@@ -774,6 +805,10 @@ function renderHome(){
   document.getElementById('hd').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const done=st.habits.filter(h=>h.done).length;
   const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const evs=[[{t:'Uni 9-5',c:'eu'}],[{t:'Uni 11:30',c:'eu'}],[{t:'Uni 9-12',c:'eu'},{t:'Work 6pm',c:'ew'}],[{t:'Work 6pm',c:'ew'}],[{t:'Work 6pm',c:'ew'}],[{t:'Stream!',c:'es'}],[{t:'Free',c:''}]];
+  const di=new Date().getDay();const ai=di===0?6:di-1;
+  document.getElementById('home-sched').innerHTML=`<div class="overview-card" style="cursor:pointer;margin-bottom:0" onclick="goPage('schedule')"><div class="ov-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span>📅 This week</span><span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">Open schedule →</span></div><div class="sg" style="gap:4px">${days.map((d,i)=>`<div class="dc ${i===ai?'today':''}" style="min-height:82px"><div class="dn">${d}</div>${evs[i].map(e=>`<div class="de ${e.c}">${e.t}</div>`).join('')}</div>`).join('')}</div></div>`;
   const ovStats=[];
   if(st.focusAreas.includes('finance')||wealth>0)ovStats.push(`<div class="ov-stat"><div class="ov-val">${fmt(wealth)}</div><div class="ov-lbl">Total wealth</div></div>`);
   ovStats.push(`<div class="ov-stat"><div class="ov-val">${done}/${st.habits.length}</div><div class="ov-lbl">Habits done</div></div>`);
@@ -787,26 +822,26 @@ function renderHome(){
 
 // ═══ AI ═══
 async function callGroq(messages){
-  if(!st.groqKey)return null;
-  const hr=new Date().getHours();
+  const key=window.GROQ_API_KEY||st.groqKey;
+  if(!key)return null;
   const sys=`You are SychBoard AI, a personal assistant for ${st.userName}. Data: wealth ${fmt(st.balances.bank+st.balances.savings+st.balances.trading)}, YouTube ${st.yt.subs} subs / ${fmtK(st.yt.views)} views / ${st.yt.hours} watch hours (needs 1000 subs + 4000h for monetisation), uni exam date ${st.examDate}, ${st.habits.filter(h=>h.done).length}/${st.habits.length} habits done, ${st.goals.filter(g=>!g.done).length} active goals, ${satDays()} days until Saturday stream. Focus areas: ${st.focusAreas.join(', ')||'general'}. Be concise, friendly, specific. Under 120 words unless asked for more.`;
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+st.groqKey},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:sys},...messages],max_tokens:400,temperature:0.7})});
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:sys},...messages],max_tokens:400,temperature:0.7})});
     const d=await res.json();
     return d.choices?.[0]?.message?.content||null;
   }catch(e){return null;}
 }
 async function loadAISug(){
   const el=document.getElementById('ai-sug');if(!el)return;
-  if(!st.groqKey){el.textContent='Add your Groq API key in Settings to enable AI.';return;}
+  if(!(window.GROQ_API_KEY||st.groqKey)){el.textContent='AI features require a Groq API key in .env.';return;}
   el.textContent='Thinking...';
   const r=await callGroq([{role:'user',content:'Give me one specific actionable suggestion for today based on my data. 2 sentences max.'}]);
-  if(el)el.textContent=r||'Could not load suggestion. Check your API key in Settings.';
+  if(el)el.textContent=r||'Could not load suggestion.';
 }
 async function homeAI(){
   const inp=document.getElementById('ai-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
   const el=document.getElementById('ai-sug');if(!el)return;
-  if(!st.groqKey){el.textContent='Add your Groq API key in Settings.';return;}
+  if(!(window.GROQ_API_KEY||st.groqKey)){el.textContent='AI features require a Groq API key.';return;}
   el.textContent='Thinking...';
   const r=await callGroq([{role:'user',content:msg}]);
   if(el)el.textContent=r||'Could not get a response.';
@@ -819,7 +854,7 @@ function rAI(){
 }
 async function sendChat(){
   const inp=document.getElementById('chat-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
-  if(!st.groqKey){addMsg('ai','Please add your Groq API key in Settings.');return;}
+  if(!(window.GROQ_API_KEY||st.groqKey)){addMsg('ai','AI features require a Groq API key in .env.');return;}
   addMsg('user',msg);
   const t=document.createElement('div');t.className='typing';t.innerHTML='<span></span><span></span><span></span>';
   document.getElementById('chat-msgs').appendChild(t);document.getElementById('chat-msgs').scrollTop=99999;
@@ -843,12 +878,9 @@ function processActions(msg,reply){
 
 // ═══ SETTINGS ═══
 function rSettings(){
-  const ki=document.getElementById('groq-in');if(ki)ki.value=st.groqKey||'';
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
-  const gs=document.getElementById('groq-st');if(gs){gs.textContent=st.groqKey?'✓ API key saved':'No key saved yet';gs.style.color=st.groqKey?'var(--green)':'var(--text3)';}
 }
-function saveGroq(){st.groqKey=document.getElementById('groq-in').value.trim();save();rSettings();}
 
 // ═══ FINANCE ═══
 function rFinance(){
