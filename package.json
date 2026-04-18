@@ -1,16 +1,22 @@
 {
   "name": "sychboard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "SychBoard - Your personal AI dashboard",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win --x64",
-    "build-portable": "electron-builder --win portable --x64"
+    "build-portable": "electron-builder --win portable --x64",
+    "publish": "electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.sychboard.app",
     "productName": "SychBoard",
+    "publish": {
+      "provider": "github",
+      "owner": "Sych0n",
+      "repo": "sychboard"
+    },
     "win": {
       "target": [
         "nsis",
@@ -30,7 +36,7 @@
       "preload.js",
       "src/**/*",
       "assets/**/*",
-      "node_modules/dotenv/**/*"
+      "node_modules/**/*"
     ]
   },
   "devDependencies": {
@@ -38,6 +44,7 @@
     "electron-builder": "^24.0.0"
   },
   "dependencies": {
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "electron-updater": "^6.8.3"
   }
 }

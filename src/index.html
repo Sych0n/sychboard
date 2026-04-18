@@ -231,6 +231,12 @@ select option{background:var(--surface2)}
 .ir3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .ta-row{display:flex;gap:8px;margin-top:8px}
 .empty{font-size:12px;color:var(--text3);padding:10px 0;text-align:center}
+#update-banner{position:fixed;bottom:20px;right:20px;z-index:500;background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:12px 16px;display:none;align-items:center;gap:12px;box-shadow:0 4px 24px rgba(0,0,0,0.4);max-width:320px;animation:slideIn 0.3s ease}
+#update-banner.show{display:flex}
+@keyframes slideIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.ub-text{flex:1;font-size:12px;color:var(--text2);line-height:1.4}
+.ub-text strong{display:block;font-size:13px;color:var(--text);margin-bottom:2px}
+.ub-actions{display:flex;gap:6px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1097,6 +1103,24 @@ if(!st.onboarded){
 } else {
   startBoot();
 }
+
+// ═══ AUTO-UPDATE ═══
+if(window.electronAPI?.onUpdateAvailable){
+  window.electronAPI.onUpdateAvailable(version=>{
+    const b=document.getElementById('update-banner');
+    if(!b)return;
+    b.innerHTML=`<div class="ub-text"><strong>Update available</strong>v${version} is downloading...</div><div class="ub-actions"><button class="btn btn-sm" onclick="document.getElementById('update-banner').classList.remove('show')">✕</button></div>`;
+    b.classList.add('show');
+  });
+  window.electronAPI.onUpdateDownloaded(()=>{
+    const b=document.getElementById('update-banner');
+    if(!b)return;
+    b.innerHTML=`<div class="ub-text"><strong>Update ready</strong>Restart to install the latest version.</div><div class="ub-actions"><button class="btn btn-p btn-sm" onclick="window.electronAPI.restartAndInstall()">Restart</button><button class="btn btn-sm" onclick="document.getElementById('update-banner').classList.remove('show')">Later</button></div>`;
+    b.classList.add('show');
+  });
+}
 </script>
+
+<div id="update-banner"></div>
 </body>
 </html>

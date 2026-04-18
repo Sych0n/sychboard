@@ -2,8 +2,10 @@ require('dotenv').config()
 const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const path = require('path')
 
+let mainWindow
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
     minWidth: 400,
@@ -23,18 +25,45 @@ function createWindow() {
     show: false
   })
 
-  win.loadFile(path.join(__dirname, 'src', 'index.html'))
+  mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
 
-  win.once('ready-to-show', () => {
-    win.show()
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+    checkForUpdates()
   })
 
-  // Open external links in browser not in app
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
 }
+
+function checkForUpdates() {
+  if (!app.isPackaged) return
+  try {
+    const { autoUpdater } = require('electron-updater')
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.logger = null
+
+    autoUpdater.on('update-available', (info) => {
+      mainWindow?.webContents.send('update-available', info.version)
+    })
+
+    autoUpdater.on('update-downloaded', () => {
+      mainWindow?.webContents.send('update-downloaded')
+    })
+
+    autoUpdater.checkForUpdates().catch(() => {})
+  } catch (e) {}
+}
+
+ipcMain.on('restart-and-install', () => {
+  try {
+    const { autoUpdater } = require('electron-updater')
+    autoUpdater.quitAndInstall()
+  } catch (e) {}
+})
 
 app.whenReady().then(() => {
   createWindow()
