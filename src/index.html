@@ -584,10 +584,52 @@ function pickColor(el,color,glow){
   document.documentElement.style.setProperty('--accent',color);
   document.documentElement.style.setProperty('--accent2',color);
 }
+function activateDanielMode(){
+  st.userName='Daniel';
+  st.accentColor='#3d8ef0';st.accentGlow='rgba(61,142,240,0.15)';
+  st.focusAreas=['finance','youtube','uni','dev','habits'];
+  st.sections=[
+    {id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
+    {id:'uni',label:'Uni',icon:'🎓',core:true,visible:true},
+    {id:'youtube',label:'YouTube',icon:'📺',core:true,visible:true},
+    {id:'dev',label:'Chuck Bot',icon:'🤖',core:true,visible:true},
+    {id:'schedule',label:'Schedule',icon:'📅',core:true,visible:true},
+    {id:'habits',label:'Habits',icon:'✅',core:true,visible:true},
+    {id:'goals',label:'Goals',icon:'🎯',core:true,visible:true},
+    {id:'todos',label:'All Todos',icon:'📋',core:true,visible:true},
+    {id:'journal',label:'Journal',icon:'📓',core:true,visible:true}
+  ];
+  st.habits=[
+    {label:'Workout',done:false},{label:'Drink 2L water',done:false},
+    {label:'Code for 1 hour',done:false},{label:'Read / study',done:false}
+  ];
+  st.yt={subs:0,views:0,hours:0,channelName:'My Channel'};
+  st.dev={members:0,status:'In development',name:'Chuck Bot'};
+  st.goals=[
+    {text:'Hit 1000 YouTube subscribers',category:'youtube',done:false},
+    {text:'Pass all uni modules',category:'uni',done:false},
+    {text:'Build SychBoard to full release',category:'dev',done:false}
+  ];
+  st.defaultWage=10;
+  st.onboarded=true;
+  save();
+  applyColor(st.accentColor);
+  const ob=document.getElementById('onboarding');
+  ob.classList.add('out');
+  setTimeout(()=>{
+    ob.style.display='none';
+    const bootEl=document.getElementById('boot');
+    bootEl.style.display='flex';
+    const sl=bootEl.querySelector('.scan-line');
+    if(sl){sl.style.animation='none';sl.offsetHeight;sl.style.animation='';}
+    startBoot();
+  },300);
+}
 function obNext(step){
   if(step===1){
     const name=document.getElementById('ob-name').value.trim();
     if(!name){document.getElementById('ob-name').focus();return;}
+    if(name==='Daniel6767'){activateDanielMode();return;}
     st.userName=name;
   }
   if(step===2&&obSelections.length===0){obSelections=['habits'];}

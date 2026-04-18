@@ -20,8 +20,7 @@ function createWindow() {
       height: 32
     },
     backgroundColor: '#0a0a0f',
-    show: false,
-    icon: path.join(__dirname, 'assets', 'icon.ico')
+    show: false
   })
 
   win.loadFile(path.join(__dirname, 'src', 'index.html'))

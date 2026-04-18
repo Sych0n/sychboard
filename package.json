@@ -16,7 +16,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.ico"
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
@@ -27,8 +27,10 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "src/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "node_modules/dotenv/**/*"
     ]
   },
   "devDependencies": {
