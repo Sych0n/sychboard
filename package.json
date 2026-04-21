@@ -1,6 +1,6 @@
 {
   "name": "sychboard",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "SychBoard - Your personal AI dashboard",
   "main": "main.js",
   "scripts": {
