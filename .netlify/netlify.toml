@@ -1,0 +1,50 @@
+headersOrigin = "config"
+plugins = []
+redirects = []
+
+[build]
+edge_functions = "C:\\Users\\danie\\Downloads\\sychboard-electron\\sychboard-electron\\netlify\\edge-functions"
+publish = "C:\\Users\\danie\\Downloads\\sychboard-electron\\sychboard-electron\\src"
+publishOrigin = "config"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[edge_functions]]
+path = "/"
+function = "inject-env"
+
+[[edge_functions]]
+path = "/index.html"
+function = "inject-env"
+
+[functions]
+
+[functions."*"]
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+X-Frame-Options = "DENY"
+X-XSS-Protection = "1; mode=block"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "notifications=(self)"
+
+[[headers]]
+for = "/manifest.json"
+
+[headers.values]
+Content-Type = "application/manifest+json"
