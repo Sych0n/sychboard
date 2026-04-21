@@ -47,17 +47,19 @@ let st={
   notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''},
   apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' },
   habitHistory: {},
-  subscriptions: []
+  subscriptions: [],
+  pomodoro: { focus: 25, break: 5 }
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#8b5cf6',obColorGlow='rgba(139,92,246,0.15)',bootStarAnim=null,bootWaveAnim=null,bootChatHistory=[];
 
 function load(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
   if(!st.subscriptions)st.subscriptions=[];
+  if(!st.pomodoro)st.pomodoro={focus:25,break:5};
   if(!st.secTodos)st.secTodos={};
   ['finance','uni','youtube','schedule','fitness','travel'].forEach(k=>{if(!st.secTodos[k])st.secTodos[k]=[];});
   if(!st.goals)st.goals=[];
@@ -80,7 +82,7 @@ function load(){
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -799,6 +801,16 @@ function saveGroqKey(){
   st.apiKeys.groq=v;save();
   toast('Groq API key saved');
 }
+function savePomSettings(){
+  st.pomodoro.focus = parseInt(document.getElementById('pom-f-in').value)||25;
+  st.pomodoro.break = parseInt(document.getElementById('pom-b-in').value)||5;
+  save();
+  if(!pomR){ 
+    pomL = pomM==='focus'?st.pomodoro.focus*60:st.pomodoro.break*60;
+    updatePom();
+  }
+  toast('Timer settings saved');
+}
 function saveDevKeys() {
   st.apiKeys.t212 = document.getElementById('dev-t212').value.trim();
   st.apiKeys.ytChannelId = document.getElementById('dev-yt-chan').value.trim();
@@ -1263,6 +1275,18 @@ function rJournal(){
   const pj=document.getElementById('past-journals');
   if(pj)pj.innerHTML=past.length?past.map(([date,text])=>`<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">${date}</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${parseMD(text)}</div></div>`).join(''):emptyState('📓','No past entries yet','Your reflections will appear here');
 }
+async function generateJournalPrompt(){
+  if(!getGroqKey()){toast('Add your Groq API key in Settings first!');return;}
+  const btn=document.getElementById('journal-prompt-btn');
+  const box=document.getElementById('journal-prompt-box');
+  btn.textContent='Thinking...';btn.disabled=true;
+  const r = await callGroq([{role:'user',content:'Generate a single, deep, thought-provoking journaling prompt for me based on my day today (check my habits, sleep, and tasks). Just return the question itself.'}]);
+  btn.innerHTML='<span class="ai-dot" style="display:inline-block;margin-right:6px"></span>AI Prompt';btn.disabled=false;
+  if(r){
+    const clean = parseActions(parseNav(r).clean).clean;
+    box.textContent = clean; box.style.display = 'block';
+  } else { toast('Failed to get prompt'); }
+}
 function saveJournal(){const today=new Date().toDateString();st.journals[today]=document.getElementById('journal-text').value;save();rJournal();}
 
 // ═══ MANAGE ═══
@@ -1505,7 +1529,7 @@ function testNotif(){
 }
 
 // ═══ POMODORO & FX ═══
-let pomT=null,pomL=25*60,pomR=false,pomM='focus';
+let pomT=null,pomR=false,pomM='focus',pomL=25*60;
 function updatePom(){
   const m=Math.floor(pomL/60).toString().padStart(2,'0');
   const s=(pomL%60).toString().padStart(2,'0');
@@ -1542,7 +1566,7 @@ function togglePom(){
 function togglePomMode(){
   if(pomR)togglePom();
   pomM=pomM==='focus'?'break':'focus';
-  pomL=pomM==='focus'?25*60:5*60;
+  pomL=pomM==='focus'?st.pomodoro.focus*60:st.pomodoro.break*60;
   document.getElementById('pom-mode-btn').textContent=pomM==='focus'?'Break':'Focus';
   document.getElementById('pom-status').textContent=pomM==='focus'?'Ready to focus':'Ready to rest';
   updatePom();
@@ -1554,6 +1578,7 @@ function fireConfetti(){
 
 // ═══ INIT ═══
 load();
+pomL = st.pomodoro.focus * 60; // Initialize timer based on saved settings
 applyColor(st.accentColor||'#8b5cf6');
 if(!st.onboarded){
   document.getElementById('boot').style.display='none';
