@@ -794,6 +794,8 @@ function rSettings(){
       `<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" onclick="saveNotifSettings()">Save notification settings</button><button class="btn btn-sm" onclick="testNotif()">Send test</button></div>`;
     document.getElementById('set-inj').innerHTML = `<div class="si"><div class="sl">Groq API key</div><div class="ss">Powers all AI features. Get a free key at console.groq.com</div><input type="password" id="groq-key-in" placeholder="gsk_..." value="${st.apiKeys.groq||''}" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroqKey()">Save</button></div>${devPanel}`;
   }
+  const pf=document.getElementById('pom-f-in');if(pf)pf.value=st.pomodoro.focus||25;
+  const pb=document.getElementById('pom-b-in');if(pb)pb.value=st.pomodoro.break||5;
 }
 function saveGroqKey(){
   const v=document.getElementById('groq-key-in').value.trim();

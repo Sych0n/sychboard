@@ -400,6 +400,13 @@
     <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
       <div id="accent-swatches" style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
     </div>
+    <div class="si"><div class="sl">Pomodoro Timer</div><div class="ss">Set your focus and break durations (in minutes).</div>
+      <div class="ir2" style="gap:8px;margin-top:8px">
+        <div><div class="fl">Focus (mins)</div><input type="number" id="pom-f-in"></div>
+        <div><div class="fl">Break (mins)</div><input type="number" id="pom-b-in"></div>
+      </div>
+      <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="savePomSettings()">Save Timer</button>
+    </div>
     <div id="set-inj"></div>
     <div class="si"><div class="sl">Data Export</div><div class="ss">Download a local backup of all your SychBoard data.</div><button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export Backup (.json)</button></div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
