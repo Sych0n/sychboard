@@ -187,18 +187,7 @@ ipcMain.handle('youtube-oauth-start', async (_, clientId, clientSecret) => {
                 resolve({ error: 'Token error — re-authenticate in YouTube settings' })
                 return
               }
-              if (d.refresh_token) {
-                const envPath = path.join(__dirname, '.env')
-        const envPath = app.isPackaged ? path.join(app.getPath('userData'), '.env') : path.join(__dirname, '.env')
-                let envTxt = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
-                envTxt = envTxt.includes('YOUTUBE_REFRESH_TOKEN=')
-                  ? envTxt.replace(/YOUTUBE_REFRESH_TOKEN=.*/, `YOUTUBE_REFRESH_TOKEN=${d.refresh_token}`)
-                  : envTxt.trimEnd() + `\nYOUTUBE_REFRESH_TOKEN=${d.refresh_token}\n`
-                fs.writeFileSync(envPath, envTxt.trim() + '\n')
-                process.env.YOUTUBE_REFRESH_TOKEN = d.refresh_token
-                console.log('[YT OAuth] Token saved successfully')
-              }
-              resolve({ access_token: d.access_token, expires_in: d.expires_in || 3600, error: d.access_token ? null : 'No token' })
+              resolve({ access_token: d.access_token, refresh_token: d.refresh_token, expires_in: d.expires_in || 3600, error: d.error || null })
             } catch(e) {
               console.error('[YT OAuth] Token parse error:', e.message)
               resolve({ error: 'Token parse error' })
