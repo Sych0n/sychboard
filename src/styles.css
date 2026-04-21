@@ -122,7 +122,7 @@ html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system
 .sb-bottom{padding:10px 10px 14px;border-top:1px solid rgba(255,255,255,0.05);flex-shrink:0;display:flex;gap:6px;-webkit-app-region:no-drag}
 .sb-bottom .btn{flex:1;font-size:11px;padding:7px 4px;text-align:center;justify-content:center}
 .main-area{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;background:var(--bg)}
-.main-topbar{height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid rgba(255,255,255,0.045);flex-shrink:0;-webkit-app-region:drag;background:rgba(7,7,14,0.97);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+.main-topbar{height:var(--topbar-h);display:flex;align-items:center;justify-content:space-between;padding:0 140px 0 22px;border-bottom:1px solid rgba(255,255,255,0.045);flex-shrink:0;-webkit-app-region:drag;background:rgba(7,7,14,0.97);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
 .main-title{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:0.02em;pointer-events:none;-webkit-app-region:no-drag}
 .main-actions{display:flex;gap:6px;-webkit-app-region:no-drag}
 .main-scroll{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.08) transparent;scroll-behavior:smooth}
@@ -179,6 +179,12 @@ html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system
 
 /* ── CARDS ── */
 .card{background:linear-gradient(155deg,rgba(255,255,255,0.028) 0%,rgba(255,255,255,0.006) 100%);border:1px solid rgba(255,255,255,0.068);border-radius:var(--radius);padding:24px;margin-bottom:16px;position:relative;backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);transition:border-color var(--t),box-shadow var(--t)}
+.sc > .card { animation: fadeUp 0.35s cubic-bezier(0.4,0,0.2,1) both; }
+.sc > .card:nth-child(1) { animation-delay: 0.02s; }
+.sc > .card:nth-child(2) { animation-delay: 0.07s; }
+.sc > .card:nth-child(3) { animation-delay: 0.12s; }
+.sc > .card:nth-child(4) { animation-delay: 0.17s; }
+.sc > .card:nth-child(5) { animation-delay: 0.22s; }
 .card::before{content:'';position:absolute;top:0;left:16%;right:16%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.10),transparent);pointer-events:none}
 .card:hover{border-color:rgba(255,255,255,0.10);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .card-title{font-size:10px;font-weight:700;color:var(--text3);margin-bottom:18px;letter-spacing:0.10em;text-transform:uppercase}
@@ -234,6 +240,12 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
 .hck{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.12);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;transition:all var(--t)}
 .hi.done .hck{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 0 10px rgba(16,185,129,0.4);animation:habCheck 0.28s ease}
 @keyframes habCheck{0%{transform:scale(0.6)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+/* ── HEATMAP ── */
+.heatmap-wrap{display:flex;gap:4px;flex-wrap:wrap;margin-top:10px}
+.hm-box{width:14px;height:14px;border-radius:3px;background:rgba(255,255,255,0.04);transition:all var(--t)}
+.hm-box:hover{transform:scale(1.2);box-shadow:0 0 8px rgba(0,0,0,0.5);z-index:2}
+.hm-box.l1{background:rgba(16,185,129,0.3)} .hm-box.l2{background:rgba(16,185,129,0.6)} .hm-box.l3{background:var(--green);box-shadow:0 0 6px rgba(16,185,129,0.4)}
 
 /* ── TODOS ── */
 .todo-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:13px;transition:opacity var(--t)}

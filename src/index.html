@@ -177,6 +177,19 @@
       <div class="live-stat-sub" id="ls-sleep-sub"></div>
     </div>
   </div>
+  <div class="card" style="margin:14px 0 0;padding:18px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.12em;display:flex;align-items:center;gap:7px"><span class="ai-dot" id="pom-dot" style="background:var(--text3);animation:none"></span> Focus Timer</div>
+      <div id="pom-status" style="font-size:10px;color:var(--text2);font-weight:600">Ready</div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div id="pom-time" style="font-size:32px;font-weight:700;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1">25:00</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" id="pom-mode-btn" onclick="togglePomMode()">Break</button>
+        <button class="btn btn-p btn-sm" id="pom-start-btn" style="min-width:60px" onclick="togglePom()">Start</button>
+      </div>
+    </div>
+  </div>
   <div class="ai-card">
     <div class="ai-label"><span class="ai-dot"></span>AI Assistant</div>
     <div class="ai-suggestion" id="ai-sug">Loading AI suggestion...</div>
@@ -213,6 +226,12 @@
       <div class="ir2" style="gap:8px;margin-bottom:10px"><div><div class="fl">Wage £/hr</div><input type="number" id="sh-w" placeholder="10.00" step="0.01"></div><div style="display:flex;align-items:flex-end"><button class="btn btn-p btn-full" onclick="addShift()">Add shift</button></div></div>
       <div id="shift-list"></div><div class="mr2" style="margin-top:8px" id="shift-totals"></div>
     </div>
+    <div class="card">
+      <div class="card-title">Subscriptions & Bills</div>
+      <div id="subs-list"></div>
+      <div class="ir3" style="gap:8px;margin-top:10px"><div><div class="fl">Name</div><input type="text" id="sub-name" placeholder="Netflix"></div><div><div class="fl">Amount (£)</div><input type="number" id="sub-amt" placeholder="10.99" step="0.01"></div><div><div class="fl">Day (1-31)</div><input type="number" id="sub-day" placeholder="15" min="1" max="31"></div></div>
+      <button class="btn btn-p btn-sm btn-full" style="margin-top:8px" onclick="addSub()">Add Bill</button>
+    </div>
     <div class="card"><div class="card-title">Finance todos</div><div id="todos-finance"></div><div class="ta-row"><input type="text" id="ti-finance" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('finance')">Add</button></div></div>
   </div>
 </div>
@@ -226,7 +245,13 @@
       <div class="row"><span class="rl">Last assignment</span><span class="rv">End of May</span></div>
       <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="exam-in" placeholder="Update exam date..." style="flex:1"><button class="btn btn-p btn-sm" onclick="updateExamDate()">Save</button></div>
     </div>
-    <div class="card"><div class="card-title">Notes</div><textarea id="uni-notes" placeholder="Topics, reminders..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.uniNotes=document.getElementById('uni-notes').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Notes</div>
+      <div id="uni-notes-display" style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;cursor:pointer" onclick="this.style.display='none';document.getElementById('uni-notes-edit').style.display='block';document.getElementById('uni-notes').focus()"></div>
+      <div id="uni-notes-edit" style="display:none">
+        <textarea id="uni-notes" placeholder="Topics, reminders..."></textarea>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveUniNotes()">Save</button>
+      </div>
+    </div>
     <div class="card"><div class="card-title">Uni todos</div><div id="todos-uni"></div><div class="ta-row"><input type="text" id="ti-uni" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('uni')">Add</button></div></div>
   </div>
 </div>
@@ -252,6 +277,13 @@
       <div class="mr2" id="dev-m"></div>
       <div class="ir2" style="gap:8px;margin-top:8px"><input type="number" id="dev-m1i" placeholder="Stat 1"><input type="text" id="dev-s1i" placeholder="Status"><select id="dev-si"><option>In development</option><option>Awaiting verification</option><option>Live</option><option>Growing</option><option>Monetised</option></select></div>
       <button class="btn btn-p btn-sm btn-full" style="margin-top:8px" onclick="updateDev()">Update</button>
+    </div>
+    <div class="card"><div class="card-title">Notes</div>
+      <div id="dev-notes-display" style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;cursor:pointer" onclick="this.style.display='none';document.getElementById('dev-notes-edit').style.display='block';document.getElementById('dev-notes').focus()"></div>
+      <div id="dev-notes-edit" style="display:none">
+        <textarea id="dev-notes" placeholder="Architecture, ideas, snippets..."></textarea>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveDevNotes()">Save</button>
+      </div>
     </div>
     <div class="card"><div class="card-title">Project todos</div><div id="dev-todos"></div><div class="ta-row"><input type="text" id="dev-ti" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addDevTodo()">Add</button></div></div>
   </div>
@@ -282,6 +314,7 @@
       <div class="ta-row"><input type="text" id="new-habit-in" placeholder="Add habit..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addHabit()">Add</button></div>
     </div>
     <div class="card"><div class="card-title">Summary</div><div class="mr2" id="habit-stats"></div></div>
+    <div class="card"><div class="card-title">Last 30 Days</div><div class="heatmap-wrap" id="habit-heatmap"></div></div>
   </div>
 </div>
 
@@ -363,6 +396,7 @@
       <div id="accent-swatches" style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
     </div>
     <div id="set-inj"></div>
+    <div class="si"><div class="sl">Data Export</div><div class="ss">Download a local backup of all your SychBoard data.</div><button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export Backup (.json)</button></div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
     <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>
