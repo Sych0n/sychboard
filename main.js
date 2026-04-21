@@ -1,9 +1,7 @@
- require('dotenv').config()
 const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const path = require('path')
 const https = require('https')
 const http = require('http')
-const fs = require('fs')
 
 let mainWindow
 
@@ -94,12 +92,11 @@ function checkForUpdates() {
   }
 }
 
-ipcMain.handle('t212-fetch', (_, endpoint) => {
+ipcMain.handle('t212-fetch', (_, endpoint, apiKey) => {
   console.log('[T212] Fetch disabled temporarily per configuration.')
   return { error: 'Trading 212 integration is currently disabled.' }
   /*
-  const apiKey = process.env.TRADING212_API_KEY
-  if (!apiKey) return { error: 'TRADING212_API_KEY not set in .env' }
+  if (!apiKey) return { error: 'Trading 212 API Key not set in Settings' }
   return new Promise(resolve => {
     const options = {
       hostname: 'live.trading212.com',
@@ -128,9 +125,8 @@ ipcMain.handle('t212-fetch', (_, endpoint) => {
   */
 })
 
-ipcMain.handle('youtube-fetch', (_, ytPath) => {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) return { error: 'YOUTUBE_API_KEY not set in .env' }
+ipcMain.handle('youtube-fetch', (_, ytPath, apiKey) => {
+  if (!apiKey) return { error: 'YouTube API Key not set in Settings' }
   return new Promise(resolve => {
     const sep = ytPath.includes('?') ? '&' : '?'
     const fullPath = `/youtube/v3${ytPath}${sep}key=${encodeURIComponent(apiKey)}`
@@ -148,10 +144,8 @@ ipcMain.handle('youtube-fetch', (_, ytPath) => {
   })
 })
 
-ipcMain.handle('youtube-oauth-start', async () => {
-  const clientId = process.env.YOUTUBE_CLIENT_ID
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET
-  if (!clientId || !clientSecret) return { error: 'Set YOUTUBE_CLIENT_ID and YOUTUBE_CLIENT_SECRET in .env' }
+ipcMain.handle('youtube-oauth-start', async (_, clientId, clientSecret) => {
+  if (!clientId || !clientSecret) return { error: 'Set YouTube Client ID and Secret in Settings' }
   return new Promise((resolve) => {
     const server = http.createServer()
     const giveUp = setTimeout(() => { server.close(); resolve({ error: 'Auth timed out (2 min)' }) }, 120000)
@@ -195,6 +189,7 @@ ipcMain.handle('youtube-oauth-start', async () => {
               }
               if (d.refresh_token) {
                 const envPath = path.join(__dirname, '.env')
+        const envPath = app.isPackaged ? path.join(app.getPath('userData'), '.env') : path.join(__dirname, '.env')
                 let envTxt = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
                 envTxt = envTxt.includes('YOUTUBE_REFRESH_TOKEN=')
                   ? envTxt.replace(/YOUTUBE_REFRESH_TOKEN=.*/, `YOUTUBE_REFRESH_TOKEN=${d.refresh_token}`)
@@ -220,11 +215,8 @@ ipcMain.handle('youtube-oauth-start', async () => {
   })
 })
 
-ipcMain.handle('youtube-oauth-refresh', () => {
-  const clientId = process.env.YOUTUBE_CLIENT_ID
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET
-  const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN
-  if (!clientId || !clientSecret || !refreshToken) return { error: 'OAuth not configured' }
+ipcMain.handle('youtube-oauth-refresh', (_, clientId, clientSecret, refreshToken) => {
+  if (!clientId || !clientSecret || !refreshToken) return { error: 'OAuth not configured in Settings' }
   return new Promise(resolve => {
     const postData = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: 'refresh_token' }).toString()
     const opts = { hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) } }

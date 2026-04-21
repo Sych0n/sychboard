@@ -44,14 +44,16 @@ let st={
   lastHabitReset:'',scheduleEvents:[],
   sleep:{logs:[],targetBed:'23:00',targetHours:8},
   notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'},
-  notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''}
+  notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''},
+  apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' }
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#8b5cf6',obColorGlow='rgba(139,92,246,0.15)',bootStarAnim=null,bootWaveAnim=null,bootChatHistory=[];
 
 function load(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
+  if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.secTodos)st.secTodos={};
   ['finance','uni','youtube','schedule','fitness','travel'].forEach(k=>{if(!st.secTodos[k])st.secTodos[k]=[];});
   if(!st.goals)st.goals=[];
@@ -74,12 +76,12 @@ function load(){
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
 // ── ENV HELPERS ──
-function getGroqKey(){return window.__ENV__?.GROQ_API_KEY||window.GROQ_API_KEY||st.groqKey;}
+function getGroqKey(){return st.apiKeys?.groq||st.groqKey||'';}
 function emptyState(icon,msg,sub=''){return`<div class="empty"><span class="empty-icon">${icon}</span>${msg}${sub?`<span class="empty-sub">${sub}</span>`:''}</div>`;}
 function setMobNav(id){document.querySelectorAll('.mnb-item').forEach(el=>el.classList.remove('active'));const el=document.getElementById('mnb-'+id);if(el)el.classList.add('active');}
 
@@ -414,7 +416,6 @@ function enterApp(){
   setTimeout(()=>{boot.style.display='none';},900);
   renderHome();
   if(getGroqKey())loadAISug();
-  if(window.electronAPI?.youtubeChannelId)fetchYTData();
   setTimeout(initNotifications,2000);
 }
 
@@ -736,17 +737,20 @@ function clearChat(){
 function rSettings(){
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
-  const gki=document.getElementById('groq-key-in');if(gki)gki.value='';
-  const gks=document.getElementById('groq-key-status');
-  if(gks){
-    if(window.__ENV__?.GROQ_API_KEY||window.GROQ_API_KEY)gks.textContent='✓ Key loaded from environment';
-    else if(st.groqKey)gks.textContent='✓ Key saved locally';
-    else gks.textContent='No key set — enter one below to enable AI';
-  }
   const sw=document.getElementById('accent-swatches');
   if(sw){
     const cols=['#8b5cf6','#3d8ef0','#2ecc8a','#f05090','#f0a832','#f05050'];
     sw.innerHTML=cols.map(c=>`<div class="settings-swatch" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:2.5px solid ${c===st.accentColor?'#fff':'transparent'};box-shadow:${c===st.accentColor?'0 0 0 3px rgba(255,255,255,0.18)':'none'};transition:all 0.18s;flex-shrink:0" onclick="applyColor('${c}');document.querySelectorAll('.settings-swatch').forEach(s=>{s.style.borderColor='transparent';s.style.boxShadow='none'});this.style.borderColor='#fff';this.style.boxShadow='0 0 0 3px rgba(255,255,255,0.18)'" title="${c}"></div>`).join('');
+  }
+  let devPanel = '';
+  if(st.userName === 'Daniel' || st.userName === 'Daniel6767') {
+    devPanel = `<div class="si"><div class="sl" style="color:var(--accent)">Developer API Keys (Daniel Only)</div><div class="ss">Securely saved on your machine. Never uploaded to GitHub.</div>
+      <input type="password" id="dev-t212" placeholder="Trading 212 API Key" value="${st.apiKeys.t212||''}" style="margin-top:6px">
+      <input type="text" id="dev-yt-chan" placeholder="YouTube Channel ID" value="${st.apiKeys.ytChannelId||''}" style="margin-top:6px">
+      <input type="password" id="dev-yt-api" placeholder="YouTube API Key" value="${st.apiKeys.ytApi||''}" style="margin-top:6px">
+      <input type="password" id="dev-yt-id" placeholder="YouTube Client ID" value="${st.apiKeys.ytClientId||''}" style="margin-top:6px">
+      <input type="password" id="dev-yt-sec" placeholder="YouTube Client Secret" value="${st.apiKeys.ytClientSecret||''}" style="margin-top:6px">
+      <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveDevKeys()">Save Developer Keys</button></div>`;
   }
   const ns=document.getElementById('notif-settings');
   if(ns){
@@ -757,15 +761,23 @@ function rSettings(){
       row('notif-habit','✅ Habit check-in','habitReminder','habitReminderTime')+
       row('notif-nudge','💡 AI nudge (needs AI key)','aiNudge','aiNudgeTime')+
       `<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" onclick="saveNotifSettings()">Save notification settings</button><button class="btn btn-sm" onclick="testNotif()">Send test</button></div>`;
+    document.getElementById('set-inj').innerHTML = `<div class="si"><div class="sl">Groq API key</div><div class="ss">Powers all AI features. Get a free key at console.groq.com</div><input type="password" id="groq-key-in" placeholder="gsk_..." value="${st.apiKeys.groq||''}" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroqKey()">Save</button></div>${devPanel}`;
   }
 }
 function saveGroqKey(){
   const v=document.getElementById('groq-key-in').value.trim();
   if(!v)return;
-  st.groqKey=v;save();
-  document.getElementById('groq-key-in').value='';
-  document.getElementById('groq-key-status').textContent='Key saved — AI features active';
+  st.apiKeys.groq=v;save();
   toast('Groq API key saved');
+}
+function saveDevKeys() {
+  st.apiKeys.t212 = document.getElementById('dev-t212').value.trim();
+  st.apiKeys.ytChannelId = document.getElementById('dev-yt-chan').value.trim();
+  st.apiKeys.ytApi = document.getElementById('dev-yt-api').value.trim();
+  st.apiKeys.ytClientId = document.getElementById('dev-yt-id').value.trim();
+  st.apiKeys.ytClientSecret = document.getElementById('dev-yt-sec').value.trim();
+  save(); toast('Developer keys saved!');
+  if(st.apiKeys.ytChannelId) fetchYTData();
 }
 
 // ═══ FINANCE ═══
@@ -781,7 +793,7 @@ async function fetchT212Portfolio(){
   if(btn){btn.textContent='…';btn.disabled=true;}
   if(body)body.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Fetching portfolio…</div>';
   let pr,cr;
-  try{[pr,cr]=await Promise.all([window.electronAPI.fetchT212('/equity/portfolio'),window.electronAPI.fetchT212('/equity/account/cash')]);}
+  try{[pr,cr]=await Promise.all([window.electronAPI.fetchT212('/equity/portfolio', st.apiKeys.t212),window.electronAPI.fetchT212('/equity/account/cash', st.apiKeys.t212)]);}
   catch(e){pr={error:e.message};cr={};}
   if(pr.error||cr.error){
     t212Cache={error:pr.error||cr.error,fetchedAt:Date.now()};
@@ -912,7 +924,7 @@ function rYT(){
   document.getElementById('yt-goals').innerHTML=`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Subscribers</span><span style="font-weight:700">${st.yt.subs}/1,000</span></div><div class="pb"><div class="pf" style="width:${sp}%"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Watch hours</span><span style="font-weight:700">${st.yt.hours}/4,000</span></div><div class="pb"><div class="pf" style="width:${hp}%"></div></div></div>`;
   const ab=document.getElementById('yt-analytics-body');
   if(ab){
-    const isConnected=st.yt.analyticsConnected||window.electronAPI?.hasYouTubeOAuth?.();
+    const isConnected=!!st.apiKeys.ytRefreshToken;
     if(st.yt.impressions28d>0){
       ab.innerHTML=`<div class="mr2" style="margin-bottom:8px"><div class="metric"><div class="ml">Impressions (28d)</div><div class="mv">${fmtK(st.yt.impressions28d)}</div></div><div class="metric"><div class="ml">CTR</div><div class="mv green">${(st.yt.ctr28d*100).toFixed(1)}%</div></div></div><div class="mr2"><div class="metric"><div class="ml">Watch time (28d)</div><div class="mv blue">${fmtK(Math.round(st.yt.watchMins28d/60))}h</div></div><div class="metric"><div class="ml">Source</div><div class="mv sm" style="font-size:11px">YouTube Analytics</div></div></div>`;
     }else if(isConnected){
@@ -927,14 +939,14 @@ function rYT(){
   rSecTodos('youtube');
   if(st.yt.apiVideos?.length)renderYTVideos({videos:st.yt.apiVideos});
   if(!ytApiCache||ytApiCache.error||Date.now()-ytApiCache.fetchedAt>5*60*1000)fetchYTData();
-  else if((st.yt.analyticsConnected||window.electronAPI?.hasYouTubeOAuth?.())&&!st.yt.impressions28d)fetchYTAnalytics();
+  else if(!!st.apiKeys.ytRefreshToken&&!st.yt.impressions28d)fetchYTAnalytics();
   else renderYTVideos(ytApiCache);
 }
 function updateYT(){const s=parseInt(document.getElementById('yt-si').value);const v=parseInt(document.getElementById('yt-vi').value);const h=parseInt(document.getElementById('yt-hi').value);if(s)st.yt.subs=s;if(v)st.yt.views=v;if(h)st.yt.hours=h;save();rYT();toast('Stats updated');}
 let ytApiCache=null;
 async function fetchYTData(){
-  const channelId=window.electronAPI?.youtubeChannelId;
-  const ytFetch=window.electronAPI?.fetchYouTube;
+  const channelId=st.apiKeys.ytChannelId;
+  const ytFetch=(path)=>window.electronAPI?.fetchYouTube(path, st.apiKeys.ytApi);
   const vidEl=document.getElementById('yt-videos');
   if(!ytFetch){if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Live stats require the desktop app</div>';return;}
   if(!channelId){if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Set YOUTUBE_CHANNEL_ID in .env</div>';return;}
@@ -997,18 +1009,18 @@ function renderYTVideos(data){
 let ytAccessToken=null,ytTokenExpiry=0;
 async function getYTAccessToken(){
   if(ytAccessToken&&Date.now()<ytTokenExpiry-60000)return ytAccessToken;
-  if(!window.electronAPI?.hasYouTubeOAuth?.())return null;
-  const r=await window.electronAPI.refreshYouTubeToken();
+  if(!st.apiKeys.ytRefreshToken)return null;
+  const r=await window.electronAPI.refreshYouTubeToken(st.apiKeys.ytClientId, st.apiKeys.ytClientSecret, st.apiKeys.ytRefreshToken);
   if(r?.access_token){ytAccessToken=r.access_token;ytTokenExpiry=Date.now()+(r.expires_in||3600)*1000;return ytAccessToken;}
   return null;
 }
 async function startYTOAuth(){
   const btn=document.getElementById('yt-oauth-btn');
   if(btn){btn.textContent='Opening browser…';btn.disabled=true;}
-  const r=await window.electronAPI?.startYouTubeOAuth?.();
+  const r=await window.electronAPI?.startYouTubeOAuth?.(st.apiKeys.ytClientId, st.apiKeys.ytClientSecret);
   if(r?.error){toast('Auth failed: '+r.error);if(btn){btn.textContent='Connect Analytics';btn.disabled=false;}return;}
   ytAccessToken=r.access_token;ytTokenExpiry=Date.now()+(r.expires_in||3600)*1000;
-  st.yt.analyticsConnected=true;save();
+  st.apiKeys.ytRefreshToken=r.refresh_token;st.yt.analyticsConnected=true;save();
   toast('Analytics connected!');
   rYT();fetchYTAnalytics();
 }
@@ -1016,7 +1028,7 @@ async function fetchYTAnalytics(){
   const token=await getYTAccessToken();
   const el=document.getElementById('yt-analytics-body');
   if(!token){
-    const wasConnected=st.yt.analyticsConnected||window.electronAPI?.hasYouTubeOAuth?.();
+    const wasConnected=!!st.apiKeys.ytRefreshToken;
     if(el){
       if(wasConnected){
         el.innerHTML=`<div style="text-align:center;padding:8px 0"><div style="font-size:12px;color:var(--text2);margin-bottom:8px">Could not refresh token — re-authenticate to continue</div><button class="btn btn-p btn-sm" id="yt-oauth-btn" onclick="startYTOAuth()">Re-authenticate</button></div>`;

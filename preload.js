@@ -2,18 +2,14 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
-  version: process.env.npm_package_version || '1.0.9',
+  version: process.env.npm_package_version || '1.0.2',
   onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (_, version) => cb(version)),
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
   onUpdaterDebug: (cb) => ipcRenderer.on('updater-debug', (_, msg) => cb(msg)),
   restartAndInstall: () => ipcRenderer.send('restart-and-install'),
-  fetchT212: (endpoint) => ipcRenderer.invoke('t212-fetch', endpoint),
-  fetchYouTube: (ytPath) => ipcRenderer.invoke('youtube-fetch', ytPath),
-  youtubeChannelId: process.env.YOUTUBE_CHANNEL_ID || '',
-  startYouTubeOAuth: () => ipcRenderer.invoke('youtube-oauth-start'),
-  refreshYouTubeToken: () => ipcRenderer.invoke('youtube-oauth-refresh'),
-  fetchYouTubeAnalytics: (ytPath, token) => ipcRenderer.invoke('youtube-analytics-fetch', ytPath, token),
-  hasYouTubeOAuth: () => Boolean(process.env.YOUTUBE_REFRESH_TOKEN)
+  fetchT212: (endpoint, apiKey) => ipcRenderer.invoke('t212-fetch', endpoint, apiKey),
+  fetchYouTube: (ytPath, apiKey) => ipcRenderer.invoke('youtube-fetch', ytPath, apiKey),
+  startYouTubeOAuth: (clientId, clientSecret) => ipcRenderer.invoke('youtube-oauth-start', clientId, clientSecret),
+  refreshYouTubeToken: (clientId, clientSecret, refreshToken) => ipcRenderer.invoke('youtube-oauth-refresh', clientId, clientSecret, refreshToken),
+  fetchYouTubeAnalytics: (ytPath, token) => ipcRenderer.invoke('youtube-analytics-fetch', ytPath, token)
 })
-
-contextBridge.exposeInMainWorld('GROQ_API_KEY', process.env.GROQ_API_KEY || '')
