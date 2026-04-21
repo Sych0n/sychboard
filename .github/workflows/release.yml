@@ -16,7 +16,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
@@ -84,7 +83,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: main
 
@@ -102,7 +100,6 @@ jobs:
 
       - run: npm run publish
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-pwa:
