@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -27,12 +28,12 @@ jobs:
           npm version patch --no-git-tag-version
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          sed -i "s/|| '[0-9]*\.[0-9]*\.[0-9]*'/|| '$NEW_VERSION'/" preload.js
+          if [ -f preload.js ]; then sed -i "s/|| '[0-9]*\.[0-9]*\.[0-9]*'/|| '$NEW_VERSION'/" preload.js || true; fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore: bump version to $NEW_VERSION"
-          git pull --rebase origin main
-          git push
+          git commit -am "chore: bump version to $NEW_VERSION" || true
+          git pull --rebase origin main || true
+          git push origin main
 
   prepare-icons:
     needs: bump
