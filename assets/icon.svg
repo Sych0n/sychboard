@@ -1,4 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <rect width="256" height="256" rx="48" fill="#0a0a0f"/>
-  <text x="128" y="168" font-family="Arial" font-size="140" font-weight="900" text-anchor="middle" fill="#3d8ef0">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="115" fill="#111118"/>
+  <path d="M340 180 C340 100 256 100 256 100 C150 100 150 190 150 220 C150 290 362 270 362 340 C362 420 256 412 256 412 C160 412 150 340 150 340" 
+        fill="none" stroke="#8b5cf6" stroke-width="45" stroke-linecap="round" filter="url(#glow)"/>
 </svg>

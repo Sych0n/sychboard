@@ -1,6 +1,6 @@
 {
   "name": "sychboard",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "SychBoard - Your personal AI dashboard",
   "main": "main.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "build": {
     "appId": "com.sychboard.app",
     "productName": "SychBoard",
+    "icon": "assets/icon",
     "publish": {
       "provider": "github",
       "owner": "Sych0n",

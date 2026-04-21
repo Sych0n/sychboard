@@ -1,0 +1,24 @@
+[build]
+  publish = "src"
+
+[[edge_functions]]
+  path = "/"
+  function = "inject-env"
+
+[[edge_functions]]
+  path = "/index.html"
+  function = "inject-env"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "notifications=(self)"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"

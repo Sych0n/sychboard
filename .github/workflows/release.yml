@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump:
+    if: "!startsWith(github.event.head_commit.message, 'chore: bump version')"
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - id: bump
+        run: |
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          sed -i "s/|| '[0-9]*\.[0-9]*\.[0-9]*'/|| '$NEW_VERSION'/" preload.js
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json preload.js
+          git commit -m "chore: bump version to $NEW_VERSION"
+          git push
+
+  prepare-icons:
+    needs: bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install tools
+        run: sudo apt-get install -y inkscape imagemagick
+
+      - name: Generate PNG sizes from SVG
+        run: |
+          for SIZE in 16 32 48 64 128 256; do
+            inkscape --export-type=png \
+              --export-width=$SIZE --export-height=$SIZE \
+              --export-filename=assets/icon-${SIZE}.png \
+              assets/icon.svg
+          done
+
+      - name: Build ICO from PNGs
+        run: |
+          convert assets/icon-16.png assets/icon-32.png assets/icon-48.png \
+                  assets/icon-64.png assets/icon-128.png assets/icon-256.png \
+                  assets/icon.ico
+
+      - name: Copy 256px PNG as main icon
+        run: cp assets/icon-256.png assets/icon.png
+
+      - name: Upload icon artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-icons
+          path: |
+            assets/icon.ico
+            assets/icon.png
+            assets/icon-16.png
+            assets/icon-32.png
+            assets/icon-48.png
+            assets/icon-64.png
+            assets/icon-128.png
+            assets/icon-256.png
+
+  build:
+    needs: prepare-icons
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Download icon artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: app-icons
+          path: assets/
+
+      - run: npm ci
+
+      - run: npm run publish
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  deploy-pwa:
+    needs: bump
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/configure-pages@v4
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
