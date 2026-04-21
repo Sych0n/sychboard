@@ -1,4 +1,36 @@
-const S={get(k){try{return JSON.parse(localStorage.getItem('sb4_'+k))}catch{return null}},set(k,v){try{localStorage.setItem('sb4_'+k,JSON.stringify(v))}catch{}}};
+const S={
+  get(k){
+    try {
+      if(!localStorage) return null;
+      const val=localStorage.getItem('sb4_'+k);
+      return val?JSON.parse(val):null;
+    }catch(e){
+      console.warn(`[storage] Get "${k}" failed:`,e.message);
+      return null;
+    }
+  },
+  set(k,v){
+    try {
+      if(!localStorage) return false;
+      localStorage.setItem('sb4_'+k,JSON.stringify(v));
+      return true;
+    }catch(e){
+      console.warn(`[storage] Set "${k}" failed:`,e.message);
+      if(e.name==='QuotaExceededError') toast('Storage full — delete old data');
+      return false;
+    }
+  },
+  available(){
+    try {
+      if(!localStorage) return false;
+      localStorage.setItem('sb4_test','1');
+      localStorage.removeItem('sb4_test');
+      return true;
+    }catch{
+      return false;
+    }
+  }
+};
 
 const DEFAULT_SCHED_EVENTS=[
   [{t:'Uni 9-5',c:'uni'}],
@@ -54,6 +86,10 @@ let st={
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#8b5cf6',obColorGlow='rgba(139,92,246,0.15)',bootStarAnim=null,bootWaveAnim=null,bootChatHistory=[];
 
 function load(){
+  if(!S.available()){
+    console.error('[storage] localStorage unavailable');
+    toast('Warning: Storage unavailable — changes may not persist');
+  }
   const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
@@ -90,6 +126,27 @@ function save(){
 function getGroqKey(){return st.apiKeys?.groq||st.groqKey||'';}
 function emptyState(icon,msg,sub=''){return`<div class="empty"><span class="empty-icon">${icon}</span>${msg}${sub?`<span class="empty-sub">${sub}</span>`:''}</div>`;}
 function setMobNav(id){document.querySelectorAll('.mnb-item').forEach(el=>el.classList.remove('active'));const el=document.getElementById('mnb-'+id);if(el)el.classList.add('active');}
+
+// ── INPUT VALIDATION & SANITIZATION ──
+function sanitizeText(str,maxLen=500){
+  if(!str)return '';
+  let s=String(str).slice(0,maxLen).trim();
+  s=s.replace(/[<>\"']/g,c=>({'<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));
+  return s;
+}
+function validateNumber(val,min=0,max=999999){
+  const n=parseFloat(val)||0;
+  return Math.max(min,Math.min(max,n));
+}
+function validateEmail(email){
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).toLowerCase());
+}
+function validateTime(time){
+  return /^\d{2}:\d{2}$/.test(time);
+}
+function validateDate(date){
+  return !isNaN(new Date(date).getTime());
+}
 
 const fmt=n=>'£'+Number(n).toFixed(2);
 const fmtK=n=>n>=1000?(n/1000).toFixed(1)+'k':String(n);
@@ -178,8 +235,8 @@ function activateDanielMode(){
 }
 function obNext(step){
   if(step===1){
-    const name=document.getElementById('ob-name').value.trim();
-    if(!name){document.getElementById('ob-name').focus();return;}
+    const name=sanitizeText(document.getElementById('ob-name').value,100).trim();
+    if(!name||name.length<2){document.getElementById('ob-name').focus();toast('Name must be at least 2 characters');return;}
     if(name==='Daniel6767'){activateDanielMode();return;}
     st.userName=name;
   }
@@ -236,6 +293,10 @@ function startBoot(){
   if(nameEl)nameEl.textContent=st.userName;
   bootChatHistory=[];
 
+  // Clean up any previous animations
+  if(bootStarAnim){cancelAnimationFrame(bootStarAnim);bootStarAnim=null;}
+  if(bootWaveAnim){cancelAnimationFrame(bootWaveAnim);bootWaveAnim=null;}
+
   // Stars — orbit slowly around center, glowing
   const sc=document.getElementById('boot-stars');
   if(sc){
@@ -252,7 +313,6 @@ function startBoot(){
       bright:Math.random()*0.5+0.25,
       orbitSpd:(Math.random()*0.00012+0.00004)*(Math.random()<0.5?1:-1)
     }));
-    if(bootStarAnim)cancelAnimationFrame(bootStarAnim);
     function drawStars(t){
       ctx.clearRect(0,0,sc.width,sc.height);
       stars.forEach(s=>{
@@ -798,14 +858,14 @@ function rSettings(){
   const pb=document.getElementById('pom-b-in');if(pb)pb.value=st.pomodoro.break||5;
 }
 function saveGroqKey(){
-  const v=document.getElementById('groq-key-in').value.trim();
-  if(!v)return;
+  const v=sanitizeText(document.getElementById('groq-key-in').value,200).trim();
+  if(!v||v.length<10){toast('Enter a valid API key');return;}
   st.apiKeys.groq=v;save();
   toast('Groq API key saved');
 }
 function savePomSettings(){
-  st.pomodoro.focus = parseInt(document.getElementById('pom-f-in').value)||25;
-  st.pomodoro.break = parseInt(document.getElementById('pom-b-in').value)||5;
+  st.pomodoro.focus = validateNumber(parseInt(document.getElementById('pom-f-in').value)||25, 1, 180);
+  st.pomodoro.break = validateNumber(parseInt(document.getElementById('pom-b-in').value)||5, 1, 60);
   save();
   if(!pomR){ 
     pomL = pomM==='focus'?st.pomodoro.focus*60:st.pomodoro.break*60;
@@ -814,11 +874,11 @@ function savePomSettings(){
   toast('Timer settings saved');
 }
 function saveDevKeys() {
-  st.apiKeys.t212 = document.getElementById('dev-t212').value.trim();
-  st.apiKeys.ytChannelId = document.getElementById('dev-yt-chan').value.trim();
-  st.apiKeys.ytApi = document.getElementById('dev-yt-api').value.trim();
-  st.apiKeys.ytClientId = document.getElementById('dev-yt-id').value.trim();
-  st.apiKeys.ytClientSecret = document.getElementById('dev-yt-sec').value.trim();
+  st.apiKeys.t212 = sanitizeText(document.getElementById('dev-t212').value,200).trim();
+  st.apiKeys.ytChannelId = sanitizeText(document.getElementById('dev-yt-chan').value,100).trim();
+  st.apiKeys.ytApi = sanitizeText(document.getElementById('dev-yt-api').value,200).trim();
+  st.apiKeys.ytClientId = sanitizeText(document.getElementById('dev-yt-id').value,200).trim();
+  st.apiKeys.ytClientSecret = sanitizeText(document.getElementById('dev-yt-sec').value,200).trim();
   save(); toast('Developer keys saved!');
   if(st.apiKeys.ytChannelId) fetchYTData();
 }
@@ -946,7 +1006,14 @@ function updHol(i){
   st.holidays[i]={name:document.getElementById('hn-'+i).value||st.holidays[i].name,date:document.getElementById('hd-'+i).value||'',target:parseFloat(document.getElementById('ht-'+i).value)||0,saved:parseFloat(document.getElementById('hs-'+i).value)||0};
   save();rFinance();
 }
-function updateBal(){const k=document.getElementById('bal-sel').value;const v=parseFloat(document.getElementById('bal-amt').value)||0;st.balances[k]=v;document.getElementById('bal-amt').value='';save();rFinance();toast('Balance updated');}
+function updateBal(){
+  const k=document.getElementById('bal-sel').value;
+  const v=validateNumber(document.getElementById('bal-amt').value,0,9999999);
+  if(v===0&&!document.getElementById('bal-amt').value.trim()){toast('Enter a valid balance');return;}
+  st.balances[k]=v;
+  document.getElementById('bal-amt').value='';
+  save();rFinance();toast('Balance updated');
+}
 function rShifts(){
   const el=document.getElementById('shift-list');if(!el)return;
   if(!st.shifts.length){el.innerHTML=emptyState('💼','No shifts logged yet','Add your first shift above');document.getElementById('shift-totals').innerHTML='';return;}
@@ -956,14 +1023,33 @@ function rShifts(){
   const mon=st.shifts.filter(s=>new Date(s.date+' '+now.getFullYear())>=ms).reduce((a,s)=>a+s.hours*s.wage,0);
   document.getElementById('shift-totals').innerHTML=`<div class="metric"><div class="ml">All time</div><div class="mv">${fmt(all)}</div></div><div class="metric"><div class="ml">This month</div><div class="mv green">${fmt(mon)}</div></div>`;
 }
-function addShift(){const d=document.getElementById('sh-d').value.trim();const h=parseFloat(document.getElementById('sh-h').value)||0;const w=parseFloat(document.getElementById('sh-w').value)||st.defaultWage;if(!d||!h)return;st.shifts.unshift({date:d,hours:h,wage:w});document.getElementById('sh-d').value='';document.getElementById('sh-h').value='';save();rShifts();}
+function addShift(){
+  const d=sanitizeText(document.getElementById('sh-d').value,50).trim();
+  const h=validateNumber(document.getElementById('sh-h').value,0,24);
+  const w=validateNumber(document.getElementById('sh-w').value,0,100)||st.defaultWage;
+  if(!d||!h){toast('Date and hours required');return;}
+  st.shifts.unshift({date:d,hours:h,wage:w});
+  document.getElementById('sh-d').value='';
+  document.getElementById('sh-h').value='';
+  save();rShifts();toast('Shift added');
+}
 function rmShift(i){st.shifts.splice(i,1);save();rShifts();}
 
 function rSubs(){
   const el=document.getElementById('subs-list');if(!el)return;
   el.innerHTML=st.subscriptions.length?st.subscriptions.map((s,i)=>`<div class="row"><span class="rl" style="font-weight:600">${s.name} <span style="font-size:10px;color:var(--text3);font-weight:500;margin-left:4px">Day ${s.date}</span></span><div style="display:flex;align-items:center;gap:12px"><span class="rv">${fmt(s.amount)}</span><button class="del-btn" style="margin:0" onclick="st.subscriptions.splice(${i},1);save();rSubs()">✕</button></div></div>`).join(''):emptyState('💳','No bills tracked yet');
 }
-function addSub(){const n=document.getElementById('sub-name').value.trim();const a=parseFloat(document.getElementById('sub-amt').value);const d=parseInt(document.getElementById('sub-day').value);if(!n||!a||!d)return;st.subscriptions.push({name:n,amount:a,date:d});document.getElementById('sub-name').value='';document.getElementById('sub-amt').value='';document.getElementById('sub-day').value='';save();rSubs();}
+function addSub(){
+  const n=sanitizeText(document.getElementById('sub-name').value,50).trim();
+  const a=validateNumber(document.getElementById('sub-amt').value,0.01,99999);
+  const d=validateNumber(document.getElementById('sub-day').value,1,31);
+  if(!n||!a||!d){toast('Name, amount, and day required');return;}
+  st.subscriptions.push({name:n,amount:a,date:d});
+  document.getElementById('sub-name').value='';
+  document.getElementById('sub-amt').value='';
+  document.getElementById('sub-day').value='';
+  save();rSubs();toast('Subscription added');
+}
 
 // ═══ UNI ═══
 function rUni(){
@@ -1239,7 +1325,17 @@ function rTravel(){
   if(tl)tl.innerHTML=st.trips.length?st.trips.map((t,i)=>`<div class="gi"><div class="gc" onclick="st.trips[${i}].done=!st.trips[${i}].done;save();rTravel()">${t.done?'✓':''}</div><div style="flex:1"><div class="gt">${t.dest}</div><div style="font-size:11px;color:var(--text2)">${t.date} · Budget: ${fmt(t.budget)}</div></div><button class="del-btn" onclick="st.trips.splice(${i},1);save();rTravel()">✕</button></div>`).join(''):emptyState('✈️','No trips planned yet','Add your next adventure below');
   rSecTodos('travel');
 }
-function addTrip(){const d=document.getElementById('trip-dest').value.trim();const dt=document.getElementById('trip-date').value.trim();const b=parseFloat(document.getElementById('trip-budget').value)||0;if(!d)return;st.trips.push({dest:d,date:dt,budget:b,done:false});document.getElementById('trip-dest').value='';document.getElementById('trip-date').value='';document.getElementById('trip-budget').value='';save();rTravel();}
+function addTrip(){
+  const d=sanitizeText(document.getElementById('trip-dest').value,100).trim();
+  const dt=sanitizeText(document.getElementById('trip-date').value,20).trim();
+  const b=validateNumber(document.getElementById('trip-budget').value,0,99999);
+  if(!d){toast('Destination required');return;}
+  st.trips.push({dest:d,date:dt,budget:b,done:false});
+  document.getElementById('trip-dest').value='';
+  document.getElementById('trip-date').value='';
+  document.getElementById('trip-budget').value='';
+  save();rTravel();toast('Trip added');
+}
 
 // ═══ GOALS ═══
 function rGoals(){
@@ -1295,8 +1391,19 @@ function saveJournal(){const today=new Date().toDateString();st.journals[today]=
 function rManage(){
   document.getElementById('manage-list').innerHTML=st.sections.map(s=>{
     const delBtn=!s.core?`<button class="btn btn-sm btn-d" onclick="promptDelSec('${s.id}')">Delete</button>`:'';
-    return`<div class="mi"><div><div style="font-size:14px;font-weight:600;color:var(--text)">${s.icon||'📁'} ${s.label}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${s.core?'Core':'Custom'} · ${s.visible?'Visible':'Hidden'}</div></div><div class="mi-actions"><button class="btn btn-sm" onclick="openRename('${s.id}')">Rename</button><button class="btn btn-sm" onclick="togVis('${s.id}')">${s.visible?'Hide':'Show'}</button>${delBtn}</div></div>`;
+    return`<div class="mi" draggable="true" ondragstart="dragStart(event,'${s.id}')" ondragend="dragEnd(event)" ondragover="dragOver(event)" ondrop="dropSec(event,'${s.id}')"><div style="display:flex;align-items:center;gap:12px"><div style="cursor:grab;color:var(--text3);padding:4px 0;font-size:15px;user-select:none;opacity:0.5;line-height:1">⋮⋮</div><div><div style="font-size:14px;font-weight:600;color:var(--text)">${s.icon||'📁'} ${s.label}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${s.core?'Core':'Custom'} · ${s.visible?'Visible':'Hidden'}</div></div></div><div class="mi-actions"><button class="btn btn-sm" onclick="openRename('${s.id}')">Rename</button><button class="btn btn-sm" onclick="togVis('${s.id}')">${s.visible?'Hide':'Show'}</button>${delBtn}</div></div>`;
   }).join('');
+}
+let dragId=null;
+function dragStart(e,id){dragId=id;e.target.style.opacity='0.4';}
+function dragEnd(e){e.target.style.opacity='1';dragId=null;}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';}
+function dropSec(e,targetId){
+  e.preventDefault();if(!dragId||dragId===targetId)return;
+  const a=st.sections.findIndex(x=>x.id===dragId);const b=st.sections.findIndex(x=>x.id===targetId);
+  if(a<0||b<0)return;
+  const[m]=st.sections.splice(a,1);st.sections.splice(b,0,m);
+  save();rManage();renderSidebar();
 }
 function togVis(id){const s=st.sections.find(x=>x.id===id);if(s)s.visible=!s.visible;save();rManage();}
 function openRename(id){renamingId=id;const s=st.sections.find(x=>x.id===id);document.getElementById('rename-val').value=s?s.label:'';openModal('modal-rename');}

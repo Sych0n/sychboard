@@ -26,12 +26,22 @@ function createWindow() {
     show: false
   })
 
-  mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
+  const indexPath = path.join(__dirname, 'src', 'index.html')
+  mainWindow.loadFile(indexPath).catch(err => {
+    console.error('[window] Failed to load index.html:', err)
+    mainWindow.loadURL(`data:text/html,<h1>Error loading app</h1><p>${err.message}</p>`)
+  })
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
-    if (!app.isPackaged) mainWindow.webContents.openDevTools()
+    if (!app.isPackaged) {
+      mainWindow.webContents.openDevTools()
+    }
     checkForUpdates()
+  })
+
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error(`[window] Load failed: ${errorCode} - ${errorDescription}`)
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -42,52 +52,56 @@ function createWindow() {
 
 function checkForUpdates() {
   if (!app.isPackaged) {
-    console.log('[updater] skipping — app not packaged')
-    mainWindow?.webContents.send('updater-debug', 'Skipped: app not packaged (dev mode)')
+    console.log('[updater] Skipped — app not packaged (dev mode)')
+    mainWindow?.webContents.send('updater-debug', 'Dev mode: updates disabled')
     return
   }
+
   try {
     const { autoUpdater } = require('electron-updater')
-    autoUpdater.autoDownload = true
-    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = false
     autoUpdater.logger = console
 
     autoUpdater.on('checking-for-update', () => {
-      console.log('[updater] checking for update...')
-      mainWindow?.webContents.send('updater-debug', 'Checking for update...')
+      console.log('[updater] Checking for updates...')
+      mainWindow?.webContents.send('updater-debug', 'Checking for updates...')
     })
 
     autoUpdater.on('update-available', (info) => {
-      console.log('[updater] update available:', info.version)
+      console.log('[updater] Update available: v' + info.version)
       mainWindow?.webContents.send('updater-debug', `Update available: v${info.version}`)
       mainWindow?.webContents.send('update-available', info.version)
+      autoUpdater.downloadUpdate()
     })
 
     autoUpdater.on('update-not-available', (info) => {
-      console.log('[updater] up to date:', info.version)
+      console.log('[updater] Up to date: v' + info.version)
       mainWindow?.webContents.send('updater-debug', `Up to date (v${info.version})`)
     })
 
     autoUpdater.on('update-downloaded', () => {
-      console.log('[updater] update downloaded')
+      console.log('[updater] Update downloaded, ready to install')
       mainWindow?.webContents.send('update-downloaded')
     })
 
     autoUpdater.on('error', (err) => {
-      console.error('[updater] error:', err.message)
+      console.error('[updater] Error:', err.message)
       mainWindow?.webContents.send('updater-debug', `Error: ${err.message}`)
     })
 
-    console.log('[updater] calling checkForUpdates()')
-    mainWindow?.webContents.send('updater-debug', 'Calling checkForUpdates()...')
-    autoUpdater.checkForUpdates().then(result => {
-      console.log('[updater] checkForUpdates resolved:', JSON.stringify(result?.updateInfo?.version))
-    }).catch(err => {
-      console.error('[updater] checkForUpdates rejected:', err.message)
-      mainWindow?.webContents.send('updater-debug', `checkForUpdates failed: ${err.message}`)
+    autoUpdater.on('download-progress', (progress) => {
+      console.log(`[updater] Downloading: ${Math.round(progress.percent)}%`)
+      mainWindow?.webContents.send('updater-debug', `Downloading: ${Math.round(progress.percent)}%`)
+    })
+
+    console.log('[updater] Starting update check...')
+    autoUpdater.checkForUpdates().catch(err => {
+      console.error('[updater] Check failed:', err.message)
+      mainWindow?.webContents.send('updater-debug', `Check failed: ${err.message}`)
     })
   } catch (e) {
-    console.error('[updater] exception:', e.message)
+    console.error('[updater] Exception:', e.message)
     mainWindow?.webContents.send('updater-debug', `Exception: ${e.message}`)
   }
 }
