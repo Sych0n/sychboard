@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
-  version: process.env.npm_package_version || '1.0.5',
+  version: process.env.npm_package_version || '1.0.6',
   onUpdateAvailable: (cb) => ipcRenderer.on('update-available', (_, version) => cb(version)),
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', () => cb()),
   onUpdaterDebug: (cb) => ipcRenderer.on('updater-debug', (_, msg) => cb(msg)),
