@@ -17,7 +17,6 @@
       "provider": "github",
       "owner": "Sych0n",
       "repo": "sychboard",
-      "draft": false,
       "releaseType": "release"
     },
     "win": {
