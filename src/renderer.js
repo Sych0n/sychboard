@@ -469,6 +469,7 @@ function initSchedEvents(){
 }
 
 function enterApp(){
+  if(window.electronAPI)document.body.classList.add('electron-inset');
   if(bootStarAnim){cancelAnimationFrame(bootStarAnim);bootStarAnim=null;}
   if(bootWaveAnim){cancelAnimationFrame(bootWaveAnim);bootWaveAnim=null;}
   const boot=document.getElementById('boot');
@@ -483,6 +484,7 @@ function enterApp(){
   renderHome();
   if(getGroqKey())loadAISug();
   setTimeout(initNotifications,2000);
+  if(window.innerWidth<=720)initSwipe();
 }
 
 // ═══ NAV ═══
@@ -503,7 +505,12 @@ function goPage(id){
   document.getElementById('sb-overlay')?.classList.remove('show');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const el=document.getElementById('page-'+id)||document.getElementById('page-custom');
-  if(el)el.classList.add('active');
+  if(el){
+    el.classList.add('active');
+    requestAnimationFrame(()=>{
+      el.querySelectorAll('.sc > .card').forEach(c=>{c.style.animation='none';c.offsetHeight;c.style.animation='';});
+    });
+  }
   setSidebarActive(id);
   setMobNav(id);
   const titles={finance:'Finance',uni:'University',youtube:'YouTube',dev:'Dev / Side Project',schedule:'Schedule',habits:'Habits',sleep:'Sleep Tracker',fitness:'Fitness',travel:'Travel',goals:'Goals',todos:'All Todos',journal:'Journal',ai:'AI Assistant',manage:'Manage Sections',settings:'Settings'};
@@ -519,6 +526,22 @@ function toggleSidebar(){
   const ov=document.getElementById('sb-overlay');
   sb.classList.toggle('mob-open');
   ov.classList.toggle('show');
+}
+let _swipeInit=false;
+function initSwipe(){
+  if(_swipeInit)return;_swipeInit=true;
+  let x0=0,y0=0;
+  const THRESH=60,EDGE=32,VMAX=60;
+  document.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;y0=e.touches[0].clientY;},{passive:true});
+  document.addEventListener('touchend',e=>{
+    const dx=e.changedTouches[0].clientX-x0;
+    const dy=Math.abs(e.changedTouches[0].clientY-y0);
+    if(dy>VMAX||Math.abs(dx)<THRESH)return;
+    const sb=document.getElementById('sidebar');
+    const open=sb.classList.contains('mob-open');
+    if(dx>0&&x0<EDGE&&!open)toggleSidebar();
+    else if(dx<0&&open)toggleSidebar();
+  },{passive:true});
 }
 function setSidebarActive(id){
   document.querySelectorAll('.sb-item').forEach(el=>el.classList.remove('active'));
@@ -618,7 +641,7 @@ async function callGroq(messages){
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
 ${t212Context()}
 Upcoming shifts: ${st.shifts.slice(0,3).map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
-Subscriptions: ${st.subscriptions.map(s=>`${s.name} (£${s.amount} on day ${s.date})`).join(', ')||'none'}. Today is the ${now.getDate()}th. Warn them if a bill is due in the next 3 days.
+Subscriptions: ${(st.subscriptions||[]).map(s=>{const d=(s.date-now.getDate()+31)%31;return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
 Holidays: ${st.holidays.map(h=>`${h.name} (saved £${h.saved}/${h.target})`).join(', ')}
 
 === YOUTUBE ===
@@ -635,7 +658,7 @@ Pending (${habitsPending.length}): ${habitsPending.map(h=>h.label).join(', ')||'
 
 === SLEEP ===
 ${sleepContext()||'No sleep data logged yet.'}
-Targets: in bed by ${st.sleep.targetBed}, goal ${st.sleep.targetHours}h
+Targets: in bed by ${st.sleep?.targetBed||'23:00'}, goal ${st.sleep?.targetHours||8}h
 
 === GOALS ===
 Active (${activeGoals.length}): ${activeGoals.slice(0,6).map(g=>`[${g.category}] ${g.text}`).join(' | ')||'none'}
@@ -649,8 +672,12 @@ Days until Saturday stream: ${satDays()}
 === TODOS ===
 Total pending: ${pendingTodos} | Today's focus: ${st.todayFocus||'not set'}
 
+=== FITNESS ===
+Notes: ${(st.fitnessNotes||'').slice(0,150)||'none'}
+Active goals: ${st.fitnessGoals.filter(g=>!g.done).map(g=>g.text).join(', ')||'none'}
+
 === JOURNAL ===
-Today: ${todayJournal.slice(0,200)||'nothing written today'}
+Today: ${todayJournal.slice(0,500)||'nothing written today'}
 Recent: ${recentJournals||'no entries'}
 
 === PROACTIVE ROLE ===
@@ -666,6 +693,11 @@ DATA ACTIONS — embed these tags when the user gives information or asks to upd
   [ADD_SHIFT:date:hours:wage] | [ADD_TRIP:destination:date:budget]
   [SET_FOCUS:text]
   [LOG_SLEEP:bedtime:waketime] e.g. [LOG_SLEEP:23:30:07:15] — log a sleep entry for tonight/last night
+  [COMPLETE_GOAL:goal text] — mark a goal done (partial match)
+  [DELETE_TODO:text] — delete a general todo (partial match)
+  [ADD_SUBSCRIPTION:name:amount:day] e.g. [ADD_SUBSCRIPTION:Netflix:10.99:15]
+  [REMOVE_HABIT:name] — delete a habit by name (partial match)
+  [SET_YT_CHANNEL:name] — update the YouTube channel name
 
 NAVIGATION — use [NAVIGATE:sectionId] after updating data OR when user asks to open a section. IDs: ${navSections}.`;
   try{
@@ -710,6 +742,11 @@ function parseActions(text){
     .replace(/\[ADD_TRIP:([^:]+):([^:]+):([^\]]+)\]/gi,(_,dest,date,budget)=>{actions.push({type:'add_trip',dest:dest.trim(),date:date.trim(),budget:parseFloat(budget)||0});return'';})
     .replace(/\[SET_FOCUS:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_focus',val:v.trim()});return'';})
     .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{actions.push({type:'log_sleep',bed:`${bh.trim().padStart(2,'0')}:${bm.trim().padStart(2,'0')}`,wake:`${wh.trim().padStart(2,'0')}:${wm.trim().padStart(2,'0')}`});return'';})
+    .replace(/\[COMPLETE_GOAL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_goal',val:v.trim().toLowerCase()});return'';})
+    .replace(/\[DELETE_TODO:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'delete_todo',val:v.trim().toLowerCase()});return'';})
+    .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:parseFloat(amount)||0,day:parseInt(day)||1});return'';})
+    .replace(/\[REMOVE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'remove_habit',val:v.trim().toLowerCase()});return'';})
+    .replace(/\[SET_YT_CHANNEL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_yt_channel',val:v.trim()});return'';})
     .replace(/\s{2,}/g,' ').trim();
   if(actions.length)console.log('[actions] parsed:',actions);
   return{clean,actions};
@@ -733,9 +770,23 @@ function executeActions(actions){
     else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:a.date,hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
     else if(a.type==='add_trip'){st.trips.push({dest:a.dest,date:a.date,budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
-    else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep.logs.findIndex(l=>l.date===today);const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
+    else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
+    else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
+    else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
+    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:a.name,amount:a.amount,date:a.day});changed=true;}
+    else if(a.type==='remove_habit'){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
+    else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
   });
-  if(changed)save();
+  if(changed){
+    save();
+    const ap=document.querySelector('.page.active')?.id?.replace('page-','');
+    if(ap==='habits')rHabits();
+    if(ap==='goals')rGoals();
+    if(ap==='finance')rFinance();
+    if(ap==='youtube')rYT();
+    if(ap==='todos')rMasterTodos();
+    try{updateLiveStats();}catch(e){}
+  }
 }
 async function loadAISug(){
   const el=document.getElementById('ai-sug');if(!el)return;
@@ -793,7 +844,7 @@ function rAI(){
       `What should I focus on today?`,
       st.examDate&&st.examDate!=='TBC'?`How long until my exam on ${st.examDate}?`:'Set my exam date to 15 June',
     ].slice(0,5);
-    chips.innerHTML=prompts.map(s=>`<div class="prompt-item" onclick="document.getElementById('chat-in').value=this.textContent;document.getElementById('chat-in').focus()">${s}</div>`).join('');
+    chips.innerHTML=prompts.map(s=>`<div class="prompt-item" data-prompt="${s.replace(/"/g,'&quot;')}" onclick="const i=document.getElementById('chat-in');i.value=this.dataset.prompt;i.focus()">${s}</div>`).join('');
   }
 }
 async function sendChat(){

@@ -1,5 +1,5 @@
-const CACHE = 'sychboard-v1';
-const SHELL = ['./', './manifest.json', './icons/icon.svg', './icons/icon-maskable.svg'];
+const CACHE = 'sychboard-v2';
+const SHELL = ['./', './manifest.json', './styles.css', './renderer.js', './icons/icon.svg', './icons/icon-maskable.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));

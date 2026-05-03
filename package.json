@@ -16,7 +16,9 @@
     "publish": {
       "provider": "github",
       "owner": "Sych0n",
-      "repo": "sychboard"
+      "repo": "sychboard",
+      "draft": false,
+      "releaseType": "release"
     },
     "win": {
       "target": [
