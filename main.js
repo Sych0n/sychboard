@@ -2,6 +2,7 @@ const { app, BrowserWindow, shell, ipcMain } = require('electron')
 const path = require('path')
 const https = require('https')
 const http = require('http')
+const db = require('./src/db')
 
 let mainWindow
 
@@ -18,13 +19,16 @@ function createWindow() {
     },
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#0a0a0f',
-      symbolColor: '#3d8ef0',
+      color: '#050508',
+      symbolColor: '#e8eaf0',
       height: 32
     },
-    backgroundColor: '#0a0a0f',
-    show: false
+    backgroundColor: '#050508',
+    show: true
   })
+
+  mainWindow.show()
+  mainWindow.maximize()
 
   const indexPath = path.join(__dirname, 'src', 'index.html')
   mainWindow.loadFile(indexPath).catch(err => {
@@ -34,9 +38,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
-    if (!app.isPackaged) {
-      mainWindow.webContents.openDevTools()
-    }
+    mainWindow.webContents.openDevTools()
     checkForUpdates()
   })
 
@@ -287,11 +289,55 @@ ipcMain.on('restart-and-install', () => {
 })
 
 app.whenReady().then(() => {
+  try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+// ── Gamification IPC ──
+ipcMain.handle('quests:list', () => { try { return db.listQuests() } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('quests:complete', (_, questId) => { try { return db.completeQuest(questId) } catch(e) { console.error('[db]',e.message); throw e } })
+ipcMain.handle('quests:uncomplete', (_, questId) => { try { return db.uncompleteQuest(questId) } catch(e) { console.error('[db]',e.message); return {} } })
+ipcMain.handle('profile:get', () => { try { return db.getProfile() } catch(e) { console.error('[db]',e.message); return null } })
+ipcMain.handle('streaks:get', () => { try { return db.getStreaks() } catch(e) { console.error('[db]',e.message); return { categories:[], globalStreak:0 } } })
+ipcMain.handle('badges:list', () => { try { return db.listBadges() } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('activity:recent', () => { try { return db.getRecentActivity() } catch(e) { console.error('[db]',e.message); return [] } })
+// Developer API keys from .env (dev machine only — .env is not packaged into builds)
+function loadEnvKeys() {
+  try {
+    const fs = require('fs')
+    const envPath = path.join(__dirname, '.env')
+    if (!fs.existsSync(envPath)) return {}
+    const out = {}
+    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    }
+    return out
+  } catch (e) { console.error('[env]', e.message); return {} }
+}
+ipcMain.handle('env:get-keys', () => {
+  const e = loadEnvKeys()
+  return {
+    groq: e.GROQ_API_KEY || '',
+    t212: e.TRADING212_API_KEY || '',
+    ytApi: e.YOUTUBE_API_KEY || '',
+    ytChannelId: e.YOUTUBE_CHANNEL_ID || '',
+    ytClientId: e.YOUTUBE_CLIENT_ID || '',
+    ytClientSecret: e.YOUTUBE_CLIENT_SECRET || '',
+    ytRefreshToken: e.YOUTUBE_REFRESH_TOKEN || ''
+  }
+})
+ipcMain.handle('coins:get', () => { try { return db.getCoins() } catch(e) { console.error('[db]',e.message); return 0 } })
+ipcMain.handle('coins:award', (_, amount, reason) => { try { return db.awardCoins(amount, reason) } catch(e) { console.error('[db]',e.message); return null } })
+ipcMain.handle('shop:purchase', (_, itemKey, cost) => { try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } } })
+ipcMain.handle('streaks:add-freeze', (_, n) => { try { return db.addFreezeTokens(n) } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('xp:history', (_, days) => { try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('settings:get', (_, key) => { try { return db.getSetting(key) } catch(e) { return null } })
+ipcMain.handle('settings:set', (_, key, value) => { try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) } })
+ipcMain.handle('profile:update-name', (_, name) => { try { db.updateDisplayName(name) } catch(e) { console.error('[db]',e.message) } })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
