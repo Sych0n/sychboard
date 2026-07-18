@@ -12,7 +12,7 @@ db.js is genuinely well-engineered: versioned migrations, transactions everywher
 soft-reset streaks with freeze tokens, coin clawback on quest-untick (no toggle farming),
 category sweep bonuses, retroactive coin grants. The IPC surface is complete and clean.
 
-## 🐛 Bugs found (fix before merging to main)
+## 🐛 Bugs found — ✅ ALL 4 FIXED 2026-07-18 (verified against real SQLite in isolated tests)
 
 1. **Streak rollover bug** — `completeQuest` computes "yesterday" from the real clock, but
    `getAppDate()` shifts the app-day before the 4am rollover. Completing a quest between
@@ -27,7 +27,7 @@ category sweep bonuses, retroactive coin grants. The IPC surface is complete and
 
 ## 🚀 v1.1 (game release) — path to merging into main
 
-1. Fix the four bugs above.
+1. ~~Fix the four bugs above.~~ ✅ done.
 2. **Data migration** — old installs have localStorage (`sb4_`) data; the game version reads
    SQLite. Write a one-time import (renderer reads sb4_ keys → IPC → db.js) so finances,
    habits, journal, sleep history survive the update. Without this, shipping wipes user data.
@@ -54,3 +54,4 @@ category sweep bonuses, retroactive coin grants. The IPC surface is complete and
 ## Autonomous work log
 
 - 2026-07-18: repo audited; uncommitted game work rescued to `game-rebuild`; this roadmap added.
+- 2026-07-18: all 4 audit bugs fixed in src/db.js (app-date streak yesterday, weekly once-per-week guard + display, sweep bonus in return, xp history rollover-aware). Tested with temp DB. Known minor quirk: a weekly completed on a previous day can't be un-ticked later in the week (uncomplete matches same-day only).

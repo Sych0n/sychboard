@@ -236,25 +236,41 @@ function migrate() {
 
 function listQuests() {
   const appDate = getAppDate()
+  // Weekly quests count as completed for the whole %Y-%W week; daily/epic per app-day.
   return _db.prepare(`
     SELECT q.*, c.name as category_name, c.key as category_key, c.icon as category_icon, c.color as category_color,
-      CASE WHEN qc.id IS NOT NULL THEN 1 ELSE 0 END as completed_today,
-      qc.xp_awarded as xp_awarded_today
+      CASE
+        WHEN q.frequency = 'weekly' THEN
+          EXISTS(SELECT 1 FROM quest_completions w WHERE w.quest_id = q.id
+                 AND strftime('%Y-%W', w.app_date) = strftime('%Y-%W', ?))
+        ELSE
+          EXISTS(SELECT 1 FROM quest_completions d WHERE d.quest_id = q.id AND d.app_date = ?)
+      END as completed_today,
+      (SELECT t.xp_awarded FROM quest_completions t WHERE t.quest_id = q.id AND t.app_date = ?
+       ORDER BY t.id DESC LIMIT 1) as xp_awarded_today
     FROM quests q
     JOIN categories c ON q.category_id = c.id
-    LEFT JOIN quest_completions qc ON qc.quest_id = q.id AND qc.app_date = ?
     WHERE q.active = 1 AND (
       q.frequency = 'daily' OR q.frequency = 'weekly' OR
-      (q.frequency = 'epic' AND (q.repeatable = 1 OR qc.id IS NULL))
+      (q.frequency = 'epic' AND (q.repeatable = 1 OR
+        NOT EXISTS(SELECT 1 FROM quest_completions e WHERE e.quest_id = q.id)))
     )
     ORDER BY q.frequency DESC, q.category_id, q.sort_order, q.id
-  `).all(appDate)
+  `).all(appDate, appDate, appDate)
 }
 
 function completeQuest(questId) {
   const appDate = getAppDate()
   const quest = _db.prepare('SELECT * FROM quests WHERE id = ?').get(questId)
   if (!quest) throw new Error('Quest not found: ' + questId)
+
+  // Weekly quests: one completion per ISO-ish week (%Y-%W), not per day
+  if (quest.frequency === 'weekly') {
+    const doneThisWeek = _db.prepare(
+      "SELECT 1 FROM quest_completions WHERE quest_id=? AND strftime('%Y-%W', app_date)=strftime('%Y-%W', ?)"
+    ).get(questId, appDate)
+    if (doneThisWeek) throw new Error('Weekly quest already completed this week')
+  }
 
   const streak = _db.prepare('SELECT * FROM streaks WHERE category_id = ?').get(quest.category_id)
   const currentStreak = streak?.current_streak ?? 0
@@ -286,9 +302,11 @@ function completeQuest(questId) {
     _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
       .run(xpAwarded, 'quest_completion', questId, newTotalXp, 'Completed: ' + quest.name)
 
-    // Update streak
+    // Update streak — "yesterday" must be relative to the APP date, not the wall
+    // clock, or completions between midnight and the rollover hour wrongly
+    // count as a broken streak.
     const lastDate = streak?.last_completion_date
-    const yesterday = new Date()
+    const yesterday = new Date(appDate)
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toISOString().split('T')[0]
 
@@ -340,17 +358,19 @@ function completeQuest(questId) {
     }
 
     // Category sweep bonus (+10 XP if all daily quests in category done today)
+    let finalTotalXp = newTotalXp
+    let sweepBonus   = 0
     const catDailyTotal = _db.prepare(`SELECT COUNT(*) as n FROM quests WHERE category_id=? AND frequency='daily' AND active=1`).get(quest.category_id)?.n ?? 0
     const catDoneToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND q.frequency='daily' AND qc.app_date=?`).get(quest.category_id, appDate)?.n ?? 0
     if (catDailyTotal > 0 && catDoneToday === catDailyTotal) {
-      const sweepXp = 10
-      const sweepTotal = newTotalXp + sweepXp
-      _db.prepare('UPDATE profile SET total_xp=? WHERE id=1').run(sweepTotal)
+      sweepBonus  = 10
+      finalTotalXp = newTotalXp + sweepBonus
+      _db.prepare('UPDATE profile SET total_xp=? WHERE id=1').run(finalTotalXp)
       _db.prepare(`INSERT INTO xp_log (amount,source_type,running_total,reason) VALUES (?,?,?,?)`)
-        .run(sweepXp, 'category_sweep', sweepTotal, catKey + ' category sweep bonus')
+        .run(sweepBonus, 'category_sweep', finalTotalXp, catKey + ' category sweep bonus')
     }
 
-    return { xpAwarded, newTotalXp, leveledUp, newLevel: newLevelInfo.level, newRank: rankForLevel(newLevelInfo.level), streak: { category: catKey, current: newStreak, bonusPct }, badgesUnlocked, coinsAwarded, coinsFromLevelUp, coins: (_db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0) }
+    return { xpAwarded, newTotalXp: finalTotalXp, sweepBonus, leveledUp, newLevel: newLevelInfo.level, newRank: rankForLevel(newLevelInfo.level), streak: { category: catKey, current: newStreak, bonusPct }, badgesUnlocked, coinsAwarded, coinsFromLevelUp, coins: (_db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0) }
   })
 
   return doComplete()
@@ -427,8 +447,11 @@ function addFreezeTokens(n = 1) {
 function getXpHistory(days = 7) {
   const n = Math.min(60, Math.max(1, Math.round(Number(days) || 7)))
   const map = {}
-  _db.prepare(`SELECT date(occurred_at) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
-    .all().forEach(r => { map[r.d] = r.xp })
+  // Group by APP date (shift by the rollover hour) so 1am grinding counts
+  // toward the same bar as the evening before, matching quests/streaks.
+  const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+  _db.prepare(`SELECT date(occurred_at, ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
+    .all(`-${rolloverHour} hours`).forEach(r => { map[r.d] = r.xp })
   const out = []
   for (let i = n - 1; i >= 0; i--) {
     const dt = new Date()
