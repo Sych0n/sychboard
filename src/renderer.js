@@ -85,7 +85,7 @@ let st={
   pomodoro: { focus: 25, break: 5 }
 };
 
-let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[];
+let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null;
 
 function load(){
   if(!S.available()){
@@ -308,7 +308,10 @@ function startBoot(){
 
   if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
   if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
+  if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
   disposeBootThree();
+
+  const bootResizeFns=[];
 
   // Star field background — slow-drifting white specks
   const pc=document.getElementById('boot-particles');
@@ -337,6 +340,7 @@ function startBoot(){
       bootParticlesAnim=requestAnimationFrame(drawParticles);
     }
     requestAnimationFrame(drawParticles);
+    bootResizeFns.push(()=>{pc.width=window.innerWidth;pc.height=window.innerHeight;});
   }
 
   // Central Three.js orb — hollow wireframe sphere + electron cloud
@@ -451,6 +455,17 @@ function startBoot(){
     gsap.set(oc,{scale:0.55,opacity:0,transformOrigin:'center center'});
     gsap.to(oc,{scale:1,opacity:1,duration:4.4,ease:'power2.inOut'});
     gsap.to(orb,{brightness:1,duration:4.8,ease:'power2.inOut'});
+
+    bootResizeFns.push(()=>{
+      const newSize=Math.min(window.innerWidth*0.42,420);
+      oc.style.width=newSize+'px';oc.style.height=newSize+'px';
+      renderer.setSize(newSize,newSize,false);
+    });
+  }
+
+  if(bootResizeFns.length){
+    bootResizeHandler=()=>{bootResizeFns.forEach(fn=>fn());};
+    window.addEventListener('resize',bootResizeHandler);
   }
 
   // Letter-by-letter title reveal (50% slower)
@@ -582,6 +597,7 @@ function enterApp(){
   if(window.electronAPI)document.body.classList.add('electron-inset');
   if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
   if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
+  if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
   window._bootOrb=null;
   disposeBootThree();
   const boot=document.getElementById('boot');

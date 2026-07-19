@@ -31,7 +31,9 @@ category sweep bonuses, retroactive coin grants. The IPC surface is complete and
 2. **Data migration** — see spec below (2026-07-19). Verdict: no code needed for v1.1;
    revisit "legacy seed" as an optional v1.2+ nice-to-have.
 3. ~~Shop completion~~ ✅ verified already done (2026-07-19) — see note below.
-4. Boot orb polish (Three.js) — user-flagged.
+4. ~~Boot orb polish (Three.js) — user-flagged.~~ ✅ done (2026-07-19) — added window-resize
+   handling for the boot screen (star field canvas + Three.js orb renderer), which previously
+   sized once at boot start and never adapted if the Electron window was resized before launch.
 5. Then: bump version, merge → main, CI ships it, installed app auto-updates.
 
 ### Shop — verified complete (2026-07-19)
@@ -123,3 +125,4 @@ rest of the v1.1/v1.2 queue.
 - 2026-07-18: repo audited; uncommitted game work rescued to `game-rebuild`; this roadmap added.
 - 2026-07-18: all 4 audit bugs fixed in src/db.js (app-date streak yesterday, weekly once-per-week guard + display, sweep bonus in return, xp history rollover-aware). Tested with temp DB. Known minor quirk: a weekly completed on a previous day can't be un-ticked later in the week (uncomplete matches same-day only).
 - 2026-07-19: audited shop system end-to-end (renderer/css/db/main/preload) — already fully implemented, no work needed. Wrote the localStorage-to-SQLite data migration spec: corrected the audit's premise (merging to main does not wipe localStorage data — appId/userData path is unchanged and old sb4_ keys are untouched by the SQLite rebuild), recommended shipping v1.1 without migration code, and sketched an optional v1.2+ "legacy seed" XP import as a deferred nice-to-have.
+- 2026-07-19: boot orb polish — the Three.js orb and star-field canvas on the boot screen sized themselves once from `window.innerWidth` at boot start with no resize handling; added a `bootResizeHandler` wired up in `startBoot()` (star canvas dims + `renderer.setSize` on the orb) and torn down in both `startBoot()`'s own reset path and `enterApp()` to avoid leaking listeners across boots. All four v1.1 queue items are now done except the merge-to-main step itself.
