@@ -142,6 +142,7 @@ ipcMain.handle('t212-fetch', (_, endpoint, apiKey) => {
 })
 
 ipcMain.handle('youtube-fetch', (_, ytPath, apiKey) => {
+  if (typeof ytPath !== 'string' || !ytPath) return { error: 'Invalid YouTube API path' }
   if (!apiKey) return { error: 'YouTube API Key not set in Settings' }
   return new Promise(resolve => {
     const sep = ytPath.includes('?') ? '&' : '?'
@@ -252,6 +253,7 @@ ipcMain.handle('youtube-oauth-refresh', (_, clientId, clientSecret, refreshToken
 })
 
 ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
+  if (typeof ytPath !== 'string' || !ytPath) return { error: 'Invalid YouTube API path' }
   if (!accessToken) return { error: 'No access token' }
   return new Promise(resolve => {
     const options = { hostname: 'youtubeanalytics.googleapis.com', path: ytPath, headers: { Authorization: `Bearer ${accessToken}` } }
@@ -297,9 +299,22 @@ app.whenReady().then(() => {
 })
 
 // ── Gamification IPC ──
+// Input validation helpers — IPC args come from the renderer and must not
+// reach better-sqlite3 with the wrong type (it throws on undefined/NaN/objects
+// bound as params, which would otherwise surface as an opaque native error).
+function isPositiveInt(v) { return Number.isInteger(v) && v > 0 }
+function isFiniteNumber(v) { return typeof v === 'number' && Number.isFinite(v) }
+function isNonEmptyString(v) { return typeof v === 'string' && v.trim().length > 0 }
+
 ipcMain.handle('quests:list', () => { try { return db.listQuests() } catch(e) { console.error('[db]',e.message); return [] } })
-ipcMain.handle('quests:complete', (_, questId) => { try { return db.completeQuest(questId) } catch(e) { console.error('[db]',e.message); throw e } })
-ipcMain.handle('quests:uncomplete', (_, questId) => { try { return db.uncompleteQuest(questId) } catch(e) { console.error('[db]',e.message); return {} } })
+ipcMain.handle('quests:complete', (_, questId) => {
+  if (!isPositiveInt(questId)) throw new Error('Invalid quest id')
+  try { return db.completeQuest(questId) } catch(e) { console.error('[db]',e.message); throw e }
+})
+ipcMain.handle('quests:uncomplete', (_, questId) => {
+  if (!isPositiveInt(questId)) return {}
+  try { return db.uncompleteQuest(questId) } catch(e) { console.error('[db]',e.message); return {} }
+})
 ipcMain.handle('profile:get', () => { try { return db.getProfile() } catch(e) { console.error('[db]',e.message); return null } })
 ipcMain.handle('streaks:get', () => { try { return db.getStreaks() } catch(e) { console.error('[db]',e.message); return { categories:[], globalStreak:0 } } })
 ipcMain.handle('badges:list', () => { try { return db.listBadges() } catch(e) { console.error('[db]',e.message); return [] } })
@@ -331,13 +346,34 @@ ipcMain.handle('env:get-keys', () => {
   }
 })
 ipcMain.handle('coins:get', () => { try { return db.getCoins() } catch(e) { console.error('[db]',e.message); return 0 } })
-ipcMain.handle('coins:award', (_, amount, reason) => { try { return db.awardCoins(amount, reason) } catch(e) { console.error('[db]',e.message); return null } })
-ipcMain.handle('shop:purchase', (_, itemKey, cost) => { try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } } })
-ipcMain.handle('streaks:add-freeze', (_, n) => { try { return db.addFreezeTokens(n) } catch(e) { console.error('[db]',e.message); return [] } })
-ipcMain.handle('xp:history', (_, days) => { try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] } })
-ipcMain.handle('settings:get', (_, key) => { try { return db.getSetting(key) } catch(e) { return null } })
-ipcMain.handle('settings:set', (_, key, value) => { try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) } })
-ipcMain.handle('profile:update-name', (_, name) => { try { db.updateDisplayName(name) } catch(e) { console.error('[db]',e.message) } })
+ipcMain.handle('coins:award', (_, amount, reason) => {
+  if (!isFiniteNumber(amount)) return null
+  try { return db.awardCoins(amount, isNonEmptyString(reason) ? reason : null) } catch(e) { console.error('[db]',e.message); return null }
+})
+ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
+  if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }
+  try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+})
+ipcMain.handle('streaks:add-freeze', (_, n) => {
+  if (n !== undefined && !isFiniteNumber(n)) return []
+  try { return db.addFreezeTokens(n) } catch(e) { console.error('[db]',e.message); return [] }
+})
+ipcMain.handle('xp:history', (_, days) => {
+  if (days !== undefined && !isFiniteNumber(days)) return []
+  try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] }
+})
+ipcMain.handle('settings:get', (_, key) => {
+  if (!isNonEmptyString(key)) return null
+  try { return db.getSetting(key) } catch(e) { return null }
+})
+ipcMain.handle('settings:set', (_, key, value) => {
+  if (!isNonEmptyString(key)) return
+  try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
+})
+ipcMain.handle('profile:update-name', (_, name) => {
+  if (!isNonEmptyString(name)) return
+  try { db.updateDisplayName(name.trim().slice(0, 40)) } catch(e) { console.error('[db]',e.message) }
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
