@@ -4,6 +4,15 @@ const https = require('https')
 const http = require('http')
 const db = require('./src/db')
 
+// An uncaught exception/rejection in the main process otherwise crashes the
+// whole app for the user with no dialog or log they can see; log and keep running.
+process.on('uncaughtException', (err) => {
+  console.error('[main] Uncaught exception:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] Unhandled rejection:', reason)
+})
+
 let mainWindow
 
 function createWindow() {
