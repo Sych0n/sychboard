@@ -453,8 +453,9 @@ function getXpHistory(days = 7) {
   _db.prepare(`SELECT date(occurred_at, ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
     .all(`-${rolloverHour} hours`).forEach(r => { map[r.d] = r.xp })
   const out = []
+  const anchor = new Date(getAppDate())
   for (let i = n - 1; i >= 0; i--) {
-    const dt = new Date()
+    const dt = new Date(anchor)
     dt.setDate(dt.getDate() - i)
     const key = dt.toISOString().split('T')[0]
     out.push({ date: key, xp: map[key] || 0, label: dt.toLocaleDateString('en-GB', { weekday: 'short' }) })
