@@ -414,7 +414,17 @@ function uncompleteQuest(questId) {
     // Revert streak if no other completions today in this category
     const otherToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND qc.app_date=? AND qc.quest_id!=?`).get(quest.category_id, appDate, questId)?.n ?? 0
     if (otherToday === 0) {
-      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=NULL WHERE category_id=?`).run(quest.category_id)
+      // Restore last_completion_date to the true most-recent prior completion (or
+      // NULL if there truly is none) — not unconditionally NULL. Nulling it here
+      // makes completeQuest treat the next completion as "first ever" (the
+      // `!lastDate` branch), which always grants +1 regardless of how many days
+      // were actually skipped, permanently disabling streak breaks/soft-resets
+      // for this category after any complete→uncomplete cycle.
+      const prevCompletion = _db.prepare(`
+        SELECT MAX(qc.app_date) as d FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id
+        WHERE q.category_id=? AND qc.app_date<?
+      `).get(quest.category_id, appDate)?.d ?? null
+      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=? WHERE category_id=?`).run(prevCompletion, quest.category_id)
     }
   })()
 
