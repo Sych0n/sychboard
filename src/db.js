@@ -309,12 +309,24 @@ function completeQuest(questId) {
     const yesterday = new Date(appDate)
     yesterday.setDate(yesterday.getDate() - 1)
     const yesterdayStr = yesterday.toISOString().split('T')[0]
+    const dayBeforeYesterday = new Date(appDate)
+    dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2)
+    const dayBeforeYesterdayStr = dayBeforeYesterday.toISOString().split('T')[0]
 
+    let tokens = streak?.freeze_tokens ?? 0
+    let freezeUsed = false
     let newStreak
     if (lastDate === appDate) {
       newStreak = currentStreak
     } else if (!lastDate || lastDate === yesterdayStr) {
       newStreak = currentStreak + 1
+    } else if (lastDate === dayBeforeYesterdayStr && tokens > 0) {
+      // Exactly one missed day and a freeze token in stock: spend it to bridge the
+      // gap instead of breaking the streak (this is what "Streak Freeze" purchases
+      // and 7-day-milestone rewards were previously granting but never consuming).
+      newStreak = currentStreak + 1
+      tokens -= 1
+      freezeUsed = true
     } else {
       // Broken streak
       const softReset = _db.prepare("SELECT value FROM settings WHERE key='soft_reset_enabled'").get()
@@ -322,7 +334,6 @@ function completeQuest(questId) {
     }
 
     const longest = Math.max(newStreak, streak?.longest_streak ?? 0)
-    let tokens = streak?.freeze_tokens ?? 0
     if (newStreak % 7 === 0 && newStreak > currentStreak) tokens = Math.min(tokens + 1, 3)
 
     if (streak && lastDate !== appDate) {
@@ -370,7 +381,7 @@ function completeQuest(questId) {
         .run(sweepBonus, 'category_sweep', finalTotalXp, catKey + ' category sweep bonus')
     }
 
-    return { xpAwarded, newTotalXp: finalTotalXp, sweepBonus, leveledUp, newLevel: newLevelInfo.level, newRank: rankForLevel(newLevelInfo.level), streak: { category: catKey, current: newStreak, bonusPct }, badgesUnlocked, coinsAwarded, coinsFromLevelUp, coins: (_db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0) }
+    return { xpAwarded, newTotalXp: finalTotalXp, sweepBonus, leveledUp, newLevel: newLevelInfo.level, newRank: rankForLevel(newLevelInfo.level), streak: { category: catKey, current: newStreak, bonusPct, freezeUsed }, badgesUnlocked, coinsAwarded, coinsFromLevelUp, coins: (_db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0) }
   })
 
   return doComplete()

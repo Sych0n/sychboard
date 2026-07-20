@@ -749,6 +749,7 @@ async function gmCompleteQuest(questId,checked,ev){
           if(res.coinsFromLevelUp)setTimeout(()=>{coinBurst('#gm-coins-widget');showXpToast(`◈ +${res.coinsFromLevelUp} SychCoins — Level ${res.newLevel}!`);},1200);
         }
         if(res.badgesUnlocked?.length)setTimeout(()=>toast(`🏆 Badge unlocked: ${res.badgesUnlocked.map(b=>b.name).join(', ')}`),800);
+        if(res.streak?.freezeUsed)setTimeout(()=>toast('❄️ Streak Freeze used — missed day covered'),800);
       }
     } else {
       await window.sychboard.quests.uncomplete(questId);
