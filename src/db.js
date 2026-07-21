@@ -405,12 +405,22 @@ function completeQuest(questId) {
 }
 
 function uncompleteQuest(questId) {
-  const appDate = getAppDate()
+  const todayAppDate = getAppDate()
   const quest = _db.prepare('SELECT * FROM quests WHERE id=?').get(questId)
   if (!quest) throw new Error('Quest not found: ' + questId)
 
-  const completion = _db.prepare('SELECT * FROM quest_completions WHERE quest_id=? AND app_date=?').get(questId, appDate)
+  // Weekly quests can be completed on any day of the ISO week (listQuests/
+  // completeQuest treat the whole %Y-%W week as "done"), so find that
+  // completion's own row instead of only looking at today's app_date —
+  // otherwise unticking a weekly quest completed earlier in the week
+  // silently no-ops and the checkbox just snaps back on refresh.
+  const completion = quest.frequency === 'weekly'
+    ? _db.prepare(
+        "SELECT * FROM quest_completions WHERE quest_id=? AND strftime('%Y-%W', app_date)=strftime('%Y-%W', ?) ORDER BY app_date DESC LIMIT 1"
+      ).get(questId, todayAppDate)
+    : _db.prepare('SELECT * FROM quest_completions WHERE quest_id=? AND app_date=?').get(questId, todayAppDate)
   if (!completion) return { xpRemoved: 0 }
+  const completionDate = completion.app_date
 
   const xpRemoved = completion.xp_awarded
   const profile = _db.prepare('SELECT * FROM profile WHERE id=1').get()
@@ -423,14 +433,17 @@ function uncompleteQuest(questId) {
   for (let L = newLevel.level + 1; L <= oldLevel.level; L++) coinsRemoved += L * 10
 
   _db.transaction(() => {
-    _db.prepare('DELETE FROM quest_completions WHERE quest_id=? AND app_date=?').run(questId, appDate)
+    _db.prepare('DELETE FROM quest_completions WHERE id=?').run(completion.id)
     _db.prepare('UPDATE profile SET total_xp=?, current_level=?, sychcoins=MAX(0,sychcoins-?) WHERE id=1').run(newTotal, newLevel.level, coinsRemoved)
     _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
       .run(-xpRemoved, 'manual_adjust', questId, newTotal, 'Uncompleted: ' + quest.name)
 
-    // Revert streak if no other completions today in this category
-    const otherToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND qc.app_date=? AND qc.quest_id!=?`).get(quest.category_id, appDate, questId)?.n ?? 0
-    if (otherToday === 0) {
+    // Revert streak if no other completions on that same date in this category.
+    // Use completionDate (the day this completion actually landed on), not
+    // today — a weekly quest's completion may be several days old by the time
+    // it's unticked, and that's the date whose streak effect must be undone.
+    const otherOnDate = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND qc.app_date=? AND qc.quest_id!=?`).get(quest.category_id, completionDate, questId)?.n ?? 0
+    if (otherOnDate === 0) {
       // Restore last_completion_date to the true most-recent prior completion (or
       // NULL if there truly is none) — not unconditionally NULL. Nulling it here
       // makes completeQuest treat the next completion as "first ever" (the
@@ -440,7 +453,7 @@ function uncompleteQuest(questId) {
       const prevCompletion = _db.prepare(`
         SELECT MAX(qc.app_date) as d FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id
         WHERE q.category_id=? AND qc.app_date<?
-      `).get(quest.category_id, appDate)?.d ?? null
+      `).get(quest.category_id, completionDate)?.d ?? null
       // If this completion was the one that bridged a missed day by spending a
       // freeze token, undoing it must refund the token — otherwise a
       // complete->uncomplete cycle permanently burns a token for nothing, since
