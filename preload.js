@@ -20,7 +20,10 @@ contextBridge.exposeInMainWorld('sychboard', {
     get: () => ipcRenderer.invoke('coins:get'),
     award: (amount, reason) => ipcRenderer.invoke('coins:award', amount, reason)
   },
-  shop: { purchase: (itemKey, cost) => ipcRenderer.invoke('shop:purchase', itemKey, cost) },
+  shop: {
+    purchase: (itemKey, cost) => ipcRenderer.invoke('shop:purchase', itemKey, cost),
+    purchaseFreeze: (cost) => ipcRenderer.invoke('shop:purchase-freeze', cost)
+  },
   xp: { history: (days) => ipcRenderer.invoke('xp:history', days) },
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),

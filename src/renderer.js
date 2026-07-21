@@ -1177,10 +1177,12 @@ async function rShop(){
 async function buyShopItem(key){
   const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
   if(item.type==='consumable'){
-    const coins=await window.sychboard.coins.get();
-    if(coins<item.cost){shakeShopBalance();toast('Not enough SychCoins');return;}
-    await window.sychboard.coins.award(-item.cost,'shop:'+key);
-    await window.sychboard.streaks.addFreeze(1);
+    const res=await window.sychboard.shop.purchaseFreeze(item.cost);
+    if(!res?.ok){
+      if(res?.error==='insufficient'){shakeShopBalance();toast('Not enough SychCoins');}
+      else toast('Purchase failed');
+      return;
+    }
     toast('❄️ Streak Freeze added to all categories');
     coinBurst('#shop-coins');
     rShop();

@@ -501,6 +501,24 @@ function addFreezeTokens(n = 1) {
   return _db.prepare('SELECT category_id, freeze_tokens FROM streaks').all()
 }
 
+// Buys a Streak Freeze consumable: checks balance, deducts coins, and grants the
+// tokens all inside one transaction, so two overlapping purchase clicks can't
+// both read "sufficient balance" before either deduction lands (the same
+// double-spend shape as the already-fixed weekly-quest/sweep-bonus farms) —
+// unlike the old renderer path, which called coins:award then streaks:add-freeze
+// as two separate non-atomic IPC round-trips.
+function purchaseFreeze(cost) {
+  const price = Math.max(0, Math.round(Number(cost) || 0))
+  const doBuy = _db.transaction(() => {
+    const coins = getCoins()
+    if (coins < price) return { ok: false, error: 'insufficient', coins }
+    _db.prepare('UPDATE profile SET sychcoins=? WHERE id=1').run(coins - price)
+    _db.prepare('UPDATE streaks SET freeze_tokens=MIN(3,freeze_tokens+1)').run()
+    return { ok: true, coins: coins - price, freezes: _db.prepare('SELECT category_id, freeze_tokens FROM streaks').all() }
+  })
+  return doBuy()
+}
+
 function getXpHistory(days = 7) {
   const n = Math.min(60, Math.max(1, Math.round(Number(days) || 7)))
   const map = {}
@@ -580,4 +598,4 @@ function updateDisplayName(name) {
   _db.prepare('UPDATE profile SET display_name=? WHERE id=1').run(name)
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, updateDisplayName, getCoins, awardCoins, purchaseItem, addFreezeTokens, getXpHistory }
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, updateDisplayName, getCoins, awardCoins, purchaseItem, addFreezeTokens, purchaseFreeze, getXpHistory }

@@ -367,6 +367,10 @@ ipcMain.handle('streaks:add-freeze', (_, n) => {
   if (n !== undefined && !isFiniteNumber(n)) return []
   try { return db.addFreezeTokens(n) } catch(e) { console.error('[db]',e.message); return [] }
 })
+ipcMain.handle('shop:purchase-freeze', (_, cost) => {
+  if (!isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }
+  try { return db.purchaseFreeze(cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+})
 ipcMain.handle('xp:history', (_, days) => {
   if (days !== undefined && !isFiniteNumber(days)) return []
   try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] }
