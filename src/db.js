@@ -208,6 +208,9 @@ function migrate() {
     { version: 3, sql: `
       ALTER TABLE profile ADD COLUMN sychcoins INTEGER NOT NULL DEFAULT 0;
       INSERT OR IGNORE INTO settings VALUES ('shop_owned','[]');
+    `},
+    { version: 4, sql: `
+      ALTER TABLE quest_completions ADD COLUMN freeze_used INTEGER NOT NULL DEFAULT 0;
     `}
   ]
 
@@ -333,6 +336,10 @@ function completeQuest(questId) {
       newStreak = softReset?.value === '1' ? Math.floor(currentStreak * 0.5) + 1 : 1
     }
 
+    if (freezeUsed) {
+      _db.prepare('UPDATE quest_completions SET freeze_used=1 WHERE quest_id=? AND app_date=?').run(questId, appDate)
+    }
+
     const longest = Math.max(newStreak, streak?.longest_streak ?? 0)
     if (newStreak % 7 === 0 && newStreak > currentStreak) tokens = Math.min(tokens + 1, 3)
 
@@ -424,7 +431,13 @@ function uncompleteQuest(questId) {
         SELECT MAX(qc.app_date) as d FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id
         WHERE q.category_id=? AND qc.app_date<?
       `).get(quest.category_id, appDate)?.d ?? null
-      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=? WHERE category_id=?`).run(prevCompletion, quest.category_id)
+      // If this completion was the one that bridged a missed day by spending a
+      // freeze token, undoing it must refund the token — otherwise a
+      // complete->uncomplete cycle permanently burns a token for nothing, since
+      // the streak effect it paid for is being reverted right here.
+      const freezeRestored = !!completion.freeze_used
+      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=?, freeze_tokens=MIN(3,freeze_tokens+?) WHERE category_id=?`)
+        .run(prevCompletion, freezeRestored ? 1 : 0, quest.category_id)
     }
   })()
 
