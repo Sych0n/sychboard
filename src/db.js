@@ -375,17 +375,27 @@ function completeQuest(questId) {
       }
     }
 
-    // Category sweep bonus (+10 XP if all daily quests in category done today)
+    // Category sweep bonus (+10 XP if all daily quests in category done today).
+    // Guarded against re-award: uncompleteQuest doesn't claw this back (it's a
+    // once-per-day-per-category credit for the day, not tied to one quest), so
+    // without this check toggling the triggering quest off/on would re-satisfy
+    // catDoneToday===catDailyTotal and farm +10 XP indefinitely for free.
     let finalTotalXp = newTotalXp
     let sweepBonus   = 0
     const catDailyTotal = _db.prepare(`SELECT COUNT(*) as n FROM quests WHERE category_id=? AND frequency='daily' AND active=1`).get(quest.category_id)?.n ?? 0
     const catDoneToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND q.frequency='daily' AND qc.app_date=?`).get(quest.category_id, appDate)?.n ?? 0
     if (catDailyTotal > 0 && catDoneToday === catDailyTotal) {
-      sweepBonus  = 10
-      finalTotalXp = newTotalXp + sweepBonus
-      _db.prepare('UPDATE profile SET total_xp=? WHERE id=1').run(finalTotalXp)
-      _db.prepare(`INSERT INTO xp_log (amount,source_type,running_total,reason) VALUES (?,?,?,?)`)
-        .run(sweepBonus, 'category_sweep', finalTotalXp, catKey + ' category sweep bonus')
+      const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+      const alreadySwept = _db.prepare(
+        `SELECT 1 FROM xp_log WHERE source_type='category_sweep' AND source_id=? AND date(occurred_at, ?)=?`
+      ).get(quest.category_id, `-${rolloverHour} hours`, appDate)
+      if (!alreadySwept) {
+        sweepBonus  = 10
+        finalTotalXp = newTotalXp + sweepBonus
+        _db.prepare('UPDATE profile SET total_xp=? WHERE id=1').run(finalTotalXp)
+        _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
+          .run(sweepBonus, 'category_sweep', quest.category_id, finalTotalXp, catKey + ' category sweep bonus')
+      }
     }
 
     return { xpAwarded, newTotalXp: finalTotalXp, sweepBonus, leveledUp, newLevel: newLevelInfo.level, newRank: rankForLevel(newLevelInfo.level), streak: { category: catKey, current: newStreak, bonusPct, freezeUsed }, badgesUnlocked, coinsAwarded, coinsFromLevelUp, coins: (_db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0) }
