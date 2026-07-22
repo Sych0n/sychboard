@@ -356,11 +356,11 @@ ipcMain.handle('env:get-keys', () => {
 })
 ipcMain.handle('coins:get', () => { try { return db.getCoins() } catch(e) { console.error('[db]',e.message); return 0 } })
 ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
-  if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }
+  if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
   try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
 ipcMain.handle('shop:purchase-freeze', (_, cost) => {
-  if (!isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }
+  if (!isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
   try { return db.purchaseFreeze(cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
 ipcMain.handle('xp:history', (_, days) => {

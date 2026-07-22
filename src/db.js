@@ -474,7 +474,9 @@ function getCoins() {
 }
 
 function purchaseItem(itemKey, cost) {
-  const price = Math.max(0, Math.round(Number(cost) || 0))
+  const numCost = Number(cost)
+  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
+  const price = Math.round(numCost)
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     let owned = []
@@ -496,7 +498,9 @@ function purchaseItem(itemKey, cost) {
 // unlike the old renderer path, which called coins:award then streaks:add-freeze
 // as two separate non-atomic IPC round-trips.
 function purchaseFreeze(cost) {
-  const price = Math.max(0, Math.round(Number(cost) || 0))
+  const numCost = Number(cost)
+  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
+  const price = Math.round(numCost)
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     if (coins < price) return { ok: false, error: 'insufficient', coins }
