@@ -47,7 +47,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
-    mainWindow.webContents.openDevTools()
+    if (!app.isPackaged) mainWindow.webContents.openDevTools()
     checkForUpdates()
   })
 
