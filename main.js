@@ -355,17 +355,9 @@ ipcMain.handle('env:get-keys', () => {
   }
 })
 ipcMain.handle('coins:get', () => { try { return db.getCoins() } catch(e) { console.error('[db]',e.message); return 0 } })
-ipcMain.handle('coins:award', (_, amount, reason) => {
-  if (!isFiniteNumber(amount)) return null
-  try { return db.awardCoins(amount, isNonEmptyString(reason) ? reason : null) } catch(e) { console.error('[db]',e.message); return null }
-})
 ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
   if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }
   try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
-})
-ipcMain.handle('streaks:add-freeze', (_, n) => {
-  if (n !== undefined && !isFiniteNumber(n)) return []
-  try { return db.addFreezeTokens(n) } catch(e) { console.error('[db]',e.message); return [] }
 })
 ipcMain.handle('shop:purchase-freeze', (_, cost) => {
   if (!isFiniteNumber(cost)) return { ok:false, error:'invalid_input' }

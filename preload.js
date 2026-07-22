@@ -11,14 +11,12 @@ contextBridge.exposeInMainWorld('sychboard', {
     updateName: (name) => ipcRenderer.invoke('profile:update-name', name)
   },
   streaks: {
-    get: () => ipcRenderer.invoke('streaks:get'),
-    addFreeze: (n) => ipcRenderer.invoke('streaks:add-freeze', n)
+    get: () => ipcRenderer.invoke('streaks:get')
   },
   badges: { list: () => ipcRenderer.invoke('badges:list') },
   activity: { recent: () => ipcRenderer.invoke('activity:recent') },
   coins: {
-    get: () => ipcRenderer.invoke('coins:get'),
-    award: (amount, reason) => ipcRenderer.invoke('coins:award', amount, reason)
+    get: () => ipcRenderer.invoke('coins:get')
   },
   shop: {
     purchase: (itemKey, cost) => ipcRenderer.invoke('shop:purchase', itemKey, cost),

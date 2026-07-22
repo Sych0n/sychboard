@@ -473,13 +473,6 @@ function getCoins() {
   return _db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0
 }
 
-function awardCoins(amount, reason) {
-  const delta = Math.round(Number(amount) || 0)
-  const next = Math.max(0, getCoins() + delta)
-  _db.prepare('UPDATE profile SET sychcoins=? WHERE id=1').run(next)
-  return { coins: next, delta, reason: reason || null }
-}
-
 function purchaseItem(itemKey, cost) {
   const price = Math.max(0, Math.round(Number(cost) || 0))
   const doBuy = _db.transaction(() => {
@@ -494,11 +487,6 @@ function purchaseItem(itemKey, cost) {
     return { ok: true, coins: coins - price, owned }
   })
   return doBuy()
-}
-
-function addFreezeTokens(n = 1) {
-  _db.prepare('UPDATE streaks SET freeze_tokens=MIN(3,freeze_tokens+?)').run(Math.max(0, Math.round(Number(n) || 0)))
-  return _db.prepare('SELECT category_id, freeze_tokens FROM streaks').all()
 }
 
 // Buys a Streak Freeze consumable: checks balance, deducts coins, and grants the
@@ -598,4 +586,4 @@ function updateDisplayName(name) {
   _db.prepare('UPDATE profile SET display_name=? WHERE id=1').run(name)
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, updateDisplayName, getCoins, awardCoins, purchaseItem, addFreezeTokens, purchaseFreeze, getXpHistory }
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, updateDisplayName, getCoins, purchaseItem, purchaseFreeze, getXpHistory }
