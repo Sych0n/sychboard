@@ -7,8 +7,7 @@ contextBridge.exposeInMainWorld('sychboard', {
     uncomplete: (id) => ipcRenderer.invoke('quests:uncomplete', id)
   },
   profile: {
-    get: () => ipcRenderer.invoke('profile:get'),
-    updateName: (name) => ipcRenderer.invoke('profile:update-name', name)
+    get: () => ipcRenderer.invoke('profile:get')
   },
   streaks: {
     get: () => ipcRenderer.invoke('streaks:get')

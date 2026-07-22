@@ -375,11 +375,6 @@ ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
-ipcMain.handle('profile:update-name', (_, name) => {
-  if (!isNonEmptyString(name)) return
-  try { db.updateDisplayName(name.trim().slice(0, 40)) } catch(e) { console.error('[db]',e.message) }
-})
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

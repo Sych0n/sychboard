@@ -586,8 +586,4 @@ function setSetting(key, value) {
   _db.prepare('INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)').run(key, String(value))
 }
 
-function updateDisplayName(name) {
-  _db.prepare('UPDATE profile SET display_name=? WHERE id=1').run(name)
-}
-
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, updateDisplayName, getCoins, purchaseItem, purchaseFreeze, getXpHistory }
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory }
