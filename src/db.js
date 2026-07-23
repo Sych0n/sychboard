@@ -568,11 +568,24 @@ function getStreaks() {
   let globalStreak = 0, globalLongest = 0
   const completionDates = _db.prepare(`SELECT DISTINCT app_date FROM quest_completions ORDER BY app_date DESC LIMIT 400`).all().map(r => r.app_date)
   if (completionDates.length) {
-    const check = parseLocalDate(appDate)
-    for (const d of completionDates) {
-      const checkStr = formatLocalDate(check)
-      if (d === checkStr) { globalStreak++; check.setDate(check.getDate() - 1) }
-      else break
+    // The streak isn't broken just because *today* has no completion yet — it's
+    // only broken once a full day has passed with no activity (same threshold
+    // completeQuest uses: a 1-day-old last completion is still "alive", a
+    // 2+-day-old one is broken). Anchor the walk at the most recent activity
+    // date if that's today or yesterday, so the widget doesn't show 0 every
+    // single morning before the user has completed anything.
+    const yesterday = parseLocalDate(appDate)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = formatLocalDate(yesterday)
+    let check = null
+    if (completionDates[0] === appDate) check = parseLocalDate(appDate)
+    else if (completionDates[0] === yesterdayStr) check = yesterday
+    if (check) {
+      for (const d of completionDates) {
+        const checkStr = formatLocalDate(check)
+        if (d === checkStr) { globalStreak++; check.setDate(check.getDate() - 1) }
+        else break
+      }
     }
     // Compute longest. These two are only ever subtracted from each other (never
     // fed through getDate()/setDate() or re-serialized), so parsing them as UTC
