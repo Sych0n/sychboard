@@ -34,11 +34,27 @@ function streakBonusPct(streak) {
   return 0
 }
 
+// Format a Date's LOCAL calendar day as YYYY-MM-DD. Never use toISOString() for
+// this — it serializes in UTC, which silently shifts the date by a day for any
+// non-UTC timezone whenever local and UTC calendar days differ (always true for
+// part of every day outside UTC+0).
+function formatLocalDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Parse a YYYY-MM-DD string as LOCAL midnight. `new Date("YYYY-MM-DD")` parses as
+// UTC midnight, which combined with local getDate()/setDate() causes the same
+// day-shift as toISOString() above (opposite direction, e.g. any UTC-negative zone).
+function parseLocalDate(s) {
+  const [y, m, d] = s.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function getAppDate() {
   const rolloverHour = parseInt(_db?.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
   const now = new Date()
   if (now.getHours() < rolloverHour) now.setDate(now.getDate() - 1)
-  return now.toISOString().split('T')[0]
+  return formatLocalDate(now)
 }
 
 // ── Init & migrations ────────────────────────────────────────────────────────
@@ -309,12 +325,12 @@ function completeQuest(questId) {
     // clock, or completions between midnight and the rollover hour wrongly
     // count as a broken streak.
     const lastDate = streak?.last_completion_date
-    const yesterday = new Date(appDate)
+    const yesterday = parseLocalDate(appDate)
     yesterday.setDate(yesterday.getDate() - 1)
-    const yesterdayStr = yesterday.toISOString().split('T')[0]
-    const dayBeforeYesterday = new Date(appDate)
+    const yesterdayStr = formatLocalDate(yesterday)
+    const dayBeforeYesterday = parseLocalDate(appDate)
     dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2)
-    const dayBeforeYesterdayStr = dayBeforeYesterday.toISOString().split('T')[0]
+    const dayBeforeYesterdayStr = formatLocalDate(dayBeforeYesterday)
 
     let tokens = streak?.freeze_tokens ?? 0
     let freezeUsed = false
@@ -520,11 +536,11 @@ function getXpHistory(days = 7) {
   _db.prepare(`SELECT date(occurred_at, ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
     .all(`-${rolloverHour} hours`).forEach(r => { map[r.d] = r.xp })
   const out = []
-  const anchor = new Date(getAppDate())
+  const anchor = parseLocalDate(getAppDate())
   for (let i = n - 1; i >= 0; i--) {
     const dt = new Date(anchor)
     dt.setDate(dt.getDate() - i)
-    const key = dt.toISOString().split('T')[0]
+    const key = formatLocalDate(dt)
     out.push({ date: key, xp: map[key] || 0, label: dt.toLocaleDateString('en-GB', { weekday: 'short' }) })
   }
   return out
@@ -544,13 +560,15 @@ function getStreaks() {
   let globalStreak = 0, globalLongest = 0
   const completionDates = _db.prepare(`SELECT DISTINCT app_date FROM quest_completions ORDER BY app_date DESC LIMIT 400`).all().map(r => r.app_date)
   if (completionDates.length) {
-    const check = new Date(appDate)
+    const check = parseLocalDate(appDate)
     for (const d of completionDates) {
-      const checkStr = check.toISOString().split('T')[0]
+      const checkStr = formatLocalDate(check)
       if (d === checkStr) { globalStreak++; check.setDate(check.getDate() - 1) }
       else break
     }
-    // Compute longest
+    // Compute longest. These two are only ever subtracted from each other (never
+    // fed through getDate()/setDate() or re-serialized), so parsing them as UTC
+    // midnight here is safe — the day-diff comes out the same either way.
     let run = 1
     for (let i = 1; i < completionDates.length; i++) {
       const a = new Date(completionDates[i-1]), b = new Date(completionDates[i])
