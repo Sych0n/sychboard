@@ -941,7 +941,7 @@ function renderHomeGamification(){
       if(!activity||!activity.length){actEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No activity yet — complete your first quest!</div>';}
       else{
         actEl.innerHTML=activity.map(a=>{
-          const ago=_timeAgo(new Date(a.completed_at));
+          const ago=_timeAgo(parseUtcTimestamp(a.completed_at));
           return`<div class="gm-act-item"><div class="gm-act-icon">●</div><div class="gm-act-body"><div class="gm-act-name">Completed "${sanitizeText(a.quest_name,50)}"</div><div class="gm-act-meta">${ago}</div></div><div class="gm-act-xp">+${a.xp_awarded}XP</div></div>`;
         }).join('');
       }
@@ -963,6 +963,12 @@ function _timeAgo(date){
   if(s<60)return'Just now';if(s<3600)return`${Math.floor(s/60)} min ago`;
   if(s<86400)return`${Math.floor(s/3600)} hr ago`;return`${Math.floor(s/86400)}d ago`;
 }
+// db.js timestamps come from SQLite's datetime('now') as "YYYY-MM-DD HH:MM:SS" UTC with
+// no timezone marker. new Date() on that exact string is parsed as LOCAL time (not UTC)
+// by V8's non-ISO date-time fallback, so every such timestamp silently comes out wrong
+// by the local UTC offset. Appending 'Z' (after swapping the space for 'T') makes it a
+// real ISO-8601 UTC string so it parses correctly everywhere.
+function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
 
 function renderHome(){
   renderSidebar();
@@ -1051,7 +1057,7 @@ async function rGame(){
   // Achievements — full grid, locked padlocked
   const unlockedN=badges.filter(b=>b.unlocked).length;
   const badgeGrid=badges.map(b=>`
-    <div class="game-badge${b.unlocked?' unlocked':' locked'}" title="${b.name}: ${b.description||''}${b.unlocked&&b.unlocked_at?` — unlocked ${b.unlocked_at.split(' ')[0]}`:''}">
+    <div class="game-badge${b.unlocked?' unlocked':' locked'}" title="${b.name}: ${b.description||''}${b.unlocked&&b.unlocked_at?` — unlocked ${parseUtcTimestamp(b.unlocked_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`:''}">
       <div class="game-badge-icon">${b.icon||'🏅'}</div>
       ${b.unlocked?'':'<div class="game-badge-lock">🔒</div>'}
       <div class="game-badge-name">${b.name}</div>
