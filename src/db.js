@@ -402,8 +402,13 @@ function completeQuest(questId) {
     const catDoneToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND q.frequency='daily' AND qc.app_date=?`).get(quest.category_id, appDate)?.n ?? 0
     if (catDailyTotal > 0 && catDoneToday === catDailyTotal) {
       const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+      // occurred_at is stored in UTC (SQLite's datetime('now')); 'localtime' must
+      // convert it to the OS-local wall clock BEFORE the rollover-hour shift, or
+      // this disagrees with getAppDate() (which shifts local time) for any
+      // non-UTC timezone during the window around the rollover hour equal in
+      // size to the UTC offset.
       const alreadySwept = _db.prepare(
-        `SELECT 1 FROM xp_log WHERE source_type='category_sweep' AND source_id=? AND date(occurred_at, ?)=?`
+        `SELECT 1 FROM xp_log WHERE source_type='category_sweep' AND source_id=? AND date(occurred_at, 'localtime', ?)=?`
       ).get(quest.category_id, `-${rolloverHour} hours`, appDate)
       if (!alreadySwept) {
         sweepBonus  = 10
@@ -532,8 +537,11 @@ function getXpHistory(days = 7) {
   const map = {}
   // Group by APP date (shift by the rollover hour) so 1am grinding counts
   // toward the same bar as the evening before, matching quests/streaks.
+  // occurred_at is stored in UTC (SQLite's datetime('now')) — 'localtime' must
+  // convert to the OS-local wall clock before the rollover shift, or this
+  // disagrees with getAppDate() for any non-UTC timezone near the rollover hour.
   const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
-  _db.prepare(`SELECT date(occurred_at, ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
+  _db.prepare(`SELECT date(occurred_at, 'localtime', ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
     .all(`-${rolloverHour} hours`).forEach(r => { map[r.d] = r.xp })
   const out = []
   const anchor = parseLocalDate(getAppDate())
