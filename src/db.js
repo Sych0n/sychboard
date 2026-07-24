@@ -50,6 +50,22 @@ function parseLocalDate(s) {
   return new Date(y, m - 1, d)
 }
 
+// Returns [mondayStr, sundayStr] for the Mon-Sun calendar week containing the
+// given YYYY-MM-DD app-date. Used instead of SQLite's strftime('%Y-%W', ...),
+// which numbers weeks from Jan 1 (not true ISO-8601 weeks) — two calendar-
+// adjacent days can land in different %W buckets across a year boundary
+// (e.g. 2026-01-04 is week "2026-00", 2026-01-05 is week "2026-01"), letting a
+// weekly quest be completed twice in what's actually the same 7-day week.
+function isoWeekRange(dateStr) {
+  const d = parseLocalDate(dateStr)
+  const dow = d.getDay() // 0=Sun..6=Sat
+  const monday = new Date(d)
+  monday.setDate(monday.getDate() + (dow === 0 ? -6 : 1 - dow))
+  const sunday = new Date(monday)
+  sunday.setDate(sunday.getDate() + 6)
+  return [formatLocalDate(monday), formatLocalDate(sunday)]
+}
+
 function getAppDate() {
   const rolloverHour = parseInt(_db?.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
   const now = new Date()
@@ -262,13 +278,14 @@ function migrate() {
 
 function listQuests() {
   const appDate = getAppDate()
-  // Weekly quests count as completed for the whole %Y-%W week; daily/epic per app-day.
+  const [weekStart, weekEnd] = isoWeekRange(appDate)
+  // Weekly quests count as completed for the whole Mon-Sun week; daily/epic per app-day.
   return _db.prepare(`
     SELECT q.*, c.name as category_name, c.key as category_key, c.icon as category_icon, c.color as category_color,
       CASE
         WHEN q.frequency = 'weekly' THEN
           EXISTS(SELECT 1 FROM quest_completions w WHERE w.quest_id = q.id
-                 AND strftime('%Y-%W', w.app_date) = strftime('%Y-%W', ?))
+                 AND w.app_date BETWEEN ? AND ?)
         ELSE
           EXISTS(SELECT 1 FROM quest_completions d WHERE d.quest_id = q.id AND d.app_date = ?)
       END as completed_today,
@@ -282,7 +299,7 @@ function listQuests() {
         NOT EXISTS(SELECT 1 FROM quest_completions e WHERE e.quest_id = q.id)))
     )
     ORDER BY q.frequency DESC, q.category_id, q.sort_order, q.id
-  `).all(appDate, appDate, appDate)
+  `).all(weekStart, weekEnd, appDate, appDate)
 }
 
 function completeQuest(questId) {
@@ -290,11 +307,12 @@ function completeQuest(questId) {
   const quest = _db.prepare('SELECT * FROM quests WHERE id = ?').get(questId)
   if (!quest) throw new Error('Quest not found: ' + questId)
 
-  // Weekly quests: one completion per ISO-ish week (%Y-%W), not per day
+  // Weekly quests: one completion per Mon-Sun calendar week, not per day
   if (quest.frequency === 'weekly') {
+    const [weekStart, weekEnd] = isoWeekRange(appDate)
     const doneThisWeek = _db.prepare(
-      "SELECT 1 FROM quest_completions WHERE quest_id=? AND strftime('%Y-%W', app_date)=strftime('%Y-%W', ?)"
-    ).get(questId, appDate)
+      'SELECT 1 FROM quest_completions WHERE quest_id=? AND app_date BETWEEN ? AND ?'
+    ).get(questId, weekStart, weekEnd)
     if (doneThisWeek) throw new Error('Weekly quest already completed this week')
   }
 
@@ -443,9 +461,12 @@ function uncompleteQuest(questId) {
   // otherwise unticking a weekly quest completed earlier in the week
   // silently no-ops and the checkbox just snaps back on refresh.
   const completion = quest.frequency === 'weekly'
-    ? _db.prepare(
-        "SELECT * FROM quest_completions WHERE quest_id=? AND strftime('%Y-%W', app_date)=strftime('%Y-%W', ?) ORDER BY app_date DESC LIMIT 1"
-      ).get(questId, todayAppDate)
+    ? (() => {
+        const [weekStart, weekEnd] = isoWeekRange(todayAppDate)
+        return _db.prepare(
+          'SELECT * FROM quest_completions WHERE quest_id=? AND app_date BETWEEN ? AND ? ORDER BY app_date DESC LIMIT 1'
+        ).get(questId, weekStart, weekEnd)
+      })()
     : _db.prepare('SELECT * FROM quest_completions WHERE quest_id=? AND app_date=?').get(questId, todayAppDate)
   if (!completion) return { xpRemoved: 0 }
   const completionDate = completion.app_date
