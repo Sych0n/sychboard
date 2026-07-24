@@ -175,6 +175,15 @@ ipcMain.handle('youtube-oauth-start', async (_, clientId, clientSecret) => {
   return new Promise((resolve) => {
     const server = http.createServer()
     const giveUp = setTimeout(() => { server.close(); resolve({ error: 'Auth timed out (2 min)' }) }, 120000)
+    // Without this, a listen failure (port/socket error) emits 'error' with no
+    // listener attached — Node treats that as an uncaught exception instead of
+    // rejecting/resolving this promise, leaving the renderer's await hanging
+    // until the unrelated 2-min timeout with no indication of what went wrong.
+    server.on('error', (err) => {
+      clearTimeout(giveUp)
+      console.error('[YT OAuth] Server error:', err.message)
+      resolve({ error: 'Could not start local OAuth server: ' + err.message })
+    })
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port
       const redirectUri = `http://127.0.0.1:${port}`
