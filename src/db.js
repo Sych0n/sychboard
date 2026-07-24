@@ -323,28 +323,15 @@ function completeQuest(questId) {
 
   const profile = _db.prepare('SELECT * FROM profile WHERE id = 1').get()
   const oldXp = profile?.total_xp ?? 0
-  const newTotalXp = oldXp + xpAwarded
-  const oldLevel = levelForTotalXp(oldXp)
-  const newLevelInfo = levelForTotalXp(newTotalXp)
-  const leveledUp = newLevelInfo.level > oldLevel.level
 
   const catKey = { 1:'health', 2:'productivity', 3:'creativity', 4:'finance' }[quest.category_id] ?? 'health'
-
-  // SychCoins: ~20% of XP per quest (min 1), plus level × 10 for each level gained
-  const coinsFromQuest = Math.max(1, Math.round(xpAwarded * 0.2))
-  let coinsFromLevelUp = 0
-  if (leveledUp) {
-    for (let L = oldLevel.level + 1; L <= newLevelInfo.level; L++) coinsFromLevelUp += L * 10
-  }
-  const coinsAwarded = coinsFromQuest + coinsFromLevelUp
 
   const doComplete = _db.transaction(() => {
     _db.prepare(`INSERT INTO quest_completions (quest_id,app_date,xp_awarded,streak_bonus_pct) VALUES (?,?,?,?)`)
       .run(questId, appDate, xpAwarded, bonusPct)
-    _db.prepare('UPDATE profile SET total_xp=?, current_level=?, sychcoins=sychcoins+? WHERE id=1')
-      .run(newTotalXp, newLevelInfo.level, coinsAwarded)
+    const afterQuestXp = oldXp + xpAwarded
     _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
-      .run(xpAwarded, 'quest_completion', questId, newTotalXp, 'Completed: ' + quest.name)
+      .run(xpAwarded, 'quest_completion', questId, afterQuestXp, 'Completed: ' + quest.name)
 
     // Update streak — "yesterday" must be relative to the APP date, not the wall
     // clock, or completions between midnight and the rollover hour wrongly
@@ -392,7 +379,8 @@ function completeQuest(questId) {
         .run(quest.category_id, appDate)
     }
 
-    // Check streak & level badges
+    // Check streak badges now; level badges are checked below, after the sweep
+    // bonus is folded into the total (see note there for why).
     const badgesUnlocked = []
     const streakMilestones = [[3,`spark_${catKey}`],[7,`week_${catKey}`],[14,`fortnight_${catKey}`],[30,`monthly_${catKey}`],[100,`centurion_${catKey}`]]
     for (const [threshold, key] of streakMilestones) {
@@ -404,24 +392,21 @@ function completeQuest(questId) {
         }
       }
     }
-    if (leveledUp) {
-      for (const [lvl, key] of [[5,'level_5'],[10,'level_10'],[20,'level_20']]) {
-        if (newLevelInfo.level >= lvl) {
-          const badge = _db.prepare('SELECT * FROM badges WHERE key=?').get(key)
-          if (badge && !_db.prepare('SELECT id FROM badge_unlocks WHERE badge_id=?').get(badge.id)) {
-            _db.prepare('INSERT OR IGNORE INTO badge_unlocks (badge_id) VALUES (?)').run(badge.id)
-            badgesUnlocked.push(badge)
-          }
-        }
-      }
-    }
 
     // Category sweep bonus (+10 XP if all daily quests in category done today).
     // Guarded against re-award: uncompleteQuest doesn't claw this back (it's a
     // once-per-day-per-category credit for the day, not tied to one quest), so
     // without this check toggling the triggering quest off/on would re-satisfy
     // catDoneToday===catDailyTotal and farm +10 XP indefinitely for free.
-    let finalTotalXp = newTotalXp
+    //
+    // This must run BEFORE level/coins are derived below: if the sweep bonus is
+    // itself what crosses a level threshold, deriving level/coins from the
+    // pre-sweep total would silently skip that level-up — no toast, no
+    // coinsFromLevelUp, no level badge — and since getProfile() always derives
+    // level fresh from total_xp, that transition could never be observed or
+    // repaid on a later call once total_xp already reflects the higher level
+    // (the coins for it would be lost for good).
+    let finalTotalXp = afterQuestXp
     let sweepBonus   = 0
     const catDailyTotal = _db.prepare(`SELECT COUNT(*) as n FROM quests WHERE category_id=? AND frequency='daily' AND active=1`).get(quest.category_id)?.n ?? 0
     const catDoneToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND q.frequency='daily' AND qc.app_date=?`).get(quest.category_id, appDate)?.n ?? 0
@@ -437,10 +422,37 @@ function completeQuest(questId) {
       ).get(quest.category_id, `-${rolloverHour} hours`, appDate)
       if (!alreadySwept) {
         sweepBonus  = 10
-        finalTotalXp = newTotalXp + sweepBonus
-        _db.prepare('UPDATE profile SET total_xp=? WHERE id=1').run(finalTotalXp)
+        finalTotalXp = afterQuestXp + sweepBonus
         _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
           .run(sweepBonus, 'category_sweep', quest.category_id, finalTotalXp, catKey + ' category sweep bonus')
+      }
+    }
+
+    // Level/coins are derived from the FINAL total (post-sweep) so a sweep-
+    // triggered level-up is never missed.
+    const oldLevel = levelForTotalXp(oldXp)
+    const newLevelInfo = levelForTotalXp(finalTotalXp)
+    const leveledUp = newLevelInfo.level > oldLevel.level
+    // SychCoins: ~20% of XP per quest (min 1), plus level × 10 for each level gained
+    const coinsFromQuest = Math.max(1, Math.round(xpAwarded * 0.2))
+    let coinsFromLevelUp = 0
+    if (leveledUp) {
+      for (let L = oldLevel.level + 1; L <= newLevelInfo.level; L++) coinsFromLevelUp += L * 10
+    }
+    const coinsAwarded = coinsFromQuest + coinsFromLevelUp
+
+    _db.prepare('UPDATE profile SET total_xp=?, current_level=?, sychcoins=sychcoins+? WHERE id=1')
+      .run(finalTotalXp, newLevelInfo.level, coinsAwarded)
+
+    if (leveledUp) {
+      for (const [lvl, key] of [[5,'level_5'],[10,'level_10'],[20,'level_20']]) {
+        if (newLevelInfo.level >= lvl) {
+          const badge = _db.prepare('SELECT * FROM badges WHERE key=?').get(key)
+          if (badge && !_db.prepare('SELECT id FROM badge_unlocks WHERE badge_id=?').get(badge.id)) {
+            _db.prepare('INSERT OR IGNORE INTO badge_unlocks (badge_id) VALUES (?)').run(badge.id)
+            badgesUnlocked.push(badge)
+          }
+        }
       }
     }
 
