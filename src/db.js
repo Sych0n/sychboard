@@ -233,8 +233,15 @@ function migrate() {
   const newlyApplied = []
   for (const m of migrations) {
     if (!applied.has(m.version)) {
-      _db.exec(m.sql)
-      _db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(m.version)
+      // Run the DDL and its schema_migrations bookkeeping in one transaction —
+      // otherwise a failure partway through leaves the schema half-applied but
+      // unmarked, and the next launch retries the same SQL from scratch, which
+      // fails on non-idempotent statements (e.g. ALTER TABLE ADD COLUMN throws
+      // "duplicate column" on the already-added part), breaking startup for good.
+      _db.transaction(() => {
+        _db.exec(m.sql)
+        _db.prepare('INSERT INTO schema_migrations (version) VALUES (?)').run(m.version)
+      })()
       newlyApplied.push(m.version)
     }
   }
