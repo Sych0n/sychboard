@@ -1440,7 +1440,7 @@ NAVIGATION — use [NAVIGATE:sectionId] ONLY when the user explicitly asks to go
   try{
     const mcpTools=await getMcpTools();
     const tools=mcpTools.length?mcpTools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.inputSchema}})):undefined;
-    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. When the user asks about those, CALL THE TOOL instead of guessing, then answer from its JSON result in plain English. Never invent tool output or tool names.`:sys;
+    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. STRICT RULES: call a tool ONLY if the user's LATEST message explicitly asks for that specific live data. For everything else — greetings, data updates, questions about finances/habits/goals/schedule or anything already in your context — reply normally with NO tool call. Never re-call a tool to refresh an answer you already gave earlier in the conversation unless the user explicitly asks you to check again. When you do call one, answer from its JSON result in plain English; never invent tool output or tool names.`:sys;
     const convo=[{role:'system',content:fullSys},...messages];
     for(let round=0;round<4;round++){
       const body={model:'llama-3.3-70b-versatile',messages:convo,max_tokens:500,temperature:0.7};
