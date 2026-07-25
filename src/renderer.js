@@ -734,8 +734,18 @@ function showLevelToast(level,rank){
   setTimeout(()=>el.classList.remove('show'),3000);
 }
 
+// Guards against a rapid re-click firing a second complete/uncomplete call for
+// the same quest while the first is still in flight — the UI's completed_today
+// state only updates after the round-trip resolves, so two quick clicks both
+// read the stale "not done" state and both call complete(); the DB blocks the
+// duplicate (UNIQUE constraint for daily, explicit check for weekly) but that
+// surfaces as a raw error and a generic "Could not update quest" toast instead
+// of being silently ignored like it should be.
+const questInFlight=new Set();
 async function gmCompleteQuest(questId,checked,ev){
   if(!window.sychboard)return;
+  if(questInFlight.has(questId))return;
+  questInFlight.add(questId);
   try{
     if(checked){
       const res=await window.sychboard.quests.complete(questId);
@@ -757,6 +767,7 @@ async function gmCompleteQuest(questId,checked,ev){
     }
     renderHomeGamification();
   }catch(e){console.error('[quests]',e.message);toast('Could not update quest');}
+  finally{questInFlight.delete(questId);}
 }
 
 function toggleQuestCat(key){
