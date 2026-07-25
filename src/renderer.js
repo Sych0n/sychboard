@@ -1115,10 +1115,10 @@ async function getMcpTools(){
   if(_mcpTools!==null)return _mcpTools;
   try{
     const r=await window.sychboard?.mcp?.listTools();
-    _mcpTools=(r&&r.ok&&r.tools)||[];
-    if(r&&!r.ok)console.warn('[mcp] unavailable:',r.error);
-  }catch(e){_mcpTools=[];}
-  return _mcpTools;
+    if(r&&r.ok){_mcpTools=r.tools||[];return _mcpTools;}
+    if(r)console.warn('[mcp] unavailable:',r.error);
+  }catch(e){console.warn('[mcp] unavailable:',e.message);}
+  return [];
 }
 function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // Ephemeral approval bubble in the chat — resolves true/false, not saved to history.
