@@ -30,9 +30,9 @@ html,body{font-family:var(--font);background:var(--bg);color:var(--text);min-hei
 #boot{position:fixed;inset:0;background:radial-gradient(120% 90% at 50% 40%,#0a0e1a 0%,#050508 60%);z-index:1000;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #boot.out{animation:bootOut 1.4s ease forwards}
 @keyframes bootOut{to{opacity:0;visibility:hidden}}
-#boot-particles{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+#boot-particles{display:none}
 .boot-ui{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:14px;width:100%;max-width:620px;padding:24px 28px;pointer-events:none}
-#boot-orb{position:fixed;inset:0;width:100vw;height:100vh;display:block;opacity:0;z-index:1;pointer-events:none}
+#boot-orb{display:none}
 .boot-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(22px,4vw,46px);font-weight:700;letter-spacing:0.3em;color:#ffffff;display:flex;gap:0;opacity:0;margin-top:4px;text-indent:0.3em;text-shadow:0 2px 20px rgba(5,5,8,0.9),0 0 8px rgba(5,5,8,0.6)}
 .boot-title .bt{display:inline-block;opacity:0;transform:translateY(16px)}
 .boot-welcome{font-size:15px;font-weight:300;color:rgba(232,234,240,0.5);letter-spacing:0.08em;font-family:'Space Grotesk',sans-serif;opacity:0;transform:translateY(8px);text-shadow:0 2px 14px rgba(5,5,8,0.9)}
