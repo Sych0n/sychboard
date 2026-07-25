@@ -3,6 +3,7 @@ const path = require('path')
 const https = require('https')
 const http = require('http')
 const db = require('./src/db')
+const mcp = require('./mcp-client')
 
 // An uncaught exception/rejection in the main process otherwise crashes the
 // whole app for the user with no dialog or log they can see; log and keep running.
@@ -384,6 +385,20 @@ ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
+// ── sychboard-mcp bridge (Phase 1 AI OS) ──
+// The renderer never talks to the MCP server directly; permission modes are
+// enforced in mcp-client.js against permissions.json on every call.
+ipcMain.handle('mcp:list-tools', async () => {
+  try { return { ok: true, tools: await mcp.listTools() } }
+  catch (e) { console.error('[mcp]', e.message); return { ok: false, error: e.message, tools: [] } }
+})
+ipcMain.handle('mcp:call-tool', async (_, name, args, approved) => {
+  if (!isNonEmptyString(name)) return { isError: true, text: 'invalid tool name' }
+  try { return await mcp.callTool(name, args, approved === true) }
+  catch (e) { console.error('[mcp]', e.message); return { isError: true, text: e.message } }
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+app.on('will-quit', () => { try { mcp.stop() } catch (e) {} })

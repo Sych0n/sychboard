@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('sychboard', {
   settings: {
     get: (key) => ipcRenderer.invoke('settings:get', key),
     set: (key, val) => ipcRenderer.invoke('settings:set', key, val)
+  },
+  mcp: {
+    listTools: () => ipcRenderer.invoke('mcp:list-tools'),
+    callTool: (name, args, approved) => ipcRenderer.invoke('mcp:call-tool', name, args, approved)
   }
 })
 

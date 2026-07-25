@@ -46,7 +46,17 @@ var if it ever moves.
 Write/destructive tools, multi-model routing, video pipeline, smart home,
 habit-learning. Read-only first, always.
 
-## Next step
+## In-app integration (done)
 
-Wire this server into SychBoard's in-app "AI Assistant" panel as an MCP
-client — that's the moment the chat box becomes the orchestrator.
+SychBoard's own AI Assistant panel is an MCP client of this server:
+
+- `mcp-client.js` (repo root) — dependency-free stdio JSON-RPC client in the
+  Electron **main process**; spawns `server.js` with `ELECTRON_RUN_AS_NODE`
+  (works in packaged builds, no system Node needed), lazily on first use.
+- Permission enforcement happens in the main process on **every** call:
+  no `permissions.json` entry → refused; `confirm` without an explicit
+  user approval → refused. The renderer can't bypass it.
+- The chat panel (`src/renderer.js`) passes the tools to Groq
+  (llama-3.3-70b tool-calling); `confirm`-mode tools show an in-chat
+  Allow/Deny prompt before running. Flip a tool to `"auto"` in
+  permissions.json to skip the prompt.

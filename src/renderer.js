@@ -1261,6 +1261,59 @@ function dayIndexOf(d){
 }
 
 // ═══ AI ═══
+// ── MCP live tools (sychboard-mcp via main process) ──
+let _mcpTools=null;
+async function getMcpTools(){
+  if(_mcpTools!==null)return _mcpTools;
+  try{
+    const r=await window.sychboard?.mcp?.listTools();
+    _mcpTools=(r&&r.ok&&r.tools)||[];
+    if(r&&!r.ok)console.warn('[mcp] unavailable:',r.error);
+  }catch(e){_mcpTools=[];}
+  return _mcpTools;
+}
+function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Ephemeral approval bubble in the chat — resolves true/false, not saved to history.
+function askToolApproval(name,args){
+  return new Promise(res=>{
+    const msgs=document.getElementById('chat-msgs');
+    if(!msgs){res(false);return;}
+    const argStr=Object.keys(args||{}).length?JSON.stringify(args):'';
+    const el=document.createElement('div');
+    el.className='ai-msg ai';
+    el.innerHTML=`<div class="ai-bubble">🔧 I'd like to run <b>${escAttr(name)}</b>${argStr?` <span style="opacity:.6;font-size:11px">${escAttr(argStr)}</span>`:''}<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p btn-sm" data-act="allow">Allow</button><button class="btn btn-sm" data-act="deny">Deny</button></div></div>`;
+    const done=(ok)=>{
+      el.querySelector('.ai-bubble').innerHTML=`🔧 <b>${escAttr(name)}</b> — ${ok?'allowed, running…':'denied'}`;
+      res(ok);
+    };
+    el.querySelector('[data-act="allow"]').addEventListener('click',()=>done(true));
+    el.querySelector('[data-act="deny"]').addEventListener('click',()=>done(false));
+    msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+  });
+}
+function toolNote(name,status){
+  const msgs=document.getElementById('chat-msgs');if(!msgs)return;
+  const icons={ok:'✓',error:'✗',denied:'⛔'};
+  const el=document.createElement('div');
+  el.className='ai-msg ai';
+  el.innerHTML=`<div class="ai-bubble" style="opacity:.65;font-size:12px">🔧 ${escAttr(name)} ${icons[status]||''}</div>`;
+  msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+}
+async function runMcpToolCall(tc){
+  const name=tc.function?.name;
+  let args={};
+  try{args=JSON.parse(tc.function?.arguments||'{}');}catch(e){}
+  const meta=(_mcpTools||[]).find(t=>t.name===name);
+  if(!meta)return`Error: unknown tool "${name}". Only use the tools you were given.`;
+  let approved=true;
+  if(meta.mode!=='auto')approved=await askToolApproval(name,args);
+  if(!approved)return'The user denied this tool call. Do not retry it; answer without it.';
+  try{
+    const r=await window.sychboard.mcp.callTool(name,args,true);
+    toolNote(name,r&&!r.isError?'ok':'error');
+    return(r&&r.text)||'Error: tool returned no result.';
+  }catch(e){toolNote(name,'error');return'Error: '+(e.message||e);}
+}
 async function callGroq(messages){
   const key=getGroqKey();
   if(!key)return null;
@@ -1365,12 +1418,30 @@ DATA ACTIONS — embed these tags when the user gives information or asks to upd
 
 NAVIGATION — use [NAVIGATE:sectionId] ONLY when the user explicitly asks to go to, open, or show a section (e.g. "show me finance", "take me to habits"). Do NOT emit [NAVIGATE] for data updates alone — just confirm the change and stay put. IDs: ${navSections}.`;
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:sys},...messages],max_tokens:400,temperature:0.7})});
-    const d=await res.json();
-    const reply=d.choices?.[0]?.message?.content||null;
-    if(reply)console.log('[groq raw]',reply);
-    return reply;
-  }catch(e){return null;}
+    const mcpTools=await getMcpTools();
+    const tools=mcpTools.length?mcpTools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.inputSchema}})):undefined;
+    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. When the user asks about those, CALL THE TOOL instead of guessing, then answer from its JSON result in plain English. Never invent tool output or tool names.`:sys;
+    const convo=[{role:'system',content:fullSys},...messages];
+    for(let round=0;round<4;round++){
+      const body={model:'llama-3.3-70b-versatile',messages:convo,max_tokens:500,temperature:0.7};
+      if(tools){body.tools=tools;body.tool_choice='auto';}
+      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body)});
+      const d=await res.json();
+      const m=d.choices?.[0]?.message;
+      if(!m)return null;
+      if(m.tool_calls?.length){
+        convo.push(m);
+        for(const tc of m.tool_calls){
+          convo.push({role:'tool',tool_call_id:tc.id,content:await runMcpToolCall(tc)});
+        }
+        continue;
+      }
+      const reply=m.content||null;
+      if(reply)console.log('[groq raw]',reply);
+      return reply;
+    }
+    return null;
+  }catch(e){console.error('[groq]',e);return null;}
 }
 function parseNav(text){
   if(!text)return{clean:text,sectionId:null};
@@ -1522,6 +1593,7 @@ function rAI(){
   const chips=document.getElementById('ai-chip-list');
   if(chips){
     const prompts=[
+      'How is the Chuck Bird bot doing?',
       st.balances.bank>0?`My bank balance is now ${fmt(st.balances.bank+100)}`:'Set my bank balance to £1,500',
       st.yt.subs>0?`I just hit ${st.yt.subs+50} subscribers`:'I hit 500 subscribers today',
       `Add a todo to ${['review my notes','check my goals','update my budget'][new Date().getDay()%3]}`,
