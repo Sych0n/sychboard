@@ -359,9 +359,9 @@ function startBoot(){
       const w=window.innerWidth,h=window.innerHeight;
       renderer.setSize(w,h,false);
       camera.aspect=w/h;
-      // keep the sphere the same apparent size regardless of window size
-      const D=Math.min(Math.min(w,h)*0.52,480);
-      cam.baseZ=(3.1*h)/(0.768*D);
+      // keep the planet the same apparent size regardless of window size
+      const D=Math.min(Math.min(w,h)*0.82,780);
+      cam.baseZ=(4.46*h)/(0.768*D);
       camera.updateProjectionMatrix();
     }
     layoutOrb();
@@ -369,14 +369,21 @@ function startBoot(){
     const orbGroup=new T.Group();
     scene.add(orbGroup);
 
-    // Hollow wireframe sphere
-    const sphereMat=new T.MeshBasicMaterial({color:bootTheme.sphere,wireframe:true,transparent:true,opacity:0});
-    const sphere=new T.Mesh(new T.SphereGeometry(1.55,26,26),sphereMat);
-    orbGroup.add(sphere);
-    // Faint inner sphere for depth
-    const innerMat=new T.MeshBasicMaterial({color:bootTheme.inner,wireframe:true,transparent:true,opacity:0});
-    const inner=new T.Mesh(new T.SphereGeometry(1.0,16,16),innerMat);
-    orbGroup.add(inner);
+    // Black-hole planet: opaque near-black core that occludes stars and
+    // particles passing behind it, plus a fresnel rim-glow shell — bright
+    // only at the silhouette edge, fading to nothing at the centre so the
+    // title stays readable on the dark core.
+    const coreMat=new T.MeshBasicMaterial({color:0x04040a});
+    const core=new T.Mesh(new T.SphereGeometry(2.18,48,48),coreMat);
+    orbGroup.add(core);
+    const rimMat=new T.ShaderMaterial({
+      uniforms:{uColor:{value:new T.Color(bootTheme.sphere)},uIntensity:{value:0}},
+      vertexShader:'varying vec3 vNormal;varying vec3 vView;void main(){vNormal=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(position,1.0);vView=normalize(-mv.xyz);gl_Position=projectionMatrix*mv;}',
+      fragmentShader:'uniform vec3 uColor;uniform float uIntensity;varying vec3 vNormal;varying vec3 vView;void main(){float rim=pow(1.0-abs(dot(normalize(vNormal),normalize(vView))),2.6);gl_FragColor=vec4(uColor,rim*uIntensity);}',
+      transparent:true,blending:T.AdditiveBlending,depthWrite:false
+    });
+    const rim=new T.Mesh(new T.SphereGeometry(2.23,48,48),rimMat);
+    orbGroup.add(rim);
 
     // Electron cloud on independent randomised orbital planes
     const P=380;
@@ -389,9 +396,9 @@ function startBoot(){
       const v=new T.Vector3().crossVectors(n,u);
       parts.push({
         u,v,
-        r:1.75+Math.random()*2.4,
+        r:2.5+Math.random()*2.6,
         a:Math.random()*Math.PI*2,
-        speed:(0.0018+Math.random()*0.009)*(Math.random()<0.5?-1:1),
+        speed:(0.0004+Math.random()*0.002)*(Math.random()<0.5?-1:1),
         wobble:Math.random()*0.08
       });
     }
@@ -404,16 +411,16 @@ function startBoot(){
     // Ripple ring pool (emitted when responding)
     const ripples=[];
     function emitRipple(){
-      const g=new T.RingGeometry(1.6,1.635,72);
+      const g=new T.RingGeometry(2.26,2.30,96);
       const m=new T.MeshBasicMaterial({color:bootTheme.ripple,transparent:true,opacity:0.5,side:T.DoubleSide,depthWrite:false});
       const ring=new T.Mesh(g,m);
       scene.add(ring);
       ripples.push({mesh:ring,life:1});
     }
 
-    const orb={phase:0,pulseSpeed:0.011,brightness:0,mode:'idle',emitRipple};
+    const orb={phase:0,pulseSpeed:0.006,brightness:0,mode:'idle',emitRipple};
     window._bootOrb=orb;
-    window._bootThree={renderer,scene,pGeo,pMat,sphereMat,innerMat,ripples};
+    window._bootThree={renderer,scene,pGeo,pMat,mats:[coreMat,rimMat],ripples};
 
     // Subtle mouse parallax — the whole scene leans toward the cursor
     let px=0,py=0,sx=0,sy=0;
@@ -432,19 +439,15 @@ function startBoot(){
       scene.rotation.y=sx*0.12;
       scene.rotation.x=sy*0.07;
       const thinking=orb.mode==='thinking';
-      // gentle idle breathing; stronger pulse while thinking
-      const amp=thinking?0.055:0.02;
+      // very gentle idle breathing; slightly stronger pulse while thinking
+      const amp=thinking?0.022:0.008;
       const pulse=1+Math.sin(orb.phase)*amp;
       orbGroup.scale.setScalar(pulse);
-      orbGroup.rotation.y+=0.001;
-      orbGroup.rotation.x+=0.00028;
-      inner.rotation.y-=0.0016;
-      sphereMat.opacity=b*(thinking?0.34:0.22);
-      innerMat.opacity=b*(thinking?0.10:0.055);
-      pMat.opacity=b*0.92;
+      rimMat.uniforms.uIntensity.value=b*(thinking?0.8:0.45);
+      pMat.opacity=b*0.85;
 
       // particles orbit independently
-      const speedMul=thinking?2.6:1;
+      const speedMul=thinking?2.2:1;
       const pos=pGeo.attributes.position.array;
       for(let i=0;i<P;i++){
         const p=parts[i];
@@ -517,7 +520,7 @@ function disposeBootThree(){
   if(!bt)return;
   try{
     bt.ripples.forEach(rp=>{rp.mesh.geometry.dispose();rp.mesh.material.dispose();});
-    bt.pGeo.dispose();bt.pMat.dispose();bt.sphereMat.dispose();bt.innerMat.dispose();
+    bt.pGeo.dispose();bt.pMat.dispose();(bt.mats||[]).forEach(m=>m.dispose());
     bt.renderer.dispose();
   }catch(e){}
   window._bootThree=null;
