@@ -85,7 +85,7 @@ let st={
   pomodoro: { focus: 25, break: 5 }
 };
 
-let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null;
+let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
 
 function load(){
   if(!S.available()){
@@ -309,6 +309,7 @@ function startBoot(){
   if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
   if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
   if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
+  if(bootMouseHandler){window.removeEventListener('mousemove',bootMouseHandler);bootMouseHandler=null;}
   disposeBootThree();
 
   const bootResizeFns=[];
@@ -343,18 +344,27 @@ function startBoot(){
     bootResizeFns.push(()=>{pc.width=window.innerWidth;pc.height=window.innerHeight;});
   }
 
-  // Central Three.js orb — hollow wireframe sphere + electron cloud
+  // Fullscreen Three.js orb — hollow wireframe sphere + electron cloud.
+  // The canvas covers the whole boot screen so the particle cloud and
+  // ripples are never clipped; the camera dollies in for the power-up.
   const oc=document.getElementById('boot-orb');
   if(oc&&window.THREE){
     const T=window.THREE;
-    const orbSize=Math.min(window.innerWidth*0.42,420);
     const renderer=new T.WebGLRenderer({canvas:oc,alpha:true,antialias:true});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-    renderer.setSize(orbSize,orbSize,false);
-    oc.style.width=orbSize+'px';oc.style.height=orbSize+'px';
     const scene=new T.Scene();
-    const camera=new T.PerspectiveCamera(42,1,0.1,50);
-    camera.position.z=6;
+    const camera=new T.PerspectiveCamera(42,1,0.1,80);
+    const cam={dist:1.7,baseZ:8};
+    function layoutOrb(){
+      const w=window.innerWidth,h=window.innerHeight;
+      renderer.setSize(w,h,false);
+      camera.aspect=w/h;
+      // keep the sphere the same apparent size regardless of window size
+      const D=Math.min(Math.min(w,h)*0.52,480);
+      cam.baseZ=(3.1*h)/(0.768*D);
+      camera.updateProjectionMatrix();
+    }
+    layoutOrb();
 
     const orbGroup=new T.Group();
     scene.add(orbGroup);
@@ -368,8 +378,8 @@ function startBoot(){
     const inner=new T.Mesh(new T.SphereGeometry(1.0,16,16),innerMat);
     orbGroup.add(inner);
 
-    // 300 particles on independent randomised orbital planes
-    const P=300;
+    // Electron cloud on independent randomised orbital planes
+    const P=380;
     const positions=new Float32Array(P*3);
     const parts=[];
     for(let i=0;i<P;i++){
@@ -379,7 +389,7 @@ function startBoot(){
       const v=new T.Vector3().crossVectors(n,u);
       parts.push({
         u,v,
-        r:1.75+Math.random()*1.35,
+        r:1.75+Math.random()*2.4,
         a:Math.random()*Math.PI*2,
         speed:(0.0018+Math.random()*0.009)*(Math.random()<0.5?-1:1),
         wobble:Math.random()*0.08
@@ -405,10 +415,22 @@ function startBoot(){
     window._bootOrb=orb;
     window._bootThree={renderer,scene,pGeo,pMat,sphereMat,innerMat,ripples};
 
+    // Subtle mouse parallax — the whole scene leans toward the cursor
+    let px=0,py=0,sx=0,sy=0;
+    bootMouseHandler=(e)=>{
+      px=(e.clientX/window.innerWidth-0.5)*2;
+      py=(e.clientY/window.innerHeight-0.5)*2;
+    };
+    window.addEventListener('mousemove',bootMouseHandler);
+
     let lastRipple=0;
     function drawOrb(){
       const b=orb.brightness;
       orb.phase+=orb.pulseSpeed;
+      camera.position.z=cam.baseZ*cam.dist;
+      sx+=(px-sx)*0.03;sy+=(py-sy)*0.03;
+      scene.rotation.y=sx*0.12;
+      scene.rotation.x=sy*0.07;
       const thinking=orb.mode==='thinking';
       // gentle idle breathing; stronger pulse while thinking
       const amp=thinking?0.055:0.02;
@@ -451,16 +473,13 @@ function startBoot(){
     }
     requestAnimationFrame(drawOrb);
 
-    // Power-up: slow, cinematic
-    gsap.set(oc,{scale:0.55,opacity:0,transformOrigin:'center center'});
-    gsap.to(oc,{scale:1,opacity:1,duration:4.4,ease:'power2.inOut'});
+    // Power-up: fade in while the camera glides in from deep space
+    gsap.set(oc,{opacity:0});
+    gsap.to(oc,{opacity:1,duration:3.2,ease:'power2.inOut'});
+    gsap.to(cam,{dist:1,duration:5.4,ease:'power2.inOut'});
     gsap.to(orb,{brightness:1,duration:4.8,ease:'power2.inOut'});
 
-    bootResizeFns.push(()=>{
-      const newSize=Math.min(window.innerWidth*0.42,420);
-      oc.style.width=newSize+'px';oc.style.height=newSize+'px';
-      renderer.setSize(newSize,newSize,false);
-    });
+    bootResizeFns.push(layoutOrb);
   }
 
   if(bootResizeFns.length){
@@ -598,6 +617,7 @@ function enterApp(){
   if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
   if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
   if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
+  if(bootMouseHandler){window.removeEventListener('mousemove',bootMouseHandler);bootMouseHandler=null;}
   window._bootOrb=null;
   disposeBootThree();
   const boot=document.getElementById('boot');
