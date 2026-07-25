@@ -1,0 +1,17 @@
+{
+  "comment": "One entry per tool. mode: 'confirm' = client must ask the user before each call; 'auto' = pre-approved; anything else (e.g. 'deny') = the server refuses to run the tool at all. A tool with no entry here is also refused. Start everything on 'confirm'; loosen individually once proven reliable.",
+  "tools": {
+    "get_chuck_bird_status": {
+      "mode": "confirm",
+      "notes": "Read-only SSH to the bot's prod box: systemctl is-active + journalctl grep. No writes."
+    },
+    "get_system_status": {
+      "mode": "confirm",
+      "notes": "Local CPU/RAM/disk readout. No writes."
+    },
+    "list_recent_project_files": {
+      "mode": "confirm",
+      "notes": "Lists file names/mtimes under a path inside the user's home dir. Does not read file contents."
+    }
+  }
+}
