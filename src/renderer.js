@@ -1919,7 +1919,7 @@ function rSchedEvents(){
 }
 function addSchedEvent(){
   const di=parseInt(document.getElementById('sched-ev-day').value);
-  const txt=document.getElementById('sched-ev-txt').value.trim();
+  const txt=sanitizeText(document.getElementById('sched-ev-txt').value,60).trim();
   if(!txt)return;
   const type=document.getElementById('sched-ev-type').value;
   st.scheduleEvents[di].push({t:txt,c:type});
