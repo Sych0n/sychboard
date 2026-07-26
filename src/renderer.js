@@ -1344,21 +1344,21 @@ function executeActions(actions){
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
     else if(a.type==='set_exam_date'){st.examDate=a.val;changed=true;console.log('[actions] set_exam_date',a.val);}
-    else if(a.type==='add_todo'){st.genTodos.push({text:a.val,done:false});changed=true;}
-    else if(a.type==='add_habit'){st.habits.push({label:a.val,done:false});changed=true;}
-    else if(a.type==='add_goal'){st.goals.push({text:a.val,category:a.cat,done:false});changed=true;}
+    else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
+    else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
+    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:a.cat,done:false});changed=true;}
     else if(a.type==='complete_habit'){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
     else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:a.date,hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
-    else if(a.type==='add_trip'){st.trips.push({dest:a.dest,date:a.date,budget:a.budget,done:false});changed=true;}
+    else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
     else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
     else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
     else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
-    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:a.name,amount:a.amount,date:a.day});changed=true;}
+    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
     else if(a.type==='remove_habit'){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
     else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
     else if(a.type==='add_event'){
@@ -1366,7 +1366,7 @@ function executeActions(actions){
       if(di>=0){
         initSchedEvents();
         const c=['uni','work','stream'].includes(a.etype)?a.etype:'';
-        st.scheduleEvents[di].push({t:a.name,c});
+        st.scheduleEvents[di].push({t:sanitizeText(a.name,80),c});
         changed=true;console.log('[actions] add_event',a.day,a.name);
       }
     }
@@ -1963,7 +1963,7 @@ function togHabit(i){
   recordHabitHistory();save();rHabits();
 }
 function rmHabit(i){st.habits.splice(i,1);save();rHabits();}
-function addHabit(){const v=document.getElementById('new-habit-in').value.trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
+function addHabit(){const v=sanitizeText(document.getElementById('new-habit-in').value,100).trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
 function resetHabits(){st.habits.forEach(h=>h.done=false);recordHabitHistory();save();rHabits();}
 
 // ═══ FITNESS ═══
@@ -1973,7 +1973,7 @@ function rFitness(){
   if(fl)fl.innerHTML=st.fitnessGoals.length?st.fitnessGoals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.fitnessGoals[${i}].done=!st.fitnessGoals[${i}].done;save();rFitness()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><button class="del-btn" onclick="st.fitnessGoals.splice(${i},1);save();rFitness()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
   rSecTodos('fitness');
 }
-function addFitnessGoal(){const v=document.getElementById('fg-in').value.trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
+function addFitnessGoal(){const v=sanitizeText(document.getElementById('fg-in').value,150).trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
 
 // ═══ TRAVEL ═══
 function rTravel(){
@@ -2000,7 +2000,7 @@ function rGoals(){
   const cats={'life':'chip-g','fitness':'chip-g','finance':'chip-b','youtube':'chip-a','uni':'chip-b','dev':'chip-a'};
   document.getElementById('goals-list').innerHTML=st.goals.length?st.goals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.goals[${i}].done=!st.goals[${i}].done;save();rGoals()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><span class="chip ${cats[g.category]||'chip-b'}">${g.category}</span><button class="del-btn" onclick="st.goals.splice(${i},1);save();rGoals()">✕</button></div>`).join(''):emptyState('🎯','No goals yet','What are you working toward?');
 }
-function addGoal(){const t=document.getElementById('goal-in').value.trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
+function addGoal(){const t=sanitizeText(document.getElementById('goal-in').value,150).trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
 
 // ═══ TODOS ═══
 function rSecTodos(sec){
@@ -2008,7 +2008,7 @@ function rSecTodos(sec){
   const el=document.getElementById('todos-'+sec);if(!el)return;
   el.innerHTML=st.secTodos[sec].length?st.secTodos[sec].map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.secTodos['${sec}'][${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.secTodos['${sec}'].splice(${i},1);save();rSecTodos('${sec}')">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
 }
-function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:inp.value.trim(),done:false});inp.value='';save();rSecTodos(sec);}
+function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rSecTodos(sec);}
 function rMasterTodos(){
   const secs=['finance','uni','youtube','schedule','fitness','travel'];
   const labs={finance:'Finance',uni:'Uni',youtube:'YouTube',schedule:'Schedule',fitness:'Fitness',travel:'Travel'};
@@ -2018,7 +2018,7 @@ function rMasterTodos(){
   html+=`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">General</div></div>${st.genTodos.length?st.genTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.genTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.genTodos.splice(${i},1);save();rMasterTodos()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>'}<div class="ta-row"><input type="text" id="gen-ti" placeholder="Add general todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addGenTodo()">Add</button></div></div>`;
   document.getElementById('master-todos').innerHTML=html||'<div class="card"><div class="empty">No todos yet</div></div>';
 }
-function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:inp.value.trim(),done:false});inp.value='';save();rMasterTodos();}
+function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rMasterTodos();}
 
 // ═══ JOURNAL ═══
 function rJournal(){
@@ -2063,8 +2063,8 @@ function dropSec(e,targetId){
 }
 function togVis(id){const s=st.sections.find(x=>x.id===id);if(s)s.visible=!s.visible;save();rManage();}
 function openRename(id){renamingId=id;const s=st.sections.find(x=>x.id===id);document.getElementById('rename-val').value=s?s.label:'';openModal('modal-rename');}
-function doRename(){if(!renamingId)return;const name=document.getElementById('rename-val').value.trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
-function doAddSec(){const name=document.getElementById('add-name').value.trim();const type=document.getElementById('add-type').value;const icon=document.getElementById('add-icon').value||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
+function doRename(){if(!renamingId)return;const name=sanitizeText(document.getElementById('rename-val').value,60).trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
+function doAddSec(){const name=sanitizeText(document.getElementById('add-name').value,60).trim();const type=document.getElementById('add-type').value;const icon=sanitizeText(document.getElementById('add-icon').value,10)||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
 function promptDelSec(id){showConfirm('Delete section?','Permanently deletes this section and all its data.',()=>{st.sections=st.sections.filter(x=>x.id!==id);delete st.customSecs[id];save();rManage();goHome();});}
 
 // ═══ CUSTOM ═══
@@ -2078,8 +2078,8 @@ function rCustom(id){
     pg.innerHTML=hdr+`<div class="card"><div class="card-title">Trackers</div><div class="mr2">${(cs.trackers||[]).map((t,i)=>`<div class="metric" style="position:relative"><div class="ml">${t.label}</div><div class="mv">${t.value}${t.suffix||''}</div><button onclick="st.customSecs['${id}'].trackers.splice(${i},1);save();rCustom('${id}')" style="position:absolute;top:5px;right:5px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px">✕</button></div>`).join('')||'<div style="font-size:12px;color:var(--text2)">No trackers yet</div>'}</div><div class="ir3" style="gap:8px;margin-top:10px"><div><div class="fl">Label</div><input type="text" id="cs-tl-${id}" placeholder="Weight"></div><div><div class="fl">Value</div><input type="text" id="cs-tv-${id}" placeholder="75"></div><div><div class="fl">Suffix</div><input type="text" id="cs-ts-${id}" placeholder="kg"></div></div><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="addCsTracker('${id}')">Add tracker</button></div></div>`;
   }
 }
-function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:inp.value.trim(),done:false});inp.value='';save();rCustom(id);}
-function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:l.value.trim(),value:v?v.value:'',suffix:s?s.value:''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
+function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rCustom(id);}
+function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:sanitizeText(l.value,60).trim(),value:v?sanitizeText(v.value,60).trim():'',suffix:s?sanitizeText(s.value,20).trim():''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
 
 // ═══ SLEEP ═══
 function sleepDuration(bed,wake){
