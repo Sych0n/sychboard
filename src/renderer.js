@@ -2124,7 +2124,7 @@ function sleepContext(){
 function logSleep(){
   const bed=document.getElementById('sleep-bed')?.value;
   const wake=document.getElementById('sleep-wake')?.value;
-  const note=document.getElementById('sleep-note')?.value?.trim()||'';
+  const note=sanitizeText(document.getElementById('sleep-note')?.value?.trim()||'',100);
   if(!bed||!wake){toast('Enter bed and wake times');return;}
   const today=new Date().toISOString().slice(0,10);
   const existing=st.sleep.logs.findIndex(l=>l.date===today);
