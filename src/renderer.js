@@ -1346,7 +1346,7 @@ function executeActions(actions){
     else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
     else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
     else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
-    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:a.cat,done:false});changed=true;}
+    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
     else if(a.type==='complete_habit'){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
