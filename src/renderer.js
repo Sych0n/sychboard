@@ -1352,7 +1352,7 @@ function executeActions(actions){
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
-    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:a.date,hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
+    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
     else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
     else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
