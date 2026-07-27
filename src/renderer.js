@@ -1343,7 +1343,7 @@ function executeActions(actions){
     if(a.type==='set_balance'&&!isNaN(a.amount)){st.balances[a.field]=a.amount;changed=true;console.log('[actions] set_balance',a.field,'=',a.amount);}
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
-    else if(a.type==='set_exam_date'){st.examDate=a.val;changed=true;console.log('[actions] set_exam_date',a.val);}
+    else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
     else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
     else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
     else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:a.cat,done:false});changed=true;}
@@ -1718,7 +1718,7 @@ function rUni(){
   if(edit)edit.style.display='none';
   rSecTodos('uni');
 }
-function updateExamDate(){st.examDate=document.getElementById('exam-in').value||'TBC';save();rUni();toast('Exam date saved');}
+function updateExamDate(){st.examDate=sanitizeText(document.getElementById('exam-in').value,50)||'TBC';save();rUni();toast('Exam date saved');}
 function saveUniNotes(){st.uniNotes=document.getElementById('uni-notes').value;save();rUni();toast('Notes saved');}
 
 // ═══ YOUTUBE ═══
