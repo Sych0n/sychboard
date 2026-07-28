@@ -384,6 +384,14 @@ ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
+ipcMain.handle('data:export-game', () => {
+  try { return { ok: true, data: db.exportGameData() } }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: e.message } }
+})
+ipcMain.handle('data:import-game', (_, data) => {
+  try { return db.importGameData(data) }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: 'import_failed' } }
+})
 // ── sychboard-mcp bridge (Phase 1 AI OS) ──
 // The renderer never talks to the MCP server directly; permission modes are
 // enforced in mcp-client.js against permissions.json on every call.

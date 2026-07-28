@@ -1538,15 +1538,51 @@ function saveDevKeys() {
   save(); toast('Developer keys saved!');
   if(st.apiKeys.ytChannelId) fetchYTData();
 }
-function exportData(){
-  const data={};
+async function exportData(){
+  const localStorageData={};
   for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);if(k.startsWith('sb4_'))data[k]=localStorage.getItem(k);
+    const k=localStorage.key(i);if(k.startsWith('sb4_'))localStorageData[k]=localStorage.getItem(k);
   }
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  let game=null;
+  if(window.sychboard?.data?.exportGame){
+    try{
+      const r=await window.sychboard.data.exportGame();
+      if(r?.ok)game=r.data;
+      else toast('Warning: game progress (XP/streaks/badges) could not be included');
+    }catch(e){toast('Warning: game progress (XP/streaks/badges) could not be included');}
+  }
+  const payload={sychboard_backup:true,version:1,exported_at:new Date().toISOString(),localStorage:localStorageData,game};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download=`sychboard-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();URL.revokeObjectURL(url);toast('Backup exported!');
+}
+function triggerImportData(){
+  document.getElementById('import-file-input')?.click();
+}
+async function handleImportFile(input){
+  const file=input.files?.[0];input.value='';
+  if(!file)return;
+  let payload;
+  try{
+    const text=await file.text();
+    payload=JSON.parse(text);
+  }catch(e){toast('Import failed: not a valid backup file');return;}
+  if(!payload||typeof payload!=='object'||!payload.sychboard_backup||typeof payload.localStorage!=='object'){
+    toast('Import failed: not a SychBoard backup file');return;
+  }
+  showConfirm('Restore this backup?','This overwrites all current data (finance, habits, journal, XP/streaks/badges, everything) with the backup\'s contents. Cannot be undone.',async()=>{
+    try{
+      for(const k of Object.keys(localStorage)){if(k.startsWith('sb4_'))localStorage.removeItem(k);}
+      for(const [k,v] of Object.entries(payload.localStorage)){if(k.startsWith('sb4_'))localStorage.setItem(k,v);}
+      if(payload.game&&window.sychboard?.data?.importGame){
+        const r=await window.sychboard.data.importGame(payload.game);
+        if(!r?.ok){toast('Restored local data, but game progress import failed: '+(r?.error||'unknown error'));setTimeout(()=>location.reload(),2000);return;}
+      }
+      toast('Backup restored — reloading…');
+      setTimeout(()=>location.reload(),1200);
+    }catch(e){toast('Import failed: '+e.message);}
+  });
 }
 
 // ═══ FINANCE ═══

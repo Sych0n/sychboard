@@ -486,7 +486,13 @@
       <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="savePomSettings()">Save Timer</button>
     </div>
     <div id="set-inj"></div>
-    <div class="si"><div class="sl">Data Export</div><div class="ss">Download a local backup of all your SychBoard data.</div><button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export Backup (.json)</button></div>
+    <div class="si"><div class="sl">Data Backup</div><div class="ss">Download or restore a full local backup — finance, habits, journal, everything, plus game progress (XP, streaks, badges, SychCoins).</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportData()">Export Backup (.json)</button>
+        <button class="btn btn-sm" onclick="triggerImportData()">Restore from Backup…</button>
+      </div>
+      <input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="handleImportFile(this)">
+    </div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
     <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>
