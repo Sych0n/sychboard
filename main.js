@@ -369,9 +369,8 @@ ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
   if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
   try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
-ipcMain.handle('shop:purchase-freeze', (_, cost) => {
-  if (!isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
-  try { return db.purchaseFreeze(cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+ipcMain.handle('shop:purchase-freeze', () => {
+  try { return db.purchaseFreeze() } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
 ipcMain.handle('xp:history', (_, days) => {
   if (days !== undefined && !isFiniteNumber(days)) return []

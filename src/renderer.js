@@ -1042,7 +1042,7 @@ async function rShop(){
 async function buyShopItem(key){
   const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
   if(item.type==='consumable'){
-    const res=await window.sychboard.shop.purchaseFreeze(item.cost);
+    const res=await window.sychboard.shop.purchaseFreeze();
     if(!res?.ok){
       if(res?.error==='insufficient'){shakeShopBalance();toast('Not enough SychCoins');}
       else toast('Purchase failed');
