@@ -534,10 +534,24 @@ function getCoins() {
   return _db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0
 }
 
+// Server-side prices for cosmetic shop items — must stay in sync with SHOP_ITEMS
+// in src/renderer.js. The renderer's catalog exists only client-side, so without
+// this, purchaseItem() had to trust whatever `cost` the IPC caller supplied for
+// whatever `itemKey` it supplied; anyone driving the IPC bridge directly (e.g.
+// devtools console) could buy any real item for 0 coins, or "own" a made-up key,
+// by simply passing a different cost — same trust gap as the negative-cost bug
+// fixed 2026-07-22, just for the price itself rather than its sign.
+const SHOP_CATALOG = {
+  accent_white: 0, accent_cyan: 50, accent_purple: 75, accent_red: 75, accent_emerald: 75, accent_gold: 100,
+  font_grotesk: 0, font_inter: 50, font_mono: 75,
+  bg_deepspace: 0, bg_nebula: 100, bg_carbon: 150, bg_aurora: 150,
+  card_standard: 0, card_glow: 100, card_glass: 150,
+  orb_white: 0, orb_cyan: 100, orb_gold: 150
+}
+
 function purchaseItem(itemKey, cost) {
-  const numCost = Number(cost)
-  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
-  const price = Math.round(numCost)
+  const price = SHOP_CATALOG[itemKey]
+  if (price === undefined) return { ok: false, error: 'unknown_item' }
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     let owned = []
@@ -558,10 +572,10 @@ function purchaseItem(itemKey, cost) {
 // double-spend shape as the already-fixed weekly-quest/sweep-bonus farms) —
 // unlike the old renderer path, which called coins:award then streaks:add-freeze
 // as two separate non-atomic IPC round-trips.
-function purchaseFreeze(cost) {
-  const numCost = Number(cost)
-  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
-  const price = Math.round(numCost)
+const FREEZE_TOKEN_COST = 150 // must stay in sync with the 'freeze_token' entry in SHOP_ITEMS
+
+function purchaseFreeze() {
+  const price = FREEZE_TOKEN_COST
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     if (coins < price) return { ok: false, error: 'insufficient', coins }
