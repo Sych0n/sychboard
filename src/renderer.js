@@ -77,13 +77,14 @@ let st={
   customSecs:{},chatHistory:[],
   lastHabitReset:'',scheduleEvents:[],
   sleep:{logs:[],targetBed:'23:00',targetHours:8},
-  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'},
+  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true},
   notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''},
   apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' },
   habitHistory: {},
   subscriptions: [],
   pomodoro: { focus: 25, break: 5 },
-  fxEnabled: true
+  fxEnabled: true,
+  lastAppDate: ''
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
@@ -93,7 +94,7 @@ function load(){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -121,11 +122,13 @@ function load(){
   if(!st.sleep.logs)st.sleep.logs=[];
   if(!st.sleep.targetBed)st.sleep.targetBed='23:00';
   if(st.sleep.targetHours==null)st.sleep.targetHours=8;
-  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'};
+  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true};
+  if(st.notifSettings.questReset==null)st.notifSettings.questReset=true;
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
+  if(st.lastAppDate==null)st.lastAppDate='';
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -1576,11 +1579,13 @@ function rSettings(){
   const ns=document.getElementById('notif-settings');
   if(ns){
     const row=(id,label,toggleKey,timeKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><input type="time" id="${id}-time" class="notif-time" value="${st.notifSettings[timeKey]}"><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
+    const rowNoTime=(id,label,toggleKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
     ns.innerHTML=
       row('notif-bed','🌙 Bedtime reminder','bedReminder','bedReminderTime')+
       row('notif-morning','☀️ Morning brief','morningBrief','morningBriefTime')+
       row('notif-habit','✅ Habit check-in','habitReminder','habitReminderTime')+
       row('notif-nudge','💡 AI nudge (needs AI key)','aiNudge','aiNudgeTime')+
+      rowNoTime('notif-quest-reset','🔄 Daily quest reset','questReset')+
       `<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" onclick="saveNotifSettings()">Save notification settings</button><button class="btn btn-sm" onclick="testNotif()">Send test</button></div>`;
     document.getElementById('set-inj').innerHTML = `<div class="si"><div class="sl">Groq API key</div><div class="ss">Powers all AI features. Get a free key at console.groq.com</div><input type="password" id="groq-key-in" placeholder="gsk_..." value="${st.apiKeys.groq||''}" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroqKey()">Save</button></div>${devPanel}`;
   }
@@ -2382,7 +2387,30 @@ function checkNotifications(){
   }
   if(ns.aiNudge&&t===ns.aiNudgeTime&&nl.aiNudge!==today){sendAINudge();}
 }
+// Local mirror of db.js's getAppDate() rollover math, so the renderer can detect a
+// quest-reset boundary without polling the DB for the app-date on every tick.
+function computeLocalAppDate(rolloverHour){
+  const now=new Date();
+  if(now.getHours()<rolloverHour)now.setDate(now.getDate()-1);
+  return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
+}
+async function checkQuestReset(){
+  if(!window.sychboard)return;
+  try{
+    const rh=parseInt(await window.sychboard.settings.get('day_rollover_hour'))||4;
+    const appDate=computeLocalAppDate(rh);
+    if(st.lastAppDate&&st.lastAppDate!==appDate){
+      if(st.notifSettings.questReset)sendNotif('🔄 Daily quests reset','A new day has started — your daily quests are ready!');
+      const ap=document.querySelector('.page.active')?.id?.replace('page-','');
+      if(ap==='home')renderHomeGamification();
+      if(ap==='game')rGame();
+    }
+    if(st.lastAppDate!==appDate){st.lastAppDate=appDate;save();}
+  }catch(e){console.error('[quest-reset]',e.message);}
+}
 function initNotifications(){
+  checkQuestReset();
+  setInterval(checkQuestReset,60000);
   if(!('Notification'in window))return;
   checkNotifications();
   setInterval(checkNotifications,60000);
@@ -2396,6 +2424,7 @@ function saveNotifSettings(){
   st.notifSettings.habitReminderTime=document.getElementById('notif-habit-time')?.value||'20:00';
   st.notifSettings.aiNudge=document.getElementById('notif-nudge-toggle')?.checked??false;
   st.notifSettings.aiNudgeTime=document.getElementById('notif-nudge-time')?.value||'12:00';
+  st.notifSettings.questReset=document.getElementById('notif-quest-reset-toggle')?.checked??true;
   save();toast('Notification settings saved');
 }
 function testNotif(){
