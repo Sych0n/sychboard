@@ -258,6 +258,16 @@ body.electron-inset .main-topbar{padding-right:140px}
 .gm-qi-xp.done{color:var(--on-accent);background:var(--accent)}
 /* XP fly chip */
 .xp-fly{position:fixed;z-index:9998;pointer-events:none;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--on-accent);background:var(--accent2);border-radius:20px;padding:3px 10px;box-shadow:0 0 20px rgba(255,255,255,0.35)}
+/* Next-best-action nudge (ADHD "what do I do now" prompt above the quest list) */
+.gm-nudge{display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:12px;background:var(--amber-light);border:1px solid rgba(251,191,36,0.28);border-radius:12px;animation:qcardIn 0.3s cubic-bezier(0.25,0.46,0.45,0.94) both}
+.gm-nudge.done{background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.08)}
+.gm-nudge-icon{font-size:16px;flex-shrink:0}
+.gm-nudge-body{flex:1;min-width:0}
+.gm-nudge-label{font-size:9.5px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:0.09em}
+.gm-nudge.done .gm-nudge-label{color:var(--text3)}
+.gm-nudge-text{font-size:12.5px;color:var(--text);font-weight:500;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gm-nudge-btn{flex-shrink:0;background:var(--amber);color:#1a1204;border:none;border-radius:20px;padding:6px 13px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform var(--t)}
+.gm-nudge-btn:hover{transform:scale(1.05)}
 /* Right column panels */
 .gm-right-col{display:flex;flex-direction:column;gap:12px}
 .gm-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px}

@@ -774,6 +774,38 @@ function renderHomeGamification(){
     const questList=document.getElementById('gm-quests-list');
     if(questList)questList.innerHTML=questHtml||'<div style="font-size:12px;color:var(--text3);padding:4px 0">No quests yet</div>';
 
+    // ── Next best action nudge ──
+    // Picks one thing to do next: a streak-at-risk quest first (highest current
+    // streak wins, since that's the most to lose), else the highest-XP quest.
+    const catStreak={};
+    (streaks?.categories||[]).forEach(c=>{catStreak[c.key]=c.current_streak||0;});
+    const incompleteDaily=dailyQuests.filter(q=>!q.completed_today);
+    let nudgeQuest=null,nudgeReason=null;
+    if(incompleteDaily.length){
+      const atRisk=incompleteDaily.filter(q=>(catStreak[q.category_key]||0)>0)
+        .sort((a,b)=>(catStreak[b.category_key]||0)-(catStreak[a.category_key]||0));
+      if(atRisk.length){nudgeQuest=atRisk[0];nudgeReason='streak';}
+      else{nudgeQuest=[...incompleteDaily].sort((a,b)=>b.base_xp-a.base_xp)[0];nudgeReason='xp';}
+    }
+    const nudgeEl=document.getElementById('gm-nudge');
+    if(nudgeEl){
+      if(nudgeQuest){
+        const qName=sanitizeText(nudgeQuest.name,60);
+        const text=nudgeReason==='streak'
+          ?`Keep your ${catStreak[nudgeQuest.category_key]}-day ${sanitizeText(nudgeQuest.category_name,30)} streak alive — "${qName}"`
+          :`Biggest win available: "${qName}" (+${nudgeQuest.base_xp} XP)`;
+        nudgeEl.className='gm-nudge';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">${nudgeReason==='streak'?'🔥':'⚡'}</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">${text}</div></div><button class="gm-nudge-btn" onclick="gmCompleteQuest(${nudgeQuest.id},true,event)">Do it</button>`;
+        nudgeEl.style.display='';
+      }else if(dailyQuests.length){
+        nudgeEl.className='gm-nudge done';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">🎉</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">All daily quests complete — nice work today</div></div>`;
+        nudgeEl.style.display='';
+      }else{
+        nudgeEl.style.display='none';
+      }
+    }
+
     // ── Upcoming ──
     const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
     const di=new Date().getDay();const ai=di===0?6:di-1;
