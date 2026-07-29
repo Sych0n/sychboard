@@ -199,6 +199,8 @@ body.electron-inset .main-topbar{padding-right:140px}
 /* Coin fly chip + burst particles */
 .coin-fly{position:fixed;z-index:9998;pointer-events:none;font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:#1a1204;background:var(--amber);border-radius:20px;padding:3px 10px;box-shadow:0 0 20px rgba(251,191,36,0.4)}
 .coin-particle{position:fixed;z-index:9998;pointer-events:none;font-size:13px;color:var(--amber);text-shadow:0 0 8px rgba(251,191,36,0.6)}
+/* Quest-complete confetti */
+.confetti-piece{position:fixed;z-index:9999;pointer-events:none;width:7px;height:10px;border-radius:2px}
 /* Mini icon button (panel headers) */
 .gm-mini-btn{width:22px;height:22px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--text2);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;transition:all var(--t);font-family:inherit;padding:0}
 .gm-mini-btn:hover{background:rgba(255,255,255,0.1);color:var(--text);border-color:rgba(255,255,255,0.2)}

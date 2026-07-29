@@ -82,7 +82,8 @@ let st={
   apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' },
   habitHistory: {},
   subscriptions: [],
-  pomodoro: { focus: 25, break: 5 }
+  pomodoro: { focus: 25, break: 5 },
+  fxEnabled: true
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
@@ -92,7 +93,7 @@ function load(){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -124,7 +125,7 @@ function load(){
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -599,6 +600,7 @@ async function gmCompleteQuest(questId,checked,ev){
       const res=await window.sychboard.quests.complete(questId);
       if(res){
         const bonus=res.streak?.bonusPct>0?` (+${Math.round(res.streak.bonusPct*100)}% streak)`:'';
+        confettiBurst(ev);playChime();
         flyXp(ev,res.xpAwarded);
         if(res.coinsAwarded)setTimeout(()=>flyChip(ev,`+${res.coinsAwarded} ◈`,'#gm-coins-widget','coin-fly'),180);
         showXpToast(`+${res.xpAwarded} XP${bonus}`);
@@ -659,6 +661,45 @@ function tweenNum(el,to,ms=600){
     if(p<1)requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
+}
+
+// Short celebratory chime (Web Audio, no asset file) — respects the Sound & confetti toggle
+let _fxAudioCtx=null;
+function playChime(){
+  if(st.fxEnabled===false)return;
+  try{
+    if(!_fxAudioCtx)_fxAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=_fxAudioCtx;
+    if(ctx.state==='suspended')ctx.resume();
+    const now=ctx.currentTime;
+    [523.25,659.25,783.99].forEach((freq,i)=>{
+      const osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.type='sine';osc.frequency.value=freq;
+      const t=now+i*0.08;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(0.1,t+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);osc.stop(t+0.4);
+    });
+  }catch(e){console.error('[fx] chime',e.message);}
+}
+
+// Confetti burst from a click position (or screen center if no event) — respects the Sound & confetti toggle
+function confettiBurst(ev){
+  if(st.fxEnabled===false||typeof gsap==='undefined')return;
+  const colors=['#e8eaf0','#fbbf24','#2ecc8a','#f05090','#5ba3ff','#a78bfa'];
+  const ox=ev?ev.clientX:window.innerWidth/2,oy=ev?ev.clientY:window.innerHeight/3;
+  for(let i=0;i<16;i++){
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    p.style.left=ox+'px';p.style.top=oy+'px';
+    p.style.background=colors[i%colors.length];
+    document.body.appendChild(p);
+    const angle=Math.random()*Math.PI*2,dist=50+Math.random()*80;
+    const dx=Math.cos(angle)*dist,dy=Math.sin(angle)*dist*0.6-30;
+    gsap.fromTo(p,{x:0,y:0,opacity:1,rotation:Math.random()*360,scale:0.7+Math.random()*0.5},{x:dx,y:dy+130,opacity:0,rotation:`+=${(Math.random()>0.5?1:-1)*360}`,duration:0.85+Math.random()*0.4,ease:'power1.out',onComplete:()=>p.remove()});
+  }
 }
 
 // Small coin particle burst at a target element (level-ups, purchases)
@@ -1516,6 +1557,7 @@ function clearChat(){
 function rSettings(){
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
+  const fxt=document.getElementById('fx-toggle');if(fxt)fxt.checked=st.fxEnabled!==false;
   const sw=document.getElementById('accent-swatches');
   if(sw){
     const cols=['#e8eaf0','#8b5cf6','#22d3ee','#2ecc8a','#f0a832','#f05090'];
