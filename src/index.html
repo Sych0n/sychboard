@@ -403,7 +403,13 @@
       <div class="ta-row"><input type="text" id="fg-in" placeholder="New fitness goal..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addFitnessGoal()">Add</button></div>
     </div>
     <div class="card"><div class="card-title">Fitness todos</div><div id="todos-fitness"></div><div class="ta-row"><input type="text" id="ti-fitness" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('fitness')">Add</button></div></div>
-    <div class="card"><div class="card-title">Notes</div><textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.fitnessNotes=document.getElementById('fitness-notes').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Notes</div>
+      <div id="fitness-notes-display" style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;cursor:pointer" onclick="this.style.display='none';document.getElementById('fitness-notes-edit').style.display='block';document.getElementById('fitness-notes').focus()"></div>
+      <div id="fitness-notes-edit" style="display:none">
+        <textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveFitnessNotes()">Save</button>
+      </div>
+    </div>
   </div>
 </div>
 

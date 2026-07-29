@@ -2084,10 +2084,15 @@ function resetHabits(){st.habits.forEach(h=>h.done=false);recordHabitHistory();s
 // ═══ FITNESS ═══
 function rFitness(){
   const fn=document.getElementById('fitness-notes');if(fn)fn.value=st.fitnessNotes||'';
+  const disp=document.getElementById('fitness-notes-display');
+  const edit=document.getElementById('fitness-notes-edit');
+  if(disp){disp.innerHTML=st.fitnessNotes?parseMD(st.fitnessNotes):emptyState('📝','Click to add notes...');disp.style.display='block';}
+  if(edit)edit.style.display='none';
   const fl=document.getElementById('fitness-goals-list');
   if(fl)fl.innerHTML=st.fitnessGoals.length?st.fitnessGoals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.fitnessGoals[${i}].done=!st.fitnessGoals[${i}].done;save();rFitness()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><button class="del-btn" onclick="st.fitnessGoals.splice(${i},1);save();rFitness()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
   rSecTodos('fitness');
 }
+function saveFitnessNotes(){st.fitnessNotes=document.getElementById('fitness-notes').value;save();rFitness();toast('Notes saved');}
 function addFitnessGoal(){const v=sanitizeText(document.getElementById('fg-in').value,150).trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
 
 // ═══ TRAVEL ═══
