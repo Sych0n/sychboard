@@ -503,6 +503,9 @@
     <div class="si"><div class="sl">Celebration effects</div><div class="ss">Confetti and a chime when you complete a quest.</div>
       <label class="toggle" style="margin-top:8px"><input type="checkbox" id="fx-toggle" onchange="st.fxEnabled=this.checked;save();if(this.checked){confettiBurst();playChime();}"><span class="toggle-slider"></span></label>
     </div>
+    <div class="si"><div class="sl">Launch on startup</div><div class="ss">Open SychBoard automatically when you log into Windows.</div>
+      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="startup-toggle" onchange="setLaunchOnStartup(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
     <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>

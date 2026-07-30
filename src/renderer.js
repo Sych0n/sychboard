@@ -1556,11 +1556,25 @@ function clearChat(){
   st.chatHistory=[];save();rAI();
 }
 
+async function setLaunchOnStartup(enabled){
+  if(!window.electronAPI?.setLoginItemSettings)return;
+  const r=await window.electronAPI.setLoginItemSettings(enabled);
+  if(r?.ok)toast(enabled?'Launch on startup enabled':'Launch on startup disabled');
+  else{
+    toast('Could not update startup setting');
+    const t=document.getElementById('startup-toggle');if(t)t.checked=!enabled;
+  }
+}
+
 // ═══ SETTINGS ═══
 function rSettings(){
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
   const fxt=document.getElementById('fx-toggle');if(fxt)fxt.checked=st.fxEnabled!==false;
+  const st_=document.getElementById('startup-toggle');
+  if(st_&&window.electronAPI?.getLoginItemSettings){
+    window.electronAPI.getLoginItemSettings().then(r=>{st_.checked=!!r?.openAtLogin;}).catch(()=>{});
+  }
   const sw=document.getElementById('accent-swatches');
   if(sw){
     const cols=['#e8eaf0','#8b5cf6','#22d3ee','#2ecc8a','#f0a832','#f05090'];

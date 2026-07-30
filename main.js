@@ -302,6 +302,16 @@ ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
   })
 })
 
+ipcMain.handle('app:get-login-item-settings', () => {
+  try { return { openAtLogin: app.getLoginItemSettings().openAtLogin } }
+  catch (e) { console.error('[app]', e.message); return { openAtLogin: false } }
+})
+ipcMain.handle('app:set-login-item-settings', (_, openAtLogin) => {
+  if (typeof openAtLogin !== 'boolean') return { ok: false, error: 'invalid_input' }
+  try { app.setLoginItemSettings({ openAtLogin }); return { ok: true } }
+  catch (e) { console.error('[app]', e.message); return { ok: false, error: 'failed' } }
+})
+
 ipcMain.on('restart-and-install', () => {
   try {
     const { autoUpdater } = require('electron-updater')
