@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const https = require('https')
 const http = require('http')
@@ -15,6 +15,30 @@ process.on('unhandledRejection', (reason) => {
 })
 
 let mainWindow
+let tray
+
+function createTray() {
+  try {
+    const iconPath = path.join(__dirname, 'src', 'icons', 'icon-96.png')
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    tray = new Tray(icon)
+    tray.setToolTip('SychBoard')
+    const showWindow = () => {
+      if (!mainWindow) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'Open SychBoard', click: showWindow },
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() }
+    ]))
+    tray.on('click', showWindow)
+  } catch (e) {
+    console.error('[tray] Failed to create tray icon:', e.message)
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -322,6 +346,7 @@ ipcMain.on('restart-and-install', () => {
 app.whenReady().then(() => {
   try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
   createWindow()
+  createTray()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -418,4 +443,7 @@ ipcMain.handle('mcp:call-tool', async (_, name, args, approved) => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
-app.on('will-quit', () => { try { mcp.stop() } catch (e) {} })
+app.on('will-quit', () => {
+  try { mcp.stop() } catch (e) {}
+  try { tray?.destroy() } catch (e) {}
+})
