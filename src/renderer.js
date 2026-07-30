@@ -59,7 +59,7 @@ const CORE_SECTIONS=[
 ];
 
 let st={
-  onboarded:false,userName:'',accentColor:'#e8eaf0',accentGlow:'rgba(232,234,240,0.10)',
+  onboarded:false,gameIntroSeen:false,userName:'',accentColor:'#e8eaf0',accentGlow:'rgba(232,234,240,0.10)',
   focusAreas:[],sections:[...CORE_SECTIONS],
   groqKey:'',defaultWage:10,
   balances:{bank:0,savings:0,trading:0},
@@ -94,7 +94,7 @@ function load(){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -128,7 +128,7 @@ function load(){
   if(st.lastAppDate==null)st.lastAppDate='';
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -165,6 +165,7 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModal('modal-confirm');confirmCb=null;};
 function showConfirm(t,b,cb){document.getElementById('mc-t').textContent=t;document.getElementById('mc-b').textContent=b;confirmCb=cb;openModal('modal-confirm');}
+function closeGameIntro(){st.gameIntroSeen=true;save();closeModal('modal-game-intro');}
 
 let _toastTimer;
 function toast(msg){
@@ -465,6 +466,7 @@ function enterApp(){
   const aiReply=document.getElementById('ai-sug');if(aiReply){aiReply.textContent='';aiReply.style.display='none';}
   setTimeout(initNotifications,2000);
   if(window.innerWidth<=720)initSwipe();
+  if(!st.gameIntroSeen)setTimeout(()=>openModal('modal-game-intro'),1200);
 }
 
 // ═══ NAV ═══
