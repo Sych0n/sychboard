@@ -534,10 +534,24 @@ function getCoins() {
   return _db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0
 }
 
+// Server-side prices for cosmetic shop items — must stay in sync with SHOP_ITEMS
+// in src/renderer.js. The renderer's catalog exists only client-side, so without
+// this, purchaseItem() had to trust whatever `cost` the IPC caller supplied for
+// whatever `itemKey` it supplied; anyone driving the IPC bridge directly (e.g.
+// devtools console) could buy any real item for 0 coins, or "own" a made-up key,
+// by simply passing a different cost — same trust gap as the negative-cost bug
+// fixed 2026-07-22, just for the price itself rather than its sign.
+const SHOP_CATALOG = {
+  accent_white: 0, accent_cyan: 50, accent_purple: 75, accent_red: 75, accent_emerald: 75, accent_gold: 100,
+  font_grotesk: 0, font_inter: 50, font_mono: 75,
+  bg_deepspace: 0, bg_nebula: 100, bg_carbon: 150, bg_aurora: 150,
+  card_standard: 0, card_glow: 100, card_glass: 150,
+  orb_white: 0, orb_cyan: 100, orb_gold: 150
+}
+
 function purchaseItem(itemKey, cost) {
-  const numCost = Number(cost)
-  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
-  const price = Math.round(numCost)
+  const price = SHOP_CATALOG[itemKey]
+  if (price === undefined) return { ok: false, error: 'unknown_item' }
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     let owned = []
@@ -558,10 +572,10 @@ function purchaseItem(itemKey, cost) {
 // double-spend shape as the already-fixed weekly-quest/sweep-bonus farms) —
 // unlike the old renderer path, which called coins:award then streaks:add-freeze
 // as two separate non-atomic IPC round-trips.
-function purchaseFreeze(cost) {
-  const numCost = Number(cost)
-  if (!Number.isFinite(numCost) || numCost < 0) return { ok: false, error: 'invalid_cost' }
-  const price = Math.round(numCost)
+const FREEZE_TOKEN_COST = 150 // must stay in sync with the 'freeze_token' entry in SHOP_ITEMS
+
+function purchaseFreeze() {
+  const price = FREEZE_TOKEN_COST
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     if (coins < price) return { ok: false, error: 'insufficient', coins }
@@ -665,4 +679,89 @@ function setSetting(key, value) {
   _db.prepare('INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)').run(key, String(value))
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory }
+// ── Data export / import ────────────────────────────────────────────────────
+// Dumps every user-generated table (not the static quest/category/badge
+// catalog, which is reseeded by migrate() on any DB) so a restore only needs
+// to replay progress, not the schema's seed data.
+function exportGameData() {
+  return {
+    profile: _db.prepare('SELECT display_name, total_xp, current_level, sychcoins FROM profile WHERE id=1').get(),
+    quest_completions: _db.prepare('SELECT quest_id, app_date, completed_at, xp_awarded, streak_bonus_pct, notes, freeze_used FROM quest_completions').all(),
+    streaks: _db.prepare('SELECT category_id, current_streak, longest_streak, last_completion_date, freeze_tokens FROM streaks').all(),
+    xp_log: _db.prepare('SELECT occurred_at, amount, source_type, source_id, running_total, reason FROM xp_log').all(),
+    badge_unlocks: _db.prepare('SELECT badge_id, unlocked_at FROM badge_unlocks').all(),
+    settings: _db.prepare('SELECT key, value FROM settings').all()
+  }
+}
+
+// Replaces all user-generated game data with the given export. Validates
+// shape before touching anything; runs as one transaction so a malformed or
+// partially-invalid file can't leave the DB half-wiped. current_level is
+// always re-derived from total_xp rather than trusted from the import, same
+// as every in-app write path (getProfile() never reads the stored column).
+function importGameData(data) {
+  if (!data || typeof data !== 'object') return { ok: false, error: 'invalid_data' }
+  const { profile, quest_completions, streaks, xp_log, badge_unlocks, settings } = data
+  if (!profile || typeof profile !== 'object' || !Array.isArray(quest_completions) ||
+      !Array.isArray(streaks) || !Array.isArray(xp_log) || !Array.isArray(badge_unlocks) ||
+      !Array.isArray(settings)) {
+    return { ok: false, error: 'malformed_data' }
+  }
+
+  const doImport = _db.transaction(() => {
+    _db.prepare('DELETE FROM quest_completions').run()
+    _db.prepare('DELETE FROM xp_log').run()
+    _db.prepare('DELETE FROM badge_unlocks').run()
+    _db.prepare('DELETE FROM streaks').run()
+    _db.prepare('DELETE FROM settings').run()
+
+    const totalXp = Math.max(0, Math.round(Number(profile.total_xp) || 0))
+    const { level } = levelForTotalXp(totalXp)
+    _db.prepare('UPDATE profile SET display_name=?, total_xp=?, current_level=?, sychcoins=? WHERE id=1')
+      .run(String(profile.display_name ?? 'Operator').slice(0, 40), totalXp, level, Math.max(0, Math.round(Number(profile.sychcoins) || 0)))
+
+    const insSetting = _db.prepare('INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)')
+    for (const s of settings) if (s && typeof s.key === 'string') insSetting.run(s.key, String(s.value ?? ''))
+    // These are relied on elsewhere (getAppDate, soft-reset, shop) — restore
+    // defaults if the import predates them or omitted them.
+    if (getSetting('day_rollover_hour') == null) insSetting.run('day_rollover_hour', '4')
+    if (getSetting('soft_reset_enabled') == null) insSetting.run('soft_reset_enabled', '1')
+    if (getSetting('shop_owned') == null) insSetting.run('shop_owned', '[]')
+
+    const insStreak = _db.prepare('INSERT INTO streaks (category_id,current_streak,longest_streak,last_completion_date,freeze_tokens) VALUES (?,?,?,?,?)')
+    for (const s of streaks) {
+      if (!Number.isInteger(s?.category_id)) continue
+      insStreak.run(s.category_id, Math.max(0, Math.round(Number(s.current_streak) || 0)), Math.max(0, Math.round(Number(s.longest_streak) || 0)),
+        typeof s.last_completion_date === 'string' ? s.last_completion_date : null, Math.min(3, Math.max(0, Math.round(Number(s.freeze_tokens) || 0))))
+    }
+
+    const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used) VALUES (?,?,?,?,?,?,?)')
+    for (const c of quest_completions) {
+      if (!Number.isInteger(c?.quest_id) || typeof c?.app_date !== 'string') continue
+      insCompletion.run(c.quest_id, c.app_date, typeof c.completed_at === 'string' ? c.completed_at : new Date().toISOString(),
+        Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0)
+    }
+
+    const insXp = _db.prepare('INSERT INTO xp_log (occurred_at,amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?,?)')
+    for (const x of xp_log) {
+      if (typeof x?.source_type !== 'string') continue
+      insXp.run(typeof x.occurred_at === 'string' ? x.occurred_at : new Date().toISOString(), Math.round(Number(x.amount) || 0),
+        x.source_type, Number.isInteger(x.source_id) ? x.source_id : null, Math.round(Number(x.running_total) || 0), typeof x.reason === 'string' ? x.reason : null)
+    }
+
+    const insBadge = _db.prepare('INSERT OR IGNORE INTO badge_unlocks (badge_id,unlocked_at) VALUES (?,?)')
+    for (const b of badge_unlocks) {
+      if (!Number.isInteger(b?.badge_id)) continue
+      insBadge.run(b.badge_id, typeof b.unlocked_at === 'string' ? b.unlocked_at : new Date().toISOString())
+    }
+  })
+
+  try {
+    doImport()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory, exportGameData, importGameData }

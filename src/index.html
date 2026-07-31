@@ -126,6 +126,18 @@
     <div class="mbtns"><button class="btn btn-full" onclick="closeModal('modal-sleep-target')">Cancel</button><button class="btn btn-p btn-full" onclick="saveSleepTargets()">Save</button></div>
   </div>
 </div>
+<div id="modal-game-intro" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt">🎮 New: The Game System</div>
+    <div class="mb" style="margin-bottom:14px">SychBoard now turns your daily habits into a game. Here's the short version:</div>
+    <div class="si"><div class="sl">✅ Quests</div><div class="ss">Complete Daily/Weekly quests across Health, Productivity, Creativity and Finance to earn XP.</div></div>
+    <div class="si"><div class="sl">⭐ Levels &amp; Rank</div><div class="ss">XP adds up to level you up and raise your rank, shown at the top of Home.</div></div>
+    <div class="si"><div class="sl">🔥 Streaks</div><div class="ss">Keep a category streak alive by completing at least one quest in it each day. Freeze tokens protect one missed day.</div></div>
+    <div class="si"><div class="sl">◈ SychCoins</div><div class="ss">Earn coins alongside XP and spend them in the Shop on cosmetics and streak freezes.</div></div>
+    <div class="si" style="border-bottom:none;padding-bottom:0"><div class="sl">🏅 Badges</div><div class="ss" style="margin-bottom:0">Unlock achievements for milestones — check the Game tab any time.</div></div>
+    <div class="mbtns"><button class="btn btn-p btn-full" onclick="closeGameIntro()">Got it, let's go</button></div>
+  </div>
+</div>
 
 <!-- APP -->
 <div id="sb-overlay" onclick="toggleSidebar()"></div>
@@ -222,6 +234,7 @@
           <div class="gm-panel-title">Daily Quests</div>
           <div class="gm-quests-prog" id="gm-quests-prog">0/0 complete</div>
         </div>
+        <div class="gm-nudge" id="gm-nudge" style="display:none"></div>
         <div id="gm-quests-list"></div>
         <!-- AI bar inside quests panel -->
         <div class="gm-ai-bar" style="margin-top:18px">
@@ -402,7 +415,13 @@
       <div class="ta-row"><input type="text" id="fg-in" placeholder="New fitness goal..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addFitnessGoal()">Add</button></div>
     </div>
     <div class="card"><div class="card-title">Fitness todos</div><div id="todos-fitness"></div><div class="ta-row"><input type="text" id="ti-fitness" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('fitness')">Add</button></div></div>
-    <div class="card"><div class="card-title">Notes</div><textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.fitnessNotes=document.getElementById('fitness-notes').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Notes</div>
+      <div id="fitness-notes-display" style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;cursor:pointer" onclick="this.style.display='none';document.getElementById('fitness-notes-edit').style.display='block';document.getElementById('fitness-notes').focus()"></div>
+      <div id="fitness-notes-edit" style="display:none">
+        <textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveFitnessNotes()">Save</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -473,7 +492,7 @@
 
 <div id="page-settings" class="page">
   <div class="sc"><div class="card">
-    <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=document.getElementById('name-in').value||st.userName;save();toast('Name saved')">Save</button></div>
+    <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=sanitizeText(document.getElementById('name-in').value,100)||st.userName;save();toast('Name saved')">Save</button></div>
     <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.defaultWage=parseFloat(document.getElementById('wage-in').value)||st.defaultWage;save();toast('Wage saved')">Save</button></div>
     <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
       <div id="accent-swatches" style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
@@ -486,7 +505,19 @@
       <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="savePomSettings()">Save Timer</button>
     </div>
     <div id="set-inj"></div>
-    <div class="si"><div class="sl">Data Export</div><div class="ss">Download a local backup of all your SychBoard data.</div><button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export Backup (.json)</button></div>
+    <div class="si"><div class="sl">Data Backup</div><div class="ss">Download or restore a full local backup — finance, habits, journal, everything, plus game progress (XP, streaks, badges, SychCoins).</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportData()">Export Backup (.json)</button>
+        <button class="btn btn-sm" onclick="triggerImportData()">Restore from Backup…</button>
+      </div>
+      <input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="handleImportFile(this)">
+    </div>
+    <div class="si"><div class="sl">Celebration effects</div><div class="ss">Confetti and a chime when you complete a quest.</div>
+      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="fx-toggle" onchange="st.fxEnabled=this.checked;save();if(this.checked){confettiBurst();playChime();}"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="si"><div class="sl">Launch on startup</div><div class="ss">Open SychBoard automatically when you log into Windows.</div>
+      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="startup-toggle" onchange="setLaunchOnStartup(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
     <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>

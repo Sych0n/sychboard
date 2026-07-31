@@ -59,7 +59,7 @@ const CORE_SECTIONS=[
 ];
 
 let st={
-  onboarded:false,userName:'',accentColor:'#e8eaf0',accentGlow:'rgba(232,234,240,0.10)',
+  onboarded:false,gameIntroSeen:false,userName:'',accentColor:'#e8eaf0',accentGlow:'rgba(232,234,240,0.10)',
   focusAreas:[],sections:[...CORE_SECTIONS],
   groqKey:'',defaultWage:10,
   balances:{bank:0,savings:0,trading:0},
@@ -77,12 +77,14 @@ let st={
   customSecs:{},chatHistory:[],
   lastHabitReset:'',scheduleEvents:[],
   sleep:{logs:[],targetBed:'23:00',targetHours:8},
-  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'},
+  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true},
   notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''},
   apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' },
   habitHistory: {},
   subscriptions: [],
-  pomodoro: { focus: 25, break: 5 }
+  pomodoro: { focus: 25, break: 5 },
+  fxEnabled: true,
+  lastAppDate: ''
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
@@ -92,7 +94,7 @@ function load(){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -120,11 +122,13 @@ function load(){
   if(!st.sleep.logs)st.sleep.logs=[];
   if(!st.sleep.targetBed)st.sleep.targetBed='23:00';
   if(st.sleep.targetHours==null)st.sleep.targetHours=8;
-  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'};
+  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true};
+  if(st.notifSettings.questReset==null)st.notifSettings.questReset=true;
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
+  if(st.lastAppDate==null)st.lastAppDate='';
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -161,6 +165,7 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModal('modal-confirm');confirmCb=null;};
 function showConfirm(t,b,cb){document.getElementById('mc-t').textContent=t;document.getElementById('mc-b').textContent=b;confirmCb=cb;openModal('modal-confirm');}
+function closeGameIntro(){st.gameIntroSeen=true;save();closeModal('modal-game-intro');}
 
 let _toastTimer;
 function toast(msg){
@@ -461,6 +466,7 @@ function enterApp(){
   const aiReply=document.getElementById('ai-sug');if(aiReply){aiReply.textContent='';aiReply.style.display='none';}
   setTimeout(initNotifications,2000);
   if(window.innerWidth<=720)initSwipe();
+  if(!st.gameIntroSeen)setTimeout(()=>openModal('modal-game-intro'),1200);
 }
 
 // ═══ NAV ═══
@@ -599,6 +605,7 @@ async function gmCompleteQuest(questId,checked,ev){
       const res=await window.sychboard.quests.complete(questId);
       if(res){
         const bonus=res.streak?.bonusPct>0?` (+${Math.round(res.streak.bonusPct*100)}% streak)`:'';
+        confettiBurst(ev);playChime();
         flyXp(ev,res.xpAwarded);
         if(res.coinsAwarded)setTimeout(()=>flyChip(ev,`+${res.coinsAwarded} ◈`,'#gm-coins-widget','coin-fly'),180);
         showXpToast(`+${res.xpAwarded} XP${bonus}`);
@@ -659,6 +666,45 @@ function tweenNum(el,to,ms=600){
     if(p<1)requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
+}
+
+// Short celebratory chime (Web Audio, no asset file) — respects the Sound & confetti toggle
+let _fxAudioCtx=null;
+function playChime(){
+  if(st.fxEnabled===false)return;
+  try{
+    if(!_fxAudioCtx)_fxAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=_fxAudioCtx;
+    if(ctx.state==='suspended')ctx.resume();
+    const now=ctx.currentTime;
+    [523.25,659.25,783.99].forEach((freq,i)=>{
+      const osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.type='sine';osc.frequency.value=freq;
+      const t=now+i*0.08;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(0.1,t+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);osc.stop(t+0.4);
+    });
+  }catch(e){console.error('[fx] chime',e.message);}
+}
+
+// Confetti burst from a click position (or screen center if no event) — respects the Sound & confetti toggle
+function confettiBurst(ev){
+  if(st.fxEnabled===false||typeof gsap==='undefined')return;
+  const colors=['#e8eaf0','#fbbf24','#2ecc8a','#f05090','#5ba3ff','#a78bfa'];
+  const ox=ev?ev.clientX:window.innerWidth/2,oy=ev?ev.clientY:window.innerHeight/3;
+  for(let i=0;i<16;i++){
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    p.style.left=ox+'px';p.style.top=oy+'px';
+    p.style.background=colors[i%colors.length];
+    document.body.appendChild(p);
+    const angle=Math.random()*Math.PI*2,dist=50+Math.random()*80;
+    const dx=Math.cos(angle)*dist,dy=Math.sin(angle)*dist*0.6-30;
+    gsap.fromTo(p,{x:0,y:0,opacity:1,rotation:Math.random()*360,scale:0.7+Math.random()*0.5},{x:dx,y:dy+130,opacity:0,rotation:`+=${(Math.random()>0.5?1:-1)*360}`,duration:0.85+Math.random()*0.4,ease:'power1.out',onComplete:()=>p.remove()});
+  }
 }
 
 // Small coin particle burst at a target element (level-ups, purchases)
@@ -774,6 +820,38 @@ function renderHomeGamification(){
     const questList=document.getElementById('gm-quests-list');
     if(questList)questList.innerHTML=questHtml||'<div style="font-size:12px;color:var(--text3);padding:4px 0">No quests yet</div>';
 
+    // ── Next best action nudge ──
+    // Picks one thing to do next: a streak-at-risk quest first (highest current
+    // streak wins, since that's the most to lose), else the highest-XP quest.
+    const catStreak={};
+    (streaks?.categories||[]).forEach(c=>{catStreak[c.key]=c.current_streak||0;});
+    const incompleteDaily=dailyQuests.filter(q=>!q.completed_today);
+    let nudgeQuest=null,nudgeReason=null;
+    if(incompleteDaily.length){
+      const atRisk=incompleteDaily.filter(q=>(catStreak[q.category_key]||0)>0)
+        .sort((a,b)=>(catStreak[b.category_key]||0)-(catStreak[a.category_key]||0));
+      if(atRisk.length){nudgeQuest=atRisk[0];nudgeReason='streak';}
+      else{nudgeQuest=[...incompleteDaily].sort((a,b)=>b.base_xp-a.base_xp)[0];nudgeReason='xp';}
+    }
+    const nudgeEl=document.getElementById('gm-nudge');
+    if(nudgeEl){
+      if(nudgeQuest){
+        const qName=sanitizeText(nudgeQuest.name,60);
+        const text=nudgeReason==='streak'
+          ?`Keep your ${catStreak[nudgeQuest.category_key]}-day ${sanitizeText(nudgeQuest.category_name,30)} streak alive — "${qName}"`
+          :`Biggest win available: "${qName}" (+${nudgeQuest.base_xp} XP)`;
+        nudgeEl.className='gm-nudge';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">${nudgeReason==='streak'?'🔥':'⚡'}</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">${text}</div></div><button class="gm-nudge-btn" onclick="gmCompleteQuest(${nudgeQuest.id},true,event)">Do it</button>`;
+        nudgeEl.style.display='';
+      }else if(dailyQuests.length){
+        nudgeEl.className='gm-nudge done';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">🎉</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">All daily quests complete — nice work today</div></div>`;
+        nudgeEl.style.display='';
+      }else{
+        nudgeEl.style.display='none';
+      }
+    }
+
     // ── Upcoming ──
     const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
     const di=new Date().getDay();const ai=di===0?6:di-1;
@@ -828,6 +906,16 @@ function _timeAgo(date){
 // by the local UTC offset. Appending 'Z' (after swapping the space for 'T') makes it a
 // real ISO-8601 UTC string so it parses correctly everywhere.
 function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
+// Local calendar-day string (YYYY-MM-DD) for a Date, using its LOCAL fields —
+// never toISOString().slice(0,10), which formats in UTC and silently shifts
+// the day for any non-UTC timezone (the same app-date/real-date mixing bug
+// class fixed throughout src/db.js and in computeLocalAppDate() below, but
+// still present at every "today"/date-key call site in the legacy
+// localStorage-backed habit history and sleep log until this fix — e.g. a
+// habit ticked at 11pm EST (already past UTC midnight) was misfiled into
+// tomorrow's heatmap bucket while maybeResetHabits(), which already used the
+// correct local toDateString(), hadn't rolled the day over yet).
+function localDateStr(d){return`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;}
 
 function renderHome(){
   renderSidebar();
@@ -1042,7 +1130,7 @@ async function rShop(){
 async function buyShopItem(key){
   const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
   if(item.type==='consumable'){
-    const res=await window.sychboard.shop.purchaseFreeze(item.cost);
+    const res=await window.sychboard.shop.purchaseFreeze();
     if(!res?.ok){
       if(res?.error==='insufficient'){shakeShopBalance();toast('Not enough SychCoins');}
       else toast('Purchase failed');
@@ -1115,10 +1203,10 @@ async function getMcpTools(){
   if(_mcpTools!==null)return _mcpTools;
   try{
     const r=await window.sychboard?.mcp?.listTools();
-    _mcpTools=(r&&r.ok&&r.tools)||[];
-    if(r&&!r.ok)console.warn('[mcp] unavailable:',r.error);
-  }catch(e){_mcpTools=[];}
-  return _mcpTools;
+    if(r&&r.ok){_mcpTools=r.tools||[];return _mcpTools;}
+    if(r)console.warn('[mcp] unavailable:',r.error);
+  }catch(e){console.warn('[mcp] unavailable:',e.message);}
+  return [];
 }
 function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // Cosmetic only — chat-bubble copy for known tools. Falls back to the raw
@@ -1357,22 +1445,22 @@ function executeActions(actions){
     if(a.type==='set_balance'&&!isNaN(a.amount)){st.balances[a.field]=a.amount;changed=true;console.log('[actions] set_balance',a.field,'=',a.amount);}
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
-    else if(a.type==='set_exam_date'){st.examDate=a.val;changed=true;console.log('[actions] set_exam_date',a.val);}
-    else if(a.type==='add_todo'){st.genTodos.push({text:a.val,done:false});changed=true;}
-    else if(a.type==='add_habit'){st.habits.push({label:a.val,done:false});changed=true;}
-    else if(a.type==='add_goal'){st.goals.push({text:a.val,category:a.cat,done:false});changed=true;}
+    else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
+    else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
+    else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
+    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
     else if(a.type==='complete_habit'){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
-    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:a.date,hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
-    else if(a.type==='add_trip'){st.trips.push({dest:a.dest,date:a.date,budget:a.budget,done:false});changed=true;}
+    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
+    else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
-    else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
+    else if(a.type==='log_sleep'){const today=localDateStr(new Date());const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
     else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
     else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
-    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:a.name,amount:a.amount,date:a.day});changed=true;}
+    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
     else if(a.type==='remove_habit'){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
     else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
     else if(a.type==='add_event'){
@@ -1380,7 +1468,7 @@ function executeActions(actions){
       if(di>=0){
         initSchedEvents();
         const c=['uni','work','stream'].includes(a.etype)?a.etype:'';
-        st.scheduleEvents[di].push({t:a.name,c});
+        st.scheduleEvents[di].push({t:sanitizeText(a.name,80),c});
         changed=true;console.log('[actions] add_event',a.day,a.name);
       }
     }
@@ -1494,10 +1582,25 @@ function clearChat(){
   st.chatHistory=[];save();rAI();
 }
 
+async function setLaunchOnStartup(enabled){
+  if(!window.electronAPI?.setLoginItemSettings)return;
+  const r=await window.electronAPI.setLoginItemSettings(enabled);
+  if(r?.ok)toast(enabled?'Launch on startup enabled':'Launch on startup disabled');
+  else{
+    toast('Could not update startup setting');
+    const t=document.getElementById('startup-toggle');if(t)t.checked=!enabled;
+  }
+}
+
 // ═══ SETTINGS ═══
 function rSettings(){
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
+  const fxt=document.getElementById('fx-toggle');if(fxt)fxt.checked=st.fxEnabled!==false;
+  const st_=document.getElementById('startup-toggle');
+  if(st_&&window.electronAPI?.getLoginItemSettings){
+    window.electronAPI.getLoginItemSettings().then(r=>{st_.checked=!!r?.openAtLogin;}).catch(()=>{});
+  }
   const sw=document.getElementById('accent-swatches');
   if(sw){
     const cols=['#e8eaf0','#8b5cf6','#22d3ee','#2ecc8a','#f0a832','#f05090'];
@@ -1516,11 +1619,13 @@ function rSettings(){
   const ns=document.getElementById('notif-settings');
   if(ns){
     const row=(id,label,toggleKey,timeKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><input type="time" id="${id}-time" class="notif-time" value="${st.notifSettings[timeKey]}"><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
+    const rowNoTime=(id,label,toggleKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
     ns.innerHTML=
       row('notif-bed','🌙 Bedtime reminder','bedReminder','bedReminderTime')+
       row('notif-morning','☀️ Morning brief','morningBrief','morningBriefTime')+
       row('notif-habit','✅ Habit check-in','habitReminder','habitReminderTime')+
       row('notif-nudge','💡 AI nudge (needs AI key)','aiNudge','aiNudgeTime')+
+      rowNoTime('notif-quest-reset','🔄 Daily quest reset','questReset')+
       `<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" onclick="saveNotifSettings()">Save notification settings</button><button class="btn btn-sm" onclick="testNotif()">Send test</button></div>`;
     document.getElementById('set-inj').innerHTML = `<div class="si"><div class="sl">Groq API key</div><div class="ss">Powers all AI features. Get a free key at console.groq.com</div><input type="password" id="groq-key-in" placeholder="gsk_..." value="${st.apiKeys.groq||''}" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroqKey()">Save</button></div>${devPanel}`;
   }
@@ -1552,15 +1657,51 @@ function saveDevKeys() {
   save(); toast('Developer keys saved!');
   if(st.apiKeys.ytChannelId) fetchYTData();
 }
-function exportData(){
-  const data={};
+async function exportData(){
+  const localStorageData={};
   for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);if(k.startsWith('sb4_'))data[k]=localStorage.getItem(k);
+    const k=localStorage.key(i);if(k.startsWith('sb4_'))localStorageData[k]=localStorage.getItem(k);
   }
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  let game=null;
+  if(window.sychboard?.data?.exportGame){
+    try{
+      const r=await window.sychboard.data.exportGame();
+      if(r?.ok)game=r.data;
+      else toast('Warning: game progress (XP/streaks/badges) could not be included');
+    }catch(e){toast('Warning: game progress (XP/streaks/badges) could not be included');}
+  }
+  const payload={sychboard_backup:true,version:1,exported_at:new Date().toISOString(),localStorage:localStorageData,game};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download=`sychboard-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();URL.revokeObjectURL(url);toast('Backup exported!');
+}
+function triggerImportData(){
+  document.getElementById('import-file-input')?.click();
+}
+async function handleImportFile(input){
+  const file=input.files?.[0];input.value='';
+  if(!file)return;
+  let payload;
+  try{
+    const text=await file.text();
+    payload=JSON.parse(text);
+  }catch(e){toast('Import failed: not a valid backup file');return;}
+  if(!payload||typeof payload!=='object'||!payload.sychboard_backup||typeof payload.localStorage!=='object'){
+    toast('Import failed: not a SychBoard backup file');return;
+  }
+  showConfirm('Restore this backup?','This overwrites all current data (finance, habits, journal, XP/streaks/badges, everything) with the backup\'s contents. Cannot be undone.',async()=>{
+    try{
+      for(const k of Object.keys(localStorage)){if(k.startsWith('sb4_'))localStorage.removeItem(k);}
+      for(const [k,v] of Object.entries(payload.localStorage)){if(k.startsWith('sb4_'))localStorage.setItem(k,v);}
+      if(payload.game&&window.sychboard?.data?.importGame){
+        const r=await window.sychboard.data.importGame(payload.game);
+        if(!r?.ok){toast('Restored local data, but game progress import failed: '+(r?.error||'unknown error'));setTimeout(()=>location.reload(),2000);return;}
+      }
+      toast('Backup restored — reloading…');
+      setTimeout(()=>location.reload(),1200);
+    }catch(e){toast('Import failed: '+e.message);}
+  });
 }
 
 // ═══ FINANCE ═══
@@ -1732,7 +1873,7 @@ function rUni(){
   if(edit)edit.style.display='none';
   rSecTodos('uni');
 }
-function updateExamDate(){st.examDate=document.getElementById('exam-in').value||'TBC';save();rUni();toast('Exam date saved');}
+function updateExamDate(){st.examDate=sanitizeText(document.getElementById('exam-in').value,50)||'TBC';save();rUni();toast('Exam date saved');}
 function saveUniNotes(){st.uniNotes=document.getElementById('uni-notes').value;save();rUni();toast('Notes saved');}
 
 // ═══ YOUTUBE ═══
@@ -1909,7 +2050,7 @@ function rDev(){
 }
 function saveDevNotes(){if(!st.dev)st.dev={};st.dev.notes=document.getElementById('dev-notes').value;save();rDev();toast('Notes saved');}
 function updateDev(){const m=parseInt(document.getElementById('dev-m1i').value);if(m)st.dev.members=m;st.dev.status=document.getElementById('dev-si').value;save();rDev();toast('Project updated');}
-function addDevTodo(){const v=document.getElementById('dev-ti').value.trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
+function addDevTodo(){const v=sanitizeText(document.getElementById('dev-ti').value,200).trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
 
 // ═══ SCHEDULE ═══
 function rSchedule(){
@@ -1933,7 +2074,7 @@ function rSchedEvents(){
 }
 function addSchedEvent(){
   const di=parseInt(document.getElementById('sched-ev-day').value);
-  const txt=document.getElementById('sched-ev-txt').value.trim();
+  const txt=sanitizeText(document.getElementById('sched-ev-txt').value,60).trim();
   if(!txt)return;
   const type=document.getElementById('sched-ev-type').value;
   st.scheduleEvents[di].push({t:txt,c:type});
@@ -1956,7 +2097,7 @@ function rHabits(){
   const hm=document.getElementById('habit-heatmap');
   if(hm){
     const days=[];
-    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
     hm.innerHTML=days.map(d=>{
       const rec=st.habitHistory[d];
       let cls=''; let txt='No data';
@@ -1969,7 +2110,7 @@ function rHabits(){
     }).join('');
   }
 }
-function recordHabitHistory(){const today=new Date().toISOString().slice(0,10);const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
+function recordHabitHistory(){const today=localDateStr(new Date());const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
 function togHabit(i){
   const wasAllDone=st.habits.length>0&&st.habits.every(h=>h.done);
   st.habits[i].done=!st.habits[i].done;save();rHabits();
@@ -1977,17 +2118,22 @@ function togHabit(i){
   recordHabitHistory();save();rHabits();
 }
 function rmHabit(i){st.habits.splice(i,1);save();rHabits();}
-function addHabit(){const v=document.getElementById('new-habit-in').value.trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
+function addHabit(){const v=sanitizeText(document.getElementById('new-habit-in').value,100).trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
 function resetHabits(){st.habits.forEach(h=>h.done=false);recordHabitHistory();save();rHabits();}
 
 // ═══ FITNESS ═══
 function rFitness(){
   const fn=document.getElementById('fitness-notes');if(fn)fn.value=st.fitnessNotes||'';
+  const disp=document.getElementById('fitness-notes-display');
+  const edit=document.getElementById('fitness-notes-edit');
+  if(disp){disp.innerHTML=st.fitnessNotes?parseMD(st.fitnessNotes):emptyState('📝','Click to add notes...');disp.style.display='block';}
+  if(edit)edit.style.display='none';
   const fl=document.getElementById('fitness-goals-list');
   if(fl)fl.innerHTML=st.fitnessGoals.length?st.fitnessGoals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.fitnessGoals[${i}].done=!st.fitnessGoals[${i}].done;save();rFitness()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><button class="del-btn" onclick="st.fitnessGoals.splice(${i},1);save();rFitness()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
   rSecTodos('fitness');
 }
-function addFitnessGoal(){const v=document.getElementById('fg-in').value.trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
+function saveFitnessNotes(){st.fitnessNotes=document.getElementById('fitness-notes').value;save();rFitness();toast('Notes saved');}
+function addFitnessGoal(){const v=sanitizeText(document.getElementById('fg-in').value,150).trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
 
 // ═══ TRAVEL ═══
 function rTravel(){
@@ -2014,7 +2160,7 @@ function rGoals(){
   const cats={'life':'chip-g','fitness':'chip-g','finance':'chip-b','youtube':'chip-a','uni':'chip-b','dev':'chip-a'};
   document.getElementById('goals-list').innerHTML=st.goals.length?st.goals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.goals[${i}].done=!st.goals[${i}].done;save();rGoals()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><span class="chip ${cats[g.category]||'chip-b'}">${g.category}</span><button class="del-btn" onclick="st.goals.splice(${i},1);save();rGoals()">✕</button></div>`).join(''):emptyState('🎯','No goals yet','What are you working toward?');
 }
-function addGoal(){const t=document.getElementById('goal-in').value.trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
+function addGoal(){const t=sanitizeText(document.getElementById('goal-in').value,150).trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
 
 // ═══ TODOS ═══
 function rSecTodos(sec){
@@ -2022,7 +2168,7 @@ function rSecTodos(sec){
   const el=document.getElementById('todos-'+sec);if(!el)return;
   el.innerHTML=st.secTodos[sec].length?st.secTodos[sec].map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.secTodos['${sec}'][${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.secTodos['${sec}'].splice(${i},1);save();rSecTodos('${sec}')">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
 }
-function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:inp.value.trim(),done:false});inp.value='';save();rSecTodos(sec);}
+function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rSecTodos(sec);}
 function rMasterTodos(){
   const secs=['finance','uni','youtube','schedule','fitness','travel'];
   const labs={finance:'Finance',uni:'Uni',youtube:'YouTube',schedule:'Schedule',fitness:'Fitness',travel:'Travel'};
@@ -2032,7 +2178,7 @@ function rMasterTodos(){
   html+=`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">General</div></div>${st.genTodos.length?st.genTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.genTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.genTodos.splice(${i},1);save();rMasterTodos()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>'}<div class="ta-row"><input type="text" id="gen-ti" placeholder="Add general todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addGenTodo()">Add</button></div></div>`;
   document.getElementById('master-todos').innerHTML=html||'<div class="card"><div class="empty">No todos yet</div></div>';
 }
-function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:inp.value.trim(),done:false});inp.value='';save();rMasterTodos();}
+function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rMasterTodos();}
 
 // ═══ JOURNAL ═══
 function rJournal(){
@@ -2077,8 +2223,8 @@ function dropSec(e,targetId){
 }
 function togVis(id){const s=st.sections.find(x=>x.id===id);if(s)s.visible=!s.visible;save();rManage();}
 function openRename(id){renamingId=id;const s=st.sections.find(x=>x.id===id);document.getElementById('rename-val').value=s?s.label:'';openModal('modal-rename');}
-function doRename(){if(!renamingId)return;const name=document.getElementById('rename-val').value.trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
-function doAddSec(){const name=document.getElementById('add-name').value.trim();const type=document.getElementById('add-type').value;const icon=document.getElementById('add-icon').value||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
+function doRename(){if(!renamingId)return;const name=sanitizeText(document.getElementById('rename-val').value,60).trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
+function doAddSec(){const name=sanitizeText(document.getElementById('add-name').value,60).trim();const type=document.getElementById('add-type').value;const icon=sanitizeText(document.getElementById('add-icon').value,10)||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
 function promptDelSec(id){showConfirm('Delete section?','Permanently deletes this section and all its data.',()=>{st.sections=st.sections.filter(x=>x.id!==id);delete st.customSecs[id];save();rManage();goHome();});}
 
 // ═══ CUSTOM ═══
@@ -2087,13 +2233,13 @@ function rCustom(id){
   const pg=document.getElementById('page-custom');
   const hdr=`<div class="sc">`;
   if(cs.type==='notes'||cs.type==='freeform'){
-    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Notes</div><textarea id="cs-n-${id}" style="min-height:160px">${cs.notes||''}</textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.customSecs['${id}'].notes=document.getElementById('cs-n-${id}').value;save()">Save</button></div>`+(cs.type==='notes'?`<div class="card"><div class="card-title">Todos</div><div id="cs-tl-${id}">${(cs.todos||[]).map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.customSecs['${id}'].todos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.customSecs['${id}'].todos.splice(${i},1);save();rCustom('${id}')">✕</button></div>`).join('')||'<div class="empty">No todos yet</div>'}</div><div class="ta-row"><input type="text" id="cs-ti-${id}" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addCsTodo('${id}')">Add</button></div></div>`:'')+`</div>`;
+    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Notes</div><textarea id="cs-n-${id}" style="min-height:160px">${cs.notes||''}</textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.customSecs['${id}'].notes=sanitizeText(document.getElementById('cs-n-${id}').value,5000);save()">Save</button></div>`+(cs.type==='notes'?`<div class="card"><div class="card-title">Todos</div><div id="cs-tl-${id}">${(cs.todos||[]).map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.customSecs['${id}'].todos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.customSecs['${id}'].todos.splice(${i},1);save();rCustom('${id}')">✕</button></div>`).join('')||'<div class="empty">No todos yet</div>'}</div><div class="ta-row"><input type="text" id="cs-ti-${id}" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addCsTodo('${id}')">Add</button></div></div>`:'')+`</div>`;
   } else {
     pg.innerHTML=hdr+`<div class="card"><div class="card-title">Trackers</div><div class="mr2">${(cs.trackers||[]).map((t,i)=>`<div class="metric" style="position:relative"><div class="ml">${t.label}</div><div class="mv">${t.value}${t.suffix||''}</div><button onclick="st.customSecs['${id}'].trackers.splice(${i},1);save();rCustom('${id}')" style="position:absolute;top:5px;right:5px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px">✕</button></div>`).join('')||'<div style="font-size:12px;color:var(--text2)">No trackers yet</div>'}</div><div class="ir3" style="gap:8px;margin-top:10px"><div><div class="fl">Label</div><input type="text" id="cs-tl-${id}" placeholder="Weight"></div><div><div class="fl">Value</div><input type="text" id="cs-tv-${id}" placeholder="75"></div><div><div class="fl">Suffix</div><input type="text" id="cs-ts-${id}" placeholder="kg"></div></div><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="addCsTracker('${id}')">Add tracker</button></div></div>`;
   }
 }
-function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:inp.value.trim(),done:false});inp.value='';save();rCustom(id);}
-function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:l.value.trim(),value:v?v.value:'',suffix:s?s.value:''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
+function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rCustom(id);}
+function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:sanitizeText(l.value,60).trim(),value:v?sanitizeText(v.value,60).trim():'',suffix:s?sanitizeText(s.value,20).trim():''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
 
 // ═══ SLEEP ═══
 function sleepDuration(bed,wake){
@@ -2138,9 +2284,9 @@ function sleepContext(){
 function logSleep(){
   const bed=document.getElementById('sleep-bed')?.value;
   const wake=document.getElementById('sleep-wake')?.value;
-  const note=document.getElementById('sleep-note')?.value?.trim()||'';
+  const note=sanitizeText(document.getElementById('sleep-note')?.value?.trim()||'',100);
   if(!bed||!wake){toast('Enter bed and wake times');return;}
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const existing=st.sleep.logs.findIndex(l=>l.date===today);
   const entry={date:today,bed,wake,note};
   if(existing>=0)st.sleep.logs[existing]=entry;
@@ -2159,17 +2305,17 @@ function saveSleepTargets(){
 }
 function clearOldSleepLogs(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
-  const cut=cutoff.toISOString().slice(0,10);
+  const cut=localDateStr(cutoff);
   st.sleep.logs=st.sleep.logs.filter(l=>l.date>=cut);
   save();rSleep();toast('Old logs cleared');
 }
 function renderSleepChart(){
   const el=document.getElementById('sleep-chart');if(!el)return;
   const days=[];
-  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
   const logMap={};(st.sleep.logs||[]).forEach(l=>{logMap[l.date]=l;});
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const maxH=10;
   const chartH=88;
   const bars=days.map(date=>{
@@ -2191,7 +2337,7 @@ function renderSleepChart(){
   el.innerHTML=`<div style="position:relative"><div style="display:flex;gap:4px;align-items:flex-start">${bars.join('')}</div><div style="position:absolute;bottom:${targetBarH+22}px;left:0;right:0;height:1px;background:rgba(139,92,246,0.25);pointer-events:none"></div></div>`;
 }
 function rSleep(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const bedEl=document.getElementById('sleep-bed');
   const wakeEl=document.getElementById('sleep-wake');
   const todayLog=st.sleep.logs.find(l=>l.date===today);
@@ -2286,7 +2432,30 @@ function checkNotifications(){
   }
   if(ns.aiNudge&&t===ns.aiNudgeTime&&nl.aiNudge!==today){sendAINudge();}
 }
+// Local mirror of db.js's getAppDate() rollover math, so the renderer can detect a
+// quest-reset boundary without polling the DB for the app-date on every tick.
+function computeLocalAppDate(rolloverHour){
+  const now=new Date();
+  if(now.getHours()<rolloverHour)now.setDate(now.getDate()-1);
+  return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
+}
+async function checkQuestReset(){
+  if(!window.sychboard)return;
+  try{
+    const rh=parseInt(await window.sychboard.settings.get('day_rollover_hour'))||4;
+    const appDate=computeLocalAppDate(rh);
+    if(st.lastAppDate&&st.lastAppDate!==appDate){
+      if(st.notifSettings.questReset)sendNotif('🔄 Daily quests reset','A new day has started — your daily quests are ready!');
+      const ap=document.querySelector('.page.active')?.id?.replace('page-','');
+      if(ap==='home')renderHomeGamification();
+      if(ap==='game')rGame();
+    }
+    if(st.lastAppDate!==appDate){st.lastAppDate=appDate;save();}
+  }catch(e){console.error('[quest-reset]',e.message);}
+}
 function initNotifications(){
+  checkQuestReset();
+  setInterval(checkQuestReset,60000);
   if(!('Notification'in window))return;
   checkNotifications();
   setInterval(checkNotifications,60000);
@@ -2300,6 +2469,7 @@ function saveNotifSettings(){
   st.notifSettings.habitReminderTime=document.getElementById('notif-habit-time')?.value||'20:00';
   st.notifSettings.aiNudge=document.getElementById('notif-nudge-toggle')?.checked??false;
   st.notifSettings.aiNudgeTime=document.getElementById('notif-nudge-time')?.value||'12:00';
+  st.notifSettings.questReset=document.getElementById('notif-quest-reset-toggle')?.checked??true;
   save();toast('Notification settings saved');
 }
 function testNotif(){

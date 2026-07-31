@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const https = require('https')
 const http = require('http')
@@ -15,6 +15,30 @@ process.on('unhandledRejection', (reason) => {
 })
 
 let mainWindow
+let tray
+
+function createTray() {
+  try {
+    const iconPath = path.join(__dirname, 'src', 'icons', 'icon-96.png')
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    tray = new Tray(icon)
+    tray.setToolTip('SychBoard')
+    const showWindow = () => {
+      if (!mainWindow) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'Open SychBoard', click: showWindow },
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() }
+    ]))
+    tray.on('click', showWindow)
+  } catch (e) {
+    console.error('[tray] Failed to create tray icon:', e.message)
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -302,6 +326,16 @@ ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
   })
 })
 
+ipcMain.handle('app:get-login-item-settings', () => {
+  try { return { openAtLogin: app.getLoginItemSettings().openAtLogin } }
+  catch (e) { console.error('[app]', e.message); return { openAtLogin: false } }
+})
+ipcMain.handle('app:set-login-item-settings', (_, openAtLogin) => {
+  if (typeof openAtLogin !== 'boolean') return { ok: false, error: 'invalid_input' }
+  try { app.setLoginItemSettings({ openAtLogin }); return { ok: true } }
+  catch (e) { console.error('[app]', e.message); return { ok: false, error: 'failed' } }
+})
+
 ipcMain.on('restart-and-install', () => {
   try {
     const { autoUpdater } = require('electron-updater')
@@ -312,6 +346,7 @@ ipcMain.on('restart-and-install', () => {
 app.whenReady().then(() => {
   try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
   createWindow()
+  createTray()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
@@ -369,9 +404,8 @@ ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
   if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
   try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
-ipcMain.handle('shop:purchase-freeze', (_, cost) => {
-  if (!isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
-  try { return db.purchaseFreeze(cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+ipcMain.handle('shop:purchase-freeze', () => {
+  try { return db.purchaseFreeze() } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
 ipcMain.handle('xp:history', (_, days) => {
   if (days !== undefined && !isFiniteNumber(days)) return []
@@ -384,6 +418,14 @@ ipcMain.handle('settings:get', (_, key) => {
 ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
+})
+ipcMain.handle('data:export-game', () => {
+  try { return { ok: true, data: db.exportGameData() } }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: e.message } }
+})
+ipcMain.handle('data:import-game', (_, data) => {
+  try { return db.importGameData(data) }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: 'import_failed' } }
 })
 // ── sychboard-mcp bridge (Phase 1 AI OS) ──
 // The renderer never talks to the MCP server directly; permission modes are
@@ -401,4 +443,7 @@ ipcMain.handle('mcp:call-tool', async (_, name, args, approved) => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
-app.on('will-quit', () => { try { mcp.stop() } catch (e) {} })
+app.on('will-quit', () => {
+  try { mcp.stop() } catch (e) {}
+  try { tray?.destroy() } catch (e) {}
+})

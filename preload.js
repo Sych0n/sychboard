@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('sychboard', {
   },
   shop: {
     purchase: (itemKey, cost) => ipcRenderer.invoke('shop:purchase', itemKey, cost),
-    purchaseFreeze: (cost) => ipcRenderer.invoke('shop:purchase-freeze', cost)
+    purchaseFreeze: () => ipcRenderer.invoke('shop:purchase-freeze')
   },
   xp: { history: (days) => ipcRenderer.invoke('xp:history', days) },
   settings: {
@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('sychboard', {
   mcp: {
     listTools: () => ipcRenderer.invoke('mcp:list-tools'),
     callTool: (name, args, approved) => ipcRenderer.invoke('mcp:call-tool', name, args, approved)
+  },
+  data: {
+    exportGame: () => ipcRenderer.invoke('data:export-game'),
+    importGame: (data) => ipcRenderer.invoke('data:import-game', data)
   }
 })
 
@@ -44,5 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchYouTube: (ytPath, apiKey) => ipcRenderer.invoke('youtube-fetch', ytPath, apiKey),
   startYouTubeOAuth: (clientId, clientSecret) => ipcRenderer.invoke('youtube-oauth-start', clientId, clientSecret),
   refreshYouTubeToken: (clientId, clientSecret, refreshToken) => ipcRenderer.invoke('youtube-oauth-refresh', clientId, clientSecret, refreshToken),
-  fetchYouTubeAnalytics: (ytPath, token) => ipcRenderer.invoke('youtube-analytics-fetch', ytPath, token)
+  fetchYouTubeAnalytics: (ytPath, token) => ipcRenderer.invoke('youtube-analytics-fetch', ytPath, token),
+  getLoginItemSettings: () => ipcRenderer.invoke('app:get-login-item-settings'),
+  setLoginItemSettings: (openAtLogin) => ipcRenderer.invoke('app:set-login-item-settings', openAtLogin)
 })
