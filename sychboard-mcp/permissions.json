@@ -1,5 +1,5 @@
 {
-  "comment": "One entry per tool. mode: 'confirm' = client must ask the user before each call; 'auto' = pre-approved; anything else (e.g. 'deny') = the server refuses to run the tool at all. A tool with no entry here is also refused. Start everything on 'confirm'; loosen individually once proven reliable.",
+  "comment": "One entry per tool. mode: 'confirm' = the SERVER itself blocks the call until the user approves (MCP elicitation if the client supports it, otherwise a native OS dialog this process spawns directly - no client can bypass this); 'auto' = pre-approved; anything else (e.g. 'deny') = the server refuses to run the tool at all. A tool with no entry here is also refused. Start everything on 'confirm'; loosen individually once proven reliable.",
   "tools": {
     "get_chuck_bird_status": {
       "mode": "confirm",
@@ -12,6 +12,22 @@
     "list_recent_project_files": {
       "mode": "confirm",
       "notes": "Lists file names/mtimes under a path inside the user's home dir. Does not read file contents."
+    },
+    "restart_chuck_bird": {
+      "mode": "confirm",
+      "notes": "WRITE action. Runs exactly 'sudo systemctl restart chuckbird' over SSH on 152.67.159.196 - no other commands, no other access. Briefly interrupts the live production bot for connected players."
+    },
+    "git_diff": {
+      "mode": "confirm",
+      "notes": "Stages all changes (non-destructive) and returns the diff, scoped to the sychboard/chuck-bird repos only. No free-text path input."
+    },
+    "git_commit": {
+      "mode": "confirm",
+      "notes": "WRITE action. Commits staged changes in sychboard or chuck-bird only. Enforced via a custom native dialog (commit-dialog.ps1) showing the real diff and an editable AI-drafted message - not a generic prompt. Never --amend, never rewrites history."
+    },
+    "git_push": {
+      "mode": "confirm",
+      "notes": "WRITE action. Pushes the current branch of sychboard or chuck-bird to origin only. Never --force/--force-with-lease, never deletes branches, never rewrites history. Refuses to push main/master unless the caller explicitly names that branch. Should only ever be called when Daniel explicitly asks for a push in that specific message - never auto-offered after a commit (this part is prompt-level guidance in the tool description, not something the server can mechanically verify)."
     }
   }
 }

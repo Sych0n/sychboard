@@ -1121,17 +1121,31 @@ async function getMcpTools(){
   return _mcpTools;
 }
 function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Cosmetic only — chat-bubble copy for known tools. Falls back to the raw
+// tool name for anything not listed, so new tools never break silently.
+const TOOL_FRIENDLY_NAMES={
+  get_system_status:'Checking system status',
+  get_chuck_bird_status:'Checking Chuck Bird bot status',
+  list_recent_project_files:'Checking recent project files',
+  restart_chuck_bird:'Restarting Chuck Bird bot',
+  git_diff:'Reading git diff',
+  git_commit:'Committing changes',
+  git_push:'Pushing to remote',
+};
+function friendlyToolName(name){return TOOL_FRIENDLY_NAMES[name]||name;}
 // Ephemeral approval bubble in the chat — resolves true/false, not saved to history.
-function askToolApproval(name,args){
+// `description` (from the tool's MCP metadata) is shown as-is so write/risky
+// actions like restart_chuck_bird show their real command, not a vague label.
+function askToolApproval(name,args,description){
   return new Promise(res=>{
     const msgs=document.getElementById('chat-msgs');
     if(!msgs){res(false);return;}
     const argStr=Object.keys(args||{}).length?JSON.stringify(args):'';
     const el=document.createElement('div');
     el.className='ai-msg ai';
-    el.innerHTML=`<div class="ai-bubble">🔧 I'd like to run <b>${escAttr(name)}</b>${argStr?` <span style="opacity:.6;font-size:11px">${escAttr(argStr)}</span>`:''}<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p btn-sm" data-act="allow">Allow</button><button class="btn btn-sm" data-act="deny">Deny</button></div></div>`;
+    el.innerHTML=`<div class="ai-bubble">🔧 <b>${escAttr(friendlyToolName(name))}</b>${argStr?` <span style="opacity:.6;font-size:11px">${escAttr(argStr)}</span>`:''}${description?`<div style="opacity:.65;font-size:11px;margin-top:4px">${escAttr(description)}</div>`:''}<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p btn-sm" data-act="allow">Allow</button><button class="btn btn-sm" data-act="deny">Deny</button></div></div>`;
     const done=(ok)=>{
-      el.querySelector('.ai-bubble').innerHTML=`🔧 <b>${escAttr(name)}</b> — ${ok?'allowed, running…':'denied'}`;
+      el.querySelector('.ai-bubble').innerHTML=`🔧 <b>${escAttr(friendlyToolName(name))}</b> — ${ok?'allowed, running…':'denied'}`;
       res(ok);
     };
     el.querySelector('[data-act="allow"]').addEventListener('click',()=>done(true));
@@ -1144,7 +1158,7 @@ function toolNote(name,status){
   const icons={ok:'✓',error:'✗',denied:'⛔'};
   const el=document.createElement('div');
   el.className='ai-msg ai';
-  el.innerHTML=`<div class="ai-bubble" style="opacity:.65;font-size:12px">🔧 ${escAttr(name)} ${icons[status]||''}</div>`;
+  el.innerHTML=`<div class="ai-bubble" style="opacity:.65;font-size:12px">🔧 ${escAttr(friendlyToolName(name))} ${icons[status]||''}</div>`;
   msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
 }
 async function runMcpToolCall(tc){
@@ -1154,7 +1168,7 @@ async function runMcpToolCall(tc){
   const meta=(_mcpTools||[]).find(t=>t.name===name);
   if(!meta)return`Error: unknown tool "${name}". Only use the tools you were given.`;
   let approved=true;
-  if(meta.mode!=='auto')approved=await askToolApproval(name,args);
+  if(meta.mode!=='auto')approved=await askToolApproval(name,args,meta.description);
   if(!approved)return'The user denied this tool call. Do not retry it; answer without it.';
   try{
     const r=await window.sychboard.mcp.callTool(name,args,true);
@@ -1195,7 +1209,7 @@ Pending daily quests today: ${pending.join(', ')||'all done!'}
       }
     }
   }catch(e){}
-  const sys=`You are SychBoard AI — a personal life assistant for ${st.userName}. You have FULL access to their real data and should use it proactively. Be concise, warm, and specific. Under 120 words unless asked for detail.
+  const sys=`You are SychBoard AI — a personal life assistant for ${st.userName}. Below is their real personal data (finances, habits, goals, schedule, etc.) — reference it proactively in conversation, e.g. noticing patterns unprompted. Be concise, warm, and specific. Under 120 words unless asked for detail. NOTE: if you're also given LIVE TOOLS further below, those follow separate, stricter rules — "use data proactively" here refers only to the data in this block, never to calling a tool.
 
 === FINANCES ===
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
@@ -1268,7 +1282,7 @@ NAVIGATION — use [NAVIGATE:sectionId] ONLY when the user explicitly asks to go
   try{
     const mcpTools=await getMcpTools();
     const tools=mcpTools.length?mcpTools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.inputSchema}})):undefined;
-    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. STRICT RULES: call a tool ONLY if the user's LATEST message explicitly asks for that specific live data. For everything else — greetings, data updates, questions about finances/habits/goals/schedule or anything already in your context — reply normally with NO tool call. Never re-call a tool to refresh an answer you already gave earlier in the conversation unless the user explicitly asks you to check again. When you do call one, answer from its JSON result in plain English; never invent tool output or tool names.`:sys;
+    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. STRICT RULES: call a tool ONLY if the user's LATEST message explicitly names that specific live data — e.g. "what's my CPU doing", "check disk space", "is Chuck up", "check the bot". Casual conversational phrases directed at YOU — "how are you doing", "how's it going", "what's up", "you good?" — are greetings, not status requests, and must NEVER trigger a tool call even though they sound status-adjacent. For everything else — greetings, small talk, data updates, questions about finances/habits/goals/schedule or anything already in your context — reply normally with NO tool call. Never re-call a tool to refresh an answer you already gave earlier in the conversation unless the user explicitly asks you to check again. When you do call one, answer from its JSON result in plain English; never invent tool output or tool names.`:sys;
     const convo=[{role:'system',content:fullSys},...messages];
     for(let round=0;round<4;round++){
       const body={model:'llama-3.3-70b-versatile',messages:convo,max_tokens:500,temperature:0.7};
