@@ -906,6 +906,16 @@ function _timeAgo(date){
 // by the local UTC offset. Appending 'Z' (after swapping the space for 'T') makes it a
 // real ISO-8601 UTC string so it parses correctly everywhere.
 function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
+// Local calendar-day string (YYYY-MM-DD) for a Date, using its LOCAL fields —
+// never toISOString().slice(0,10), which formats in UTC and silently shifts
+// the day for any non-UTC timezone (the same app-date/real-date mixing bug
+// class fixed throughout src/db.js and in computeLocalAppDate() below, but
+// still present at every "today"/date-key call site in the legacy
+// localStorage-backed habit history and sleep log until this fix — e.g. a
+// habit ticked at 11pm EST (already past UTC midnight) was misfiled into
+// tomorrow's heatmap bucket while maybeResetHabits(), which already used the
+// correct local toDateString(), hadn't rolled the day over yet).
+function localDateStr(d){return`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;}
 
 function renderHome(){
   renderSidebar();
@@ -1433,7 +1443,7 @@ function executeActions(actions){
     else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
     else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
-    else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
+    else if(a.type==='log_sleep'){const today=localDateStr(new Date());const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
     else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
     else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
     else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
@@ -2073,7 +2083,7 @@ function rHabits(){
   const hm=document.getElementById('habit-heatmap');
   if(hm){
     const days=[];
-    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
     hm.innerHTML=days.map(d=>{
       const rec=st.habitHistory[d];
       let cls=''; let txt='No data';
@@ -2086,7 +2096,7 @@ function rHabits(){
     }).join('');
   }
 }
-function recordHabitHistory(){const today=new Date().toISOString().slice(0,10);const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
+function recordHabitHistory(){const today=localDateStr(new Date());const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
 function togHabit(i){
   const wasAllDone=st.habits.length>0&&st.habits.every(h=>h.done);
   st.habits[i].done=!st.habits[i].done;save();rHabits();
@@ -2262,7 +2272,7 @@ function logSleep(){
   const wake=document.getElementById('sleep-wake')?.value;
   const note=sanitizeText(document.getElementById('sleep-note')?.value?.trim()||'',100);
   if(!bed||!wake){toast('Enter bed and wake times');return;}
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const existing=st.sleep.logs.findIndex(l=>l.date===today);
   const entry={date:today,bed,wake,note};
   if(existing>=0)st.sleep.logs[existing]=entry;
@@ -2281,17 +2291,17 @@ function saveSleepTargets(){
 }
 function clearOldSleepLogs(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
-  const cut=cutoff.toISOString().slice(0,10);
+  const cut=localDateStr(cutoff);
   st.sleep.logs=st.sleep.logs.filter(l=>l.date>=cut);
   save();rSleep();toast('Old logs cleared');
 }
 function renderSleepChart(){
   const el=document.getElementById('sleep-chart');if(!el)return;
   const days=[];
-  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
   const logMap={};(st.sleep.logs||[]).forEach(l=>{logMap[l.date]=l;});
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const maxH=10;
   const chartH=88;
   const bars=days.map(date=>{
@@ -2313,7 +2323,7 @@ function renderSleepChart(){
   el.innerHTML=`<div style="position:relative"><div style="display:flex;gap:4px;align-items:flex-start">${bars.join('')}</div><div style="position:absolute;bottom:${targetBarH+22}px;left:0;right:0;height:1px;background:rgba(139,92,246,0.25);pointer-events:none"></div></div>`;
 }
 function rSleep(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const bedEl=document.getElementById('sleep-bed');
   const wakeEl=document.getElementById('sleep-wake');
   const todayLog=st.sleep.logs.find(l=>l.date===today);
