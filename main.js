@@ -1,9 +1,44 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const https = require('https')
 const http = require('http')
+const db = require('./src/db')
+const mcp = require('./mcp-client')
+
+// An uncaught exception/rejection in the main process otherwise crashes the
+// whole app for the user with no dialog or log they can see; log and keep running.
+process.on('uncaughtException', (err) => {
+  console.error('[main] Uncaught exception:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] Unhandled rejection:', reason)
+})
 
 let mainWindow
+let tray
+
+function createTray() {
+  try {
+    const iconPath = path.join(__dirname, 'src', 'icons', 'icon-96.png')
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    tray = new Tray(icon)
+    tray.setToolTip('SychBoard')
+    const showWindow = () => {
+      if (!mainWindow) return
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: 'Open SychBoard', click: showWindow },
+      { type: 'separator' },
+      { label: 'Quit', click: () => app.quit() }
+    ]))
+    tray.on('click', showWindow)
+  } catch (e) {
+    console.error('[tray] Failed to create tray icon:', e.message)
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -18,13 +53,16 @@ function createWindow() {
     },
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#0a0a0f',
-      symbolColor: '#3d8ef0',
+      color: '#050508',
+      symbolColor: '#e8eaf0',
       height: 32
     },
-    backgroundColor: '#0a0a0f',
-    show: false
+    backgroundColor: '#050508',
+    show: true
   })
+
+  mainWindow.show()
+  mainWindow.maximize()
 
   const indexPath = path.join(__dirname, 'src', 'index.html')
   mainWindow.loadFile(indexPath).catch(err => {
@@ -34,9 +72,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
-    if (!app.isPackaged) {
-      mainWindow.webContents.openDevTools()
-    }
+    if (!app.isPackaged) mainWindow.webContents.openDevTools()
     checkForUpdates()
   })
 
@@ -140,6 +176,7 @@ ipcMain.handle('t212-fetch', (_, endpoint, apiKey) => {
 })
 
 ipcMain.handle('youtube-fetch', (_, ytPath, apiKey) => {
+  if (typeof ytPath !== 'string' || !ytPath) return { error: 'Invalid YouTube API path' }
   if (!apiKey) return { error: 'YouTube API Key not set in Settings' }
   return new Promise(resolve => {
     const sep = ytPath.includes('?') ? '&' : '?'
@@ -163,6 +200,15 @@ ipcMain.handle('youtube-oauth-start', async (_, clientId, clientSecret) => {
   return new Promise((resolve) => {
     const server = http.createServer()
     const giveUp = setTimeout(() => { server.close(); resolve({ error: 'Auth timed out (2 min)' }) }, 120000)
+    // Without this, a listen failure (port/socket error) emits 'error' with no
+    // listener attached — Node treats that as an uncaught exception instead of
+    // rejecting/resolving this promise, leaving the renderer's await hanging
+    // until the unrelated 2-min timeout with no indication of what went wrong.
+    server.on('error', (err) => {
+      clearTimeout(giveUp)
+      console.error('[YT OAuth] Server error:', err.message)
+      resolve({ error: 'Could not start local OAuth server: ' + err.message })
+    })
     server.listen(0, '127.0.0.1', () => {
       const port = server.address().port
       const redirectUri = `http://127.0.0.1:${port}`
@@ -250,6 +296,7 @@ ipcMain.handle('youtube-oauth-refresh', (_, clientId, clientSecret, refreshToken
 })
 
 ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
+  if (typeof ytPath !== 'string' || !ytPath) return { error: 'Invalid YouTube API path' }
   if (!accessToken) return { error: 'No access token' }
   return new Promise(resolve => {
     const options = { hostname: 'youtubeanalytics.googleapis.com', path: ytPath, headers: { Authorization: `Bearer ${accessToken}` } }
@@ -279,6 +326,16 @@ ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
   })
 })
 
+ipcMain.handle('app:get-login-item-settings', () => {
+  try { return { openAtLogin: app.getLoginItemSettings().openAtLogin } }
+  catch (e) { console.error('[app]', e.message); return { openAtLogin: false } }
+})
+ipcMain.handle('app:set-login-item-settings', (_, openAtLogin) => {
+  if (typeof openAtLogin !== 'boolean') return { ok: false, error: 'invalid_input' }
+  try { app.setLoginItemSettings({ openAtLogin }); return { ok: true } }
+  catch (e) { console.error('[app]', e.message); return { ok: false, error: 'failed' } }
+})
+
 ipcMain.on('restart-and-install', () => {
   try {
     const { autoUpdater } = require('electron-updater')
@@ -287,12 +344,106 @@ ipcMain.on('restart-and-install', () => {
 })
 
 app.whenReady().then(() => {
+  try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
   createWindow()
+  createTray()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
+// ── Gamification IPC ──
+// Input validation helpers — IPC args come from the renderer and must not
+// reach better-sqlite3 with the wrong type (it throws on undefined/NaN/objects
+// bound as params, which would otherwise surface as an opaque native error).
+function isPositiveInt(v) { return Number.isInteger(v) && v > 0 }
+function isFiniteNumber(v) { return typeof v === 'number' && Number.isFinite(v) }
+function isNonEmptyString(v) { return typeof v === 'string' && v.trim().length > 0 }
+
+ipcMain.handle('quests:list', () => { try { return db.listQuests() } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('quests:complete', (_, questId) => {
+  if (!isPositiveInt(questId)) throw new Error('Invalid quest id')
+  try { return db.completeQuest(questId) } catch(e) { console.error('[db]',e.message); throw e }
+})
+ipcMain.handle('quests:uncomplete', (_, questId) => {
+  if (!isPositiveInt(questId)) return {}
+  try { return db.uncompleteQuest(questId) } catch(e) { console.error('[db]',e.message); return {} }
+})
+ipcMain.handle('profile:get', () => { try { return db.getProfile() } catch(e) { console.error('[db]',e.message); return null } })
+ipcMain.handle('streaks:get', () => { try { return db.getStreaks() } catch(e) { console.error('[db]',e.message); return { categories:[], globalStreak:0 } } })
+ipcMain.handle('badges:list', () => { try { return db.listBadges() } catch(e) { console.error('[db]',e.message); return [] } })
+ipcMain.handle('activity:recent', () => { try { return db.getRecentActivity() } catch(e) { console.error('[db]',e.message); return [] } })
+// Developer API keys from .env (dev machine only — .env is not packaged into builds)
+function loadEnvKeys() {
+  try {
+    const fs = require('fs')
+    const envPath = path.join(__dirname, '.env')
+    if (!fs.existsSync(envPath)) return {}
+    const out = {}
+    for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/)
+      if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '')
+    }
+    return out
+  } catch (e) { console.error('[env]', e.message); return {} }
+}
+ipcMain.handle('env:get-keys', () => {
+  const e = loadEnvKeys()
+  return {
+    groq: e.GROQ_API_KEY || '',
+    t212: e.TRADING212_API_KEY || '',
+    ytApi: e.YOUTUBE_API_KEY || '',
+    ytChannelId: e.YOUTUBE_CHANNEL_ID || '',
+    ytClientId: e.YOUTUBE_CLIENT_ID || '',
+    ytClientSecret: e.YOUTUBE_CLIENT_SECRET || '',
+    ytRefreshToken: e.YOUTUBE_REFRESH_TOKEN || ''
+  }
+})
+ipcMain.handle('coins:get', () => { try { return db.getCoins() } catch(e) { console.error('[db]',e.message); return 0 } })
+ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
+  if (!isNonEmptyString(itemKey) || !isFiniteNumber(cost) || cost < 0) return { ok:false, error:'invalid_input' }
+  try { return db.purchaseItem(itemKey, cost) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+})
+ipcMain.handle('shop:purchase-freeze', () => {
+  try { return db.purchaseFreeze() } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+})
+ipcMain.handle('xp:history', (_, days) => {
+  if (days !== undefined && !isFiniteNumber(days)) return []
+  try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] }
+})
+ipcMain.handle('settings:get', (_, key) => {
+  if (!isNonEmptyString(key)) return null
+  try { return db.getSetting(key) } catch(e) { return null }
+})
+ipcMain.handle('settings:set', (_, key, value) => {
+  if (!isNonEmptyString(key)) return
+  try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
+})
+ipcMain.handle('data:export-game', () => {
+  try { return { ok: true, data: db.exportGameData() } }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: e.message } }
+})
+ipcMain.handle('data:import-game', (_, data) => {
+  try { return db.importGameData(data) }
+  catch(e) { console.error('[db]',e.message); return { ok: false, error: 'import_failed' } }
+})
+// ── sychboard-mcp bridge (Phase 1 AI OS) ──
+// The renderer never talks to the MCP server directly; permission modes are
+// enforced in mcp-client.js against permissions.json on every call.
+ipcMain.handle('mcp:list-tools', async () => {
+  try { return { ok: true, tools: await mcp.listTools() } }
+  catch (e) { console.error('[mcp]', e.message); return { ok: false, error: e.message, tools: [] } }
+})
+ipcMain.handle('mcp:call-tool', async (_, name, args, approved) => {
+  if (!isNonEmptyString(name)) return { isError: true, text: 'invalid tool name' }
+  try { return await mcp.callTool(name, args, approved === true) }
+  catch (e) { console.error('[mcp]', e.message); return { isError: true, text: e.message } }
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+app.on('will-quit', () => {
+  try { mcp.stop() } catch (e) {}
+  try { tray?.destroy() } catch (e) {}
 })

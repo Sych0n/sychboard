@@ -3,6 +3,10 @@
   "version": "1.0.17",
   "description": "SychBoard - Your personal AI dashboard",
   "main": "main.js",
+  "author": {
+    "name": "Sych0n",
+    "email": "danieltcpires@gmail.com"
+  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win --x64",
@@ -12,6 +16,7 @@
   "build": {
     "appId": "com.sychboard.app",
     "productName": "SychBoard",
+    "copyright": "Copyright © 2026 Sych0n",
     "icon": "assets/icon",
     "publish": {
       "provider": "github",
@@ -42,11 +47,15 @@
     ]
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.1.0",
     "electron": "^31.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "playwright-core": "^1.61.0"
   },
   "dependencies": {
-    "dotenv": "^17.4.2",
-    "electron-updater": "^6.8.3"
+    "better-sqlite3": "^12.11.1",
+    "electron-updater": "^6.8.3",
+    "gsap": "^3.15.0",
+    "three": "^0.149.0"
   }
 }

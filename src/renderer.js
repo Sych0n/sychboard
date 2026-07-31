@@ -43,6 +43,8 @@ const DEFAULT_SCHED_EVENTS=[
 ];
 function evClass(c){return{uni:'eu',work:'ew',stream:'es'}[c]||'';}
 
+const QCAT_COLORS={health:'var(--cat-health)',productivity:'var(--cat-productivity)',creativity:'var(--cat-creativity)',finance:'var(--cat-finance)'};
+
 const CORE_SECTIONS=[
   {id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
   {id:'uni',label:'Uni',icon:'🎓',core:true,visible:true},
@@ -57,7 +59,7 @@ const CORE_SECTIONS=[
 ];
 
 let st={
-  onboarded:false,userName:'',accentColor:'#8b5cf6',accentGlow:'rgba(139,92,246,0.15)',
+  onboarded:false,gameIntroSeen:false,userName:'',accentColor:'#e8eaf0',accentGlow:'rgba(232,234,240,0.10)',
   focusAreas:[],sections:[...CORE_SECTIONS],
   groqKey:'',defaultWage:10,
   balances:{bank:0,savings:0,trading:0},
@@ -75,22 +77,24 @@ let st={
   customSecs:{},chatHistory:[],
   lastHabitReset:'',scheduleEvents:[],
   sleep:{logs:[],targetBed:'23:00',targetHours:8},
-  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'},
+  notifSettings:{bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true},
   notifLastSent:{bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''},
   apiKeys: { groq: '', t212: '', ytApi: '', ytClientId: '', ytClientSecret: '', ytRefreshToken: '', ytChannelId: '' },
   habitHistory: {},
   subscriptions: [],
-  pomodoro: { focus: 25, break: 5 }
+  pomodoro: { focus: 25, break: 5 },
+  fxEnabled: true,
+  lastAppDate: ''
 };
 
-let confirmCb=null,renamingId=null,obSelections=[],obColor='#8b5cf6',obColorGlow='rgba(139,92,246,0.15)',bootStarAnim=null,bootWaveAnim=null,bootChatHistory=[];
+let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
 
 function load(){
   if(!S.available()){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -102,7 +106,11 @@ function load(){
   if(!st.chatHistory)st.chatHistory=[];
   if(!st.holidays||st.holidays.length<2)st.holidays=[{name:'Holiday 1',date:'',target:500,saved:0},{name:'Holiday 2',date:'',target:1000,saved:0}];
   if(!st.yt)st.yt={};
-  if(st.accentColor==='#3d8ef0'){st.accentColor='#8b5cf6';st.accentGlow='rgba(139,92,246,0.15)';}
+  // One-time migration of legacy cyan/blue accents to the new soft-white default
+  if(!S.get('accentMigratedV2')){
+    if(st.accentColor==='#3d8ef0'||st.accentColor==='#22d3ee'||st.accentColor==='#8b5cf6'){st.accentColor='#e8eaf0';st.accentGlow='rgba(232,234,240,0.10)';}
+    S.set('accentMigratedV2',true);
+  }
   if(!st.yt.apiVideos)st.yt.apiVideos=[];
   if(!st.yt.weekChecks)st.yt.weekChecks=[];
   if(st.yt.videoCount==null)st.yt.videoCount=0;
@@ -114,11 +122,13 @@ function load(){
   if(!st.sleep.logs)st.sleep.logs=[];
   if(!st.sleep.targetBed)st.sleep.targetBed='23:00';
   if(st.sleep.targetHours==null)st.sleep.targetHours=8;
-  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00'};
+  if(!st.notifSettings)st.notifSettings={bedReminder:true,bedReminderTime:'22:30',morningBrief:true,morningBriefTime:'08:00',habitReminder:true,habitReminderTime:'20:00',aiNudge:false,aiNudgeTime:'12:00',questReset:true};
+  if(st.notifSettings.questReset==null)st.notifSettings.questReset=true;
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
+  if(st.lastAppDate==null)st.lastAppDate='';
 }
 function save(){
-  const keys=['onboarded','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -155,6 +165,7 @@ function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModal('modal-confirm');confirmCb=null;};
 function showConfirm(t,b,cb){document.getElementById('mc-t').textContent=t;document.getElementById('mc-b').textContent=b;confirmCb=cb;openModal('modal-confirm');}
+function closeGameIntro(){st.gameIntroSeen=true;save();closeModal('modal-game-intro');}
 
 let _toastTimer;
 function toast(msg){
@@ -164,9 +175,9 @@ function toast(msg){
   clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
 function applyColor(hex){
-  const glowMap={'#8b5cf6':'rgba(139,92,246,0.15)','#3d8ef0':'rgba(61,142,240,0.15)','#2ecc8a':'rgba(46,204,138,0.12)','#f05090':'rgba(240,80,144,0.12)','#f0a832':'rgba(240,168,50,0.12)','#a855f7':'rgba(168,85,247,0.12)','#f05050':'rgba(240,80,80,0.12)'};
-  const a2map={'#8b5cf6':'#a78bfa','#3d8ef0':'#5ba3ff','#2ecc8a':'#52d9a0','#f05090':'#f570a8','#f0a832':'#f5bc5a','#a855f7':'#be7cf9','#f05050':'#f57070'};
-  st.accentColor=hex;st.accentGlow=glowMap[hex]||'rgba(61,142,240,0.15)';
+  const glowMap={'#e8eaf0':'rgba(232,234,240,0.10)','#ffffff':'rgba(255,255,255,0.10)','#22d3ee':'rgba(34,211,238,0.12)','#8b5cf6':'rgba(139,92,246,0.15)','#3d8ef0':'rgba(61,142,240,0.15)','#2ecc8a':'rgba(46,204,138,0.12)','#f05090':'rgba(240,80,144,0.12)','#f0a832':'rgba(240,168,50,0.12)','#a855f7':'rgba(168,85,247,0.12)','#f05050':'rgba(240,80,80,0.12)'};
+  const a2map={'#e8eaf0':'#ffffff','#ffffff':'#ffffff','#22d3ee':'#67e8f9','#8b5cf6':'#a78bfa','#3d8ef0':'#5ba3ff','#2ecc8a':'#52d9a0','#f05090':'#f570a8','#f0a832':'#f5bc5a','#a855f7':'#be7cf9','#f05050':'#f57070'};
+  st.accentColor=hex;st.accentGlow=glowMap[hex]||'rgba(232,234,240,0.10)';
   document.documentElement.style.setProperty('--accent',hex);
   document.documentElement.style.setProperty('--accent2',a2map[hex]||hex);
   document.documentElement.style.setProperty('--accent-glow',st.accentGlow);
@@ -188,14 +199,14 @@ function toggleOb(el,val){
 function pickColor(el,color,glow){
   document.querySelectorAll('.ob-color').forEach(e=>e.classList.remove('selected'));
   el.classList.add('selected');
-  const _a2map={'#8b5cf6':'#a78bfa','#3d8ef0':'#5ba3ff','#2ecc8a':'#52d9a0','#f05090':'#f570a8','#f0a832':'#f5bc5a','#a855f7':'#be7cf9','#f05050':'#f57070'};
+  const _a2map={'#e8eaf0':'#ffffff','#ffffff':'#ffffff','#22d3ee':'#67e8f9','#8b5cf6':'#a78bfa','#3d8ef0':'#5ba3ff','#2ecc8a':'#52d9a0','#f05090':'#f570a8','#f0a832':'#f5bc5a','#a855f7':'#be7cf9','#f05050':'#f57070'};
   obColor=color;obColorGlow=glow;
   document.documentElement.style.setProperty('--accent',color);
   document.documentElement.style.setProperty('--accent2',_a2map[color]||color);
 }
 function activateDanielMode(){
   st.userName='Daniel';
-  st.accentColor='#8b5cf6';st.accentGlow='rgba(139,92,246,0.15)';
+  st.accentColor='#e8eaf0';st.accentGlow='rgba(232,234,240,0.10)';
   st.focusAreas=['finance','youtube','uni','dev','habits'];
   st.sections=[
     {id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
@@ -287,155 +298,121 @@ function obFinish(){
   },500);
 }
 
-// ═══ BOOT ═══
+// ═══ BOOT (Three.js Jarvis orb) ═══
+const ORB_THEMES={
+  white:{sphere:0xe8eaf0,inner:0xffffff,particles:0xffffff,ripple:0xffffff,star:'232,234,240'},
+  cyan:{sphere:0x22d3ee,inner:0x67e8f9,particles:0xa5f3fc,ripple:0x22d3ee,star:'165,243,252'},
+  gold:{sphere:0xf59e0b,inner:0xfcd34d,particles:0xfde68a,ripple:0xf59e0b,star:'253,230,138'}
+};
 function startBoot(){
   const nameEl=document.getElementById('boot-name');
   if(nameEl)nameEl.textContent=st.userName;
   bootChatHistory=[];
+  window._bootOrb=null;
 
-  // Clean up any previous animations
-  if(bootStarAnim){cancelAnimationFrame(bootStarAnim);bootStarAnim=null;}
-  if(bootWaveAnim){cancelAnimationFrame(bootWaveAnim);bootWaveAnim=null;}
+  if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
+  if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
+  if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
+  if(bootMouseHandler){window.removeEventListener('mousemove',bootMouseHandler);bootMouseHandler=null;}
+  disposeBootThree();
 
-  // Stars — orbit slowly around center, glowing
-  const sc=document.getElementById('boot-stars');
-  if(sc){
-    sc.width=window.innerWidth;sc.height=window.innerHeight;
-    const ctx=sc.getContext('2d');
-    const cx=sc.width/2,cy=sc.height/2;
-    const maxR=Math.hypot(cx,cy);
-    const stars=Array.from({length:200},()=>({
-      angle:Math.random()*Math.PI*2,
-      radius:Math.random()*maxR*0.92+maxR*0.04,
-      size:Math.random()*1.1+0.2,
-      phase:Math.random()*Math.PI*2,
-      twinkle:Math.random()*0.003+0.001,
-      bright:Math.random()*0.5+0.25,
-      orbitSpd:(Math.random()*0.00012+0.00004)*(Math.random()<0.5?1:-1)
-    }));
-    function drawStars(t){
-      ctx.clearRect(0,0,sc.width,sc.height);
-      stars.forEach(s=>{
-        s.angle+=s.orbitSpd;
-        const x=cx+Math.cos(s.angle)*s.radius;
-        const y=cy+Math.sin(s.angle)*s.radius;
-        const a=s.bright*(0.3+0.7*Math.abs(Math.sin(t*s.twinkle*200+s.phase)));
-        const g=ctx.createRadialGradient(x,y,0,x,y,s.size*4);
-        g.addColorStop(0,`rgba(180,215,255,${a*0.55})`);
-        g.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.beginPath();ctx.arc(x,y,s.size*4,0,Math.PI*2);
-        ctx.fillStyle=g;ctx.fill();
-        ctx.beginPath();ctx.arc(x,y,s.size,0,Math.PI*2);
-        ctx.fillStyle=`rgba(225,238,255,${Math.min(a*1.6,1)})`;ctx.fill();
-      });
-      bootStarAnim=requestAnimationFrame(drawStars);
-    }
-    setTimeout(()=>{sc.classList.add('visible');requestAnimationFrame(drawStars);},100);
-  }
+  // Visual centrepiece removed (stars + orb) — pending new design direction.
+  // The boot screen is currently just the title/welcome/chat on the dark
+  // gradient. window._bootOrb stays null; all consumers already guard on it.
 
-  // Waves — wavy concentric rings radiating from center
-  const wc=document.getElementById('boot-waves');
-  if(wc){
-    wc.width=window.innerWidth;wc.height=window.innerHeight;
-    const wctx=wc.getContext('2d');
-    const cx=wc.width/2,cy=wc.height/2;
-    let wt=0;
-    const rings=[
-      {base:90, amp:10,angFreq:6, ph:0.0, spd:0.18,r:61,g:142,b:240,a:0.20},
-      {base:175,amp:14,angFreq:8, ph:1.2, spd:0.14,r:91,g:163,b:255,a:0.15},
-      {base:275,amp:18,angFreq:7, ph:2.4, spd:0.11,r:61,g:142,b:240,a:0.11},
-      {base:390,amp:22,angFreq:9, ph:0.7, spd:0.09,r:120,g:100,b:255,a:0.09},
-      {base:520,amp:26,angFreq:6, ph:3.5, spd:0.07,r:61,g:142,b:240,a:0.07},
-    ];
-    function drawWaves(){
-      wctx.clearRect(0,0,wc.width,wc.height);
-      wt+=0.005;
-      rings.forEach(rng=>{
-        const shimmer=0.5+0.5*Math.sin(wt*0.5+rng.ph*1.5);
-        wctx.beginPath();
-        const steps=360;
-        for(let i=0;i<=steps;i++){
-          const angle=(i/steps)*Math.PI*2;
-          const r=rng.base+rng.amp*Math.sin(rng.angFreq*angle+rng.ph+wt*rng.spd);
-          const x=cx+Math.cos(angle)*r;
-          const y=cy+Math.sin(angle)*r;
-          i===0?wctx.moveTo(x,y):wctx.lineTo(x,y);
-        }
-        wctx.closePath();
-        wctx.strokeStyle=`rgba(${rng.r},${rng.g},${rng.b},${rng.a*shimmer})`;
-        wctx.lineWidth=1;wctx.stroke();
-      });
-      bootWaveAnim=requestAnimationFrame(drawWaves);
-    }
-    setTimeout(()=>{wc.classList.add('visible');drawWaves();},1500);
-  }
+  // Letter-by-letter title reveal (50% slower)
+  const letters=document.querySelectorAll('.boot-title .bt');
+  const titleEl=document.getElementById('boot-title');
+  gsap.set(titleEl,{opacity:1});
+  gsap.fromTo(letters,{opacity:0,y:20},{opacity:1,y:0,duration:0.9,stagger:0.13,ease:'power3.out',delay:2.6});
 
-  // Content sequence
-  const content=document.getElementById('boot-content');
-  const bootSecs=document.getElementById('boot-sections');
-  const bootLaunch=document.getElementById('boot-launch');
+  // Welcome text
+  const welcomeEl=document.getElementById('boot-welcome');
+  gsap.to(welcomeEl,{opacity:1,y:0,duration:2.0,ease:'power2.out',delay:4.8});
 
-  setTimeout(()=>{if(content)content.classList.add('visible');},3500);
+  // AI greeting after orb is fully on
   setTimeout(()=>{
     const greeting=getBootMsg();
     bootChatHistory=[{role:'assistant',content:greeting}];
-    const msgEl=addBootMsg('ai',greeting);
-    const el=document.getElementById(msgEl);
-    if(el){
-      Object.assign(el.style,{opacity:'0',transform:'translateY(10px)',transition:'opacity 1.1s ease, transform 1.1s ease'});
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='translateY(0)';}));
+    showBootResponse(greeting,()=>{
+      const inputWrap=document.getElementById('boot-input-wrap');
+      gsap.to(inputWrap,{opacity:1,y:0,duration:1.3,ease:'power2.out'});
+      setTimeout(()=>{
+        const btn=document.getElementById('boot-launch');
+        if(btn)btn.classList.add('visible');
+      },1000);
+    });
+  },6600);
+}
+
+function disposeBootThree(){
+  const bt=window._bootThree;
+  if(!bt)return;
+  try{
+    bt.ripples.forEach(rp=>{rp.mesh.geometry.dispose();rp.mesh.material.dispose();});
+    bt.pGeo.dispose();bt.pMat.dispose();(bt.mats||[]).forEach(m=>m.dispose());
+    bt.renderer.dispose();
+  }catch(e){}
+  window._bootThree=null;
+}
+
+function showBootResponse(text,onDone){
+  const el=document.getElementById('boot-response');
+  if(!el)return;
+  el.innerHTML='';
+  if(window._bootOrb)window._bootOrb.mode='responding';
+  const words=text.split(' ');
+  const frag=document.createDocumentFragment();
+  words.forEach((word,i)=>{
+    const span=document.createElement('span');
+    span.className='boot-word';
+    span.textContent=word+(i<words.length-1?' ':'');
+    frag.appendChild(span);
+  });
+  el.appendChild(frag);
+  if(window._bootOrb?.emitRipple)window._bootOrb.emitRipple();
+  const wordEls=el.querySelectorAll('.boot-word');
+  gsap.to(wordEls,{opacity:1,duration:0.56,stagger:0.08,ease:'power1.out',
+    onComplete:()=>{
+      if(window._bootOrb)window._bootOrb.mode='idle';
+      if(onDone)onDone();
     }
-    setTimeout(()=>{
-      if(bootSecs){
-        const secs=st.sections.filter(s=>s.visible).slice(0,9);
-        const list=document.getElementById('boot-sec-list');
-        if(list)list.innerHTML=secs.map(s=>`<div class="boot-sec-item" onclick="enterAppAndGo('${s.id}')"><div class="boot-sec-icon">${s.icon||'📁'}</div><div>${s.label}</div></div>`).join('');
-        bootSecs.classList.add('visible');
-      }
-      setTimeout(()=>{if(bootLaunch)bootLaunch.classList.add('visible');},400);
-    },1300);
-  },4400);
+  });
 }
 
 function addBootMsg(role,text){
-  const msgs=document.getElementById('boot-msgs');if(!msgs)return null;
-  const id='bm-'+Date.now()+Math.floor(Math.random()*9999);
-  const div=document.createElement('div');
-  div.className='boot-msg '+role;div.id=id;
-  if(role==='typing'){div.innerHTML='<span></span><span></span><span></span>';}
-  else{div.textContent=text;}
-  msgs.appendChild(div);msgs.scrollTop=msgs.scrollHeight;
-  return id;
+  if(role==='ai'){showBootResponse(text,null);return 'boot-response';}
+  return null;
 }
 
 async function bootSend(){
   const inp=document.getElementById('boot-chat-in');if(!inp)return;
   const msg=inp.value.trim();if(!msg)return;inp.value='';
-  addBootMsg('user',msg);
   bootChatHistory.push({role:'user',content:msg});
+
+  // Show user message dimmed while waiting
+  const respEl=document.getElementById('boot-response');
+  if(respEl){respEl.innerHTML=`<span class="boot-word" style="opacity:0.45;font-style:italic">${msg}</span>`;}
+
+  if(window._bootOrb){window._bootOrb.mode='thinking';window._bootOrb.pulseSpeed=0.05;}
+
   const key=getGroqKey();
-  if(!key){addBootMsg('ai','No AI key configured.');return;}
-  const tid=addBootMsg('typing','');
+  if(!key){
+    if(window._bootOrb){window._bootOrb.mode='idle';window._bootOrb.pulseSpeed=0.011;}
+    showBootResponse('No AI key configured — add one in Settings.',null);
+    return;
+  }
+
   const r=await callGroq(bootChatHistory);
-  const tEl=document.getElementById(tid);if(tEl)tEl.remove();
+  if(window._bootOrb){window._bootOrb.mode='idle';window._bootOrb.pulseSpeed=0.011;}
+
   const{clean:r1,sectionId}=parseNav(r||'Ready when you are.');
   const{clean,actions}=parseActions(r1);
   executeActions(actions);
   bootChatHistory.push({role:'assistant',content:clean});
-  const rid=addBootMsg('ai','');
-  const rEl=document.getElementById(rid);
-  if(rEl)typeWrite(rEl,clean,0,sectionId?()=>setTimeout(()=>enterAppAndGo(sectionId),600):null);
-  const msgs=document.getElementById('boot-msgs');
-  if(msgs)msgs.scrollTop=msgs.scrollHeight;
+  showBootResponse(clean,sectionId?()=>setTimeout(()=>enterAppAndGo(sectionId),600):null);
 }
 
-function toggleBootSecs(){
-  const list=document.getElementById('boot-sec-list');
-  const arrow=document.getElementById('boot-sec-arrow');
-  if(!list)return;
-  list.classList.toggle('open');
-  if(arrow)arrow.classList.toggle('open');
-}
 function enterAppAndGo(sectionId){enterApp();setTimeout(()=>goPage(sectionId),150);}
 
 function typeWrite(el,text,i,cb){
@@ -470,8 +447,12 @@ function initSchedEvents(){
 
 function enterApp(){
   if(window.electronAPI)document.body.classList.add('electron-inset');
-  if(bootStarAnim){cancelAnimationFrame(bootStarAnim);bootStarAnim=null;}
-  if(bootWaveAnim){cancelAnimationFrame(bootWaveAnim);bootWaveAnim=null;}
+  if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
+  if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
+  if(bootResizeHandler){window.removeEventListener('resize',bootResizeHandler);bootResizeHandler=null;}
+  if(bootMouseHandler){window.removeEventListener('mousemove',bootMouseHandler);bootMouseHandler=null;}
+  window._bootOrb=null;
+  disposeBootThree();
   const boot=document.getElementById('boot');
   const app=document.getElementById('app');
   boot.classList.add('out');
@@ -482,9 +463,10 @@ function enterApp(){
   renderSidebar();
   setTimeout(()=>{boot.style.display='none';},900);
   renderHome();
-  if(getGroqKey())loadAISug();
+  const aiReply=document.getElementById('ai-sug');if(aiReply){aiReply.textContent='';aiReply.style.display='none';}
   setTimeout(initNotifications,2000);
   if(window.innerWidth<=720)initSwipe();
+  if(!st.gameIntroSeen)setTimeout(()=>openModal('modal-game-intro'),1200);
 }
 
 // ═══ NAV ═══
@@ -513,11 +495,11 @@ function goPage(id){
   }
   setSidebarActive(id);
   setMobNav(id);
-  const titles={finance:'Finance',uni:'University',youtube:'YouTube',dev:'Dev / Side Project',schedule:'Schedule',habits:'Habits',sleep:'Sleep Tracker',fitness:'Fitness',travel:'Travel',goals:'Goals',todos:'All Todos',journal:'Journal',ai:'AI Assistant',manage:'Manage Sections',settings:'Settings'};
+  const titles={finance:'Finance',uni:'University',youtube:'YouTube',dev:'Dev / Side Project',schedule:'Schedule',habits:'Habits',sleep:'Sleep Tracker',fitness:'Fitness',travel:'Travel',goals:'Goals',todos:'All Todos',journal:'Journal',game:'Game',shop:'Shop',ai:'AI Assistant',manage:'Manage Sections',settings:'Settings'};
   const sec=st.sections.find(s=>s.id===id);
   setMainTitle(titles[id]||(sec?.label)||id);
   const s=document.getElementById('main-scroll');if(s)s.scrollTop=0;
-  const renders={finance:rFinance,uni:rUni,youtube:rYT,dev:rDev,schedule:rSchedule,habits:rHabits,sleep:rSleep,fitness:rFitness,travel:rTravel,goals:rGoals,todos:rMasterTodos,journal:rJournal,ai:rAI,manage:rManage,settings:rSettings};
+  const renders={finance:rFinance,uni:rUni,youtube:rYT,dev:rDev,schedule:rSchedule,habits:rHabits,sleep:rSleep,fitness:rFitness,travel:rTravel,goals:rGoals,todos:rMasterTodos,journal:rJournal,game:rGame,shop:rShop,ai:rAI,manage:rManage,settings:rSettings};
   if(renders[id])renders[id]();
   else rCustom(id);
 }
@@ -562,63 +544,726 @@ function renderSidebar(){
     `<div class="sb-sec-label">Sections</div>`+
     secs.map(s=>`<div class="sb-item${activePage===s.id?' active':''}" id="sbi-${s.id}" onclick="goPage('${s.id}')"><span class="sb-icon">${s.icon||'📁'}</span><span>${s.label}</span></div>`).join('')+
     `<div class="sb-divider"></div>`+
+    `<div class="sb-item${activePage==='game'?' active':''}" id="sbi-game" onclick="goPage('game')"><span class="sb-icon">🎮</span><span>Game</span></div>`+
+    `<div class="sb-item${activePage==='shop'?' active':''}" id="sbi-shop" onclick="goPage('shop')"><span class="sb-icon">🛍️</span><span>Shop</span></div>`+
     `<div class="sb-item${activePage==='ai'?' active':''}" id="sbi-ai" onclick="goPage('ai')"><span class="sb-icon">💬</span><span>AI Assistant</span></div>`+
     `<div class="sb-item${activePage==='settings'?' active':''}" id="sbi-settings" onclick="goPage('settings')"><span class="sb-icon">⚙</span><span>Settings</span></div>`;
 }
 
-// ═══ HOME ═══
+// ═══ HOME (Gamification) ═══
+
+function drawSparkline(canvasId,points,color='#e8eaf0'){
+  const c=document.getElementById(canvasId);if(!c)return;
+  const dpr=window.devicePixelRatio||1;
+  const w=c.offsetWidth||180,h=c.offsetHeight||36;
+  c.width=w*dpr;c.height=h*dpr;
+  const ctx=c.getContext('2d');ctx.scale(dpr,dpr);
+  if(!points||points.length<2)return;
+  const mn=Math.min(...points),mx=Math.max(...points),rng=mx-mn||1;
+  const xs=i=>i/(points.length-1)*w,ys=v=>h-4-(v-mn)/rng*(h-8);
+  ctx.beginPath();ctx.moveTo(xs(0),ys(points[0]));
+  for(let i=1;i<points.length;i++)ctx.lineTo(xs(i),ys(points[i]));
+  ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
+  const grad=ctx.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,color+'22');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.lineTo(xs(points.length-1),h);ctx.lineTo(xs(0),h);ctx.closePath();
+  ctx.fillStyle=grad;ctx.fill();
+}
+
+let _xpToastTimer=null;
+function showXpToast(text){
+  let el=document.getElementById('xp-toast');
+  if(!el){el=document.createElement('div');el.id='xp-toast';el.className='xp-toast';document.body.appendChild(el);}
+  el.textContent=text;el.classList.add('show');
+  clearTimeout(_xpToastTimer);_xpToastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+function showLevelToast(level,rank){
+  let el=document.getElementById('level-toast');
+  if(!el){el=document.createElement('div');el.id='level-toast';el.className='level-toast';el.innerHTML=`<div class="level-toast-icon">⚡</div><div class="level-toast-title" id="lt-title"></div><div class="level-toast-sub" id="lt-sub"></div>`;document.body.appendChild(el);}
+  document.getElementById('lt-title').textContent=`Level ${level}!`;
+  document.getElementById('lt-sub').textContent=`You've reached ${rank}`;
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// Guards against a rapid re-click firing a second complete/uncomplete call for
+// the same quest while the first is still in flight — the UI's completed_today
+// state only updates after the round-trip resolves, so two quick clicks both
+// read the stale "not done" state and both call complete(); the DB blocks the
+// duplicate (UNIQUE constraint for daily, explicit check for weekly) but that
+// surfaces as a raw error and a generic "Could not update quest" toast instead
+// of being silently ignored like it should be.
+const questInFlight=new Set();
+async function gmCompleteQuest(questId,checked,ev){
+  if(!window.sychboard)return;
+  if(questInFlight.has(questId))return;
+  questInFlight.add(questId);
+  try{
+    if(checked){
+      const res=await window.sychboard.quests.complete(questId);
+      if(res){
+        const bonus=res.streak?.bonusPct>0?` (+${Math.round(res.streak.bonusPct*100)}% streak)`:'';
+        confettiBurst(ev);playChime();
+        flyXp(ev,res.xpAwarded);
+        if(res.coinsAwarded)setTimeout(()=>flyChip(ev,`+${res.coinsAwarded} ◈`,'#gm-coins-widget','coin-fly'),180);
+        showXpToast(`+${res.xpAwarded} XP${bonus}`);
+        if(res.leveledUp){
+          setTimeout(()=>showLevelToast(res.newLevel,res.newRank),600);
+          if(res.coinsFromLevelUp)setTimeout(()=>{coinBurst('#gm-coins-widget');showXpToast(`◈ +${res.coinsFromLevelUp} SychCoins — Level ${res.newLevel}!`);},1200);
+        }
+        if(res.sweepBonus)setTimeout(()=>toast(`🧹 Category swept! +${res.sweepBonus} XP bonus`),800);
+        if(res.badgesUnlocked?.length)setTimeout(()=>toast(`🏆 Badge unlocked: ${res.badgesUnlocked.map(b=>b.name).join(', ')}`),800);
+        if(res.streak?.freezeUsed)setTimeout(()=>toast('❄️ Streak Freeze used — missed day covered'),800);
+      }
+    } else {
+      await window.sychboard.quests.uncomplete(questId);
+    }
+    renderHomeGamification();
+  }catch(e){console.error('[quests]',e.message);toast('Could not update quest');}
+  finally{questInFlight.delete(questId);}
+}
+
+function toggleQuestCat(key){
+  const c=S.get('qcatCollapsed')||{};
+  c[key]=!c[key];
+  S.set('qcatCollapsed',c);
+  document.getElementById('qcb-'+key)?.classList.toggle('collapsed',c[key]);
+  document.getElementById('qch-'+key)?.classList.toggle('collapsed',c[key]);
+}
+
+// Animate a chip from a click position to a target widget (XP → level widget, coins → coin widget)
+function flyChip(ev,text,targetSel,cls){
+  const target=document.querySelector(targetSel);
+  if(!target||!ev||typeof gsap==='undefined')return;
+  const chip=document.createElement('div');
+  chip.className=cls;chip.textContent=text;
+  chip.style.left=ev.clientX+'px';chip.style.top=ev.clientY+'px';
+  document.body.appendChild(chip);
+  const tr=target.getBoundingClientRect();
+  const dx=tr.left+tr.width/2-ev.clientX,dy=tr.top+tr.height/2-ev.clientY;
+  gsap.fromTo(chip,{x:0,y:0,scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.2,ease:'power2.out',onComplete:()=>{
+    gsap.to(chip,{x:dx,y:dy,scale:0.45,opacity:0,duration:0.75,ease:'power2.inOut',onComplete:()=>{
+      chip.remove();
+      gsap.fromTo(target,{scale:1.05},{scale:1,duration:0.35,ease:'power2.out'});
+    }});
+  }});
+}
+function flyXp(ev,amount){flyChip(ev,`+${amount} XP`,'.gm-level-widget','xp-fly');}
+
+// Smooth number count-up (used for XP, coins, level)
+function tweenNum(el,to,ms=600){
+  if(!el)return;
+  const target=Math.round(to||0);
+  const from=parseInt(String(el.textContent).replace(/[^0-9\-]/g,''),10)||0;
+  if(from===target){el.textContent=target;return;}
+  const t0=performance.now();
+  function step(t){
+    const p=Math.min(1,(t-t0)/ms);
+    const e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(target-from)*e);
+    if(p<1)requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// Short celebratory chime (Web Audio, no asset file) — respects the Sound & confetti toggle
+let _fxAudioCtx=null;
+function playChime(){
+  if(st.fxEnabled===false)return;
+  try{
+    if(!_fxAudioCtx)_fxAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const ctx=_fxAudioCtx;
+    if(ctx.state==='suspended')ctx.resume();
+    const now=ctx.currentTime;
+    [523.25,659.25,783.99].forEach((freq,i)=>{
+      const osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.type='sine';osc.frequency.value=freq;
+      const t=now+i*0.08;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(0.1,t+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);osc.stop(t+0.4);
+    });
+  }catch(e){console.error('[fx] chime',e.message);}
+}
+
+// Confetti burst from a click position (or screen center if no event) — respects the Sound & confetti toggle
+function confettiBurst(ev){
+  if(st.fxEnabled===false||typeof gsap==='undefined')return;
+  const colors=['#e8eaf0','#fbbf24','#2ecc8a','#f05090','#5ba3ff','#a78bfa'];
+  const ox=ev?ev.clientX:window.innerWidth/2,oy=ev?ev.clientY:window.innerHeight/3;
+  for(let i=0;i<16;i++){
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    p.style.left=ox+'px';p.style.top=oy+'px';
+    p.style.background=colors[i%colors.length];
+    document.body.appendChild(p);
+    const angle=Math.random()*Math.PI*2,dist=50+Math.random()*80;
+    const dx=Math.cos(angle)*dist,dy=Math.sin(angle)*dist*0.6-30;
+    gsap.fromTo(p,{x:0,y:0,opacity:1,rotation:Math.random()*360,scale:0.7+Math.random()*0.5},{x:dx,y:dy+130,opacity:0,rotation:`+=${(Math.random()>0.5?1:-1)*360}`,duration:0.85+Math.random()*0.4,ease:'power1.out',onComplete:()=>p.remove()});
+  }
+}
+
+// Small coin particle burst at a target element (level-ups, purchases)
+function coinBurst(targetSel){
+  const target=document.querySelector(targetSel||'#gm-coins-widget');
+  if(!target)return;
+  const r=target.getBoundingClientRect();
+  const cx=r.left+r.width/2,cy=r.top+r.height/2;
+  for(let i=0;i<8;i++){
+    const p=document.createElement('div');
+    p.className='coin-particle';p.textContent='◈';
+    p.style.left=cx+'px';p.style.top=cy+'px';
+    document.body.appendChild(p);
+    const a=(i/8)*Math.PI*2+Math.random()*0.5,d=32+Math.random()*30;
+    gsap.fromTo(p,{x:0,y:0,scale:0.5,opacity:1},{x:Math.cos(a)*d,y:Math.sin(a)*d,scale:1,opacity:0,duration:0.65+Math.random()*0.25,ease:'power2.out',onComplete:()=>p.remove()});
+  }
+}
+
+function renderHomeGamification(){
+  if(!window.sychboard)return;
+  Promise.all([
+    window.sychboard.profile.get(),
+    window.sychboard.streaks.get(),
+    window.sychboard.quests.list(),
+    window.sychboard.badges.list(),
+    window.sychboard.activity.recent(),
+    window.sychboard.coins?window.sychboard.coins.get():0
+  ]).then(([profile,streaks,quests,badges,activity,coins])=>{
+    if(!profile)return;
+
+    // ── SychCoins ──
+    tweenNum(document.getElementById('gm-coins-num'),coins||0);
+
+    // ── Greeting ──
+    const hr=new Date().getHours();
+    const gEl=document.getElementById('gm-greeting-label');
+    if(gEl)gEl.textContent=`${hr<12?'GOOD MORNING':hr<17?'GOOD AFTERNOON':'GOOD EVENING'}, ${(st.userName||'OPERATOR').toUpperCase()}`;
+
+    // ── Level bar ──
+    const pct=Math.min(100,(profile.currentLevelXp/profile.xpToNext)*100);
+    tweenNum(document.getElementById('gm-level'),profile.level,400);
+    tweenNum(document.getElementById('gm-xp-cur'),profile.currentLevelXp,500);
+    const xpMax=document.getElementById('gm-xp-max');if(xpMax)xpMax.textContent=profile.xpToNext;
+    const fill=document.getElementById('gm-xp-fill');if(fill)fill.style.width=pct+'%';
+    const rank=document.getElementById('gm-rank');if(rank)rank.textContent=profile.rank;
+
+    // ── Streak ──
+    const gs=streaks?.globalStreak||0;
+    const sNum=document.getElementById('gm-streak-num');if(sNum)sNum.textContent=gs;
+    const sSub=document.getElementById('gm-streak-sub');if(sSub)sSub.textContent=streaks?.globalLongest>0&&gs>=streaks.globalLongest?'🔥 Personal best':'Keep it up';
+    const sw=document.getElementById('gm-streak-widget');if(sw)sw.classList.toggle('active',gs>0);
+
+    // ── Stat cards ──
+    const setDelta=(id,pct)=>{
+      const el=document.getElementById(id);if(!el)return;
+      if(pct==null||!isFinite(pct)){el.textContent='';el.className='gm-sc-delta';return;}
+      el.textContent=`${pct>=0?'+':''}${pct.toFixed(1)}%`;
+      el.className='gm-sc-delta '+(pct>0.05?'pos':pct<-0.05?'neg':'flat');
+    };
+    const sparkDelta=pts=>pts&&pts.length>1&&pts[0]>0?((pts[pts.length-1]-pts[0])/pts[0])*100:null;
+    const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
+    const finEl=document.getElementById('gm-fin-val');if(finEl)finEl.textContent=fmt(wealth);
+    const finPts=[st.balances.savings||0,st.balances.bank||0,wealth*0.92,wealth*0.96,wealth].map(v=>v||0);
+    drawSparkline('gm-spark-fin',finPts);
+    setDelta('gm-fin-delta',wealth>0?((wealth-wealth*0.92)/(wealth*0.92))*100:null);
+    const ytEl=document.getElementById('gm-yt-val');if(ytEl)ytEl.textContent=`${fmtK(st.yt.subs||0)} subs`;
+    const ytPts=[...Array(7)].map((_,i)=>Math.max(0,(st.yt.subs||0)*(0.7+i*0.05)));
+    if(st.yt.subs>0){drawSparkline('gm-spark-yt',ytPts);}
+    setDelta('gm-yt-delta',st.yt.subs>0?sparkDelta(ytPts.slice(-2)):null);
+    const habDone=st.habits.filter(h=>h.done).length;
+    const fitEl=document.getElementById('gm-fit-val');if(fitEl)fitEl.textContent=`${habDone}/${st.habits.length} habits`;
+    const fitPts=[...Array(7)].map((_,i)=>Math.round(habDone*(0.3+i*0.1)));drawSparkline('gm-spark-fit',fitPts,'#34d399');
+    setDelta('gm-fit-delta',habDone>0&&st.habits.length?((habDone/st.habits.length)*100)-100:null);
+
+    // ── Quests (cards grouped by category) ──
+    const CAT_COLORS=QCAT_COLORS;
+    const dailyQuests=(quests||[]).filter(q=>q.frequency==='daily');
+    const epicQuests=(quests||[]).filter(q=>q.frequency==='epic'&&!q.completed_today);
+    const doneCount=dailyQuests.filter(q=>q.completed_today).length;
+    const progEl=document.getElementById('gm-quests-prog');if(progEl)progEl.textContent=`${doneCount}/${dailyQuests.length} complete`;
+
+    const questCard=(q,i)=>{
+      const qc=CAT_COLORS[q.category_key]||q.category_color||'#8f92a1';
+      const freq=q.frequency==='weekly'?' · Weekly':q.frequency==='epic'?' · Milestone':'';
+      return`<div class="gm-quest-item${q.completed_today?' done':''}" style="--qc:${qc};animation-delay:${Math.min((i||0)*30,300)}ms" onclick="gmCompleteQuest(${q.id},${!q.completed_today},event)">
+        <div class="gm-qi-check${q.completed_today?' done':''}"></div>
+        <div class="gm-qi-body">
+          <div class="gm-qi-name">${sanitizeText(q.name,80)}</div>
+          <div class="gm-qi-cat">${q.category_name}${freq}</div>
+        </div>
+        <div class="gm-qi-xp${q.completed_today?' done':''}">+${q.base_xp}XP</div>
+      </div>`;
+    };
+    const qcatCollapsed=S.get('qcatCollapsed')||{};
+    const catGroup=(key,name,qs)=>{
+      const col=!!qcatCollapsed[key];
+      const doneN=qs.filter(q=>q.completed_today).length;
+      return`<div class="gm-qcat-hd${col?' collapsed':''}" id="qch-${key}" style="--qc:${CAT_COLORS[key]||'#8f92a1'}" onclick="toggleQuestCat('${key}')">
+          <span class="gm-qcat-dot"></span><span class="gm-qcat-name">${name}</span>
+          <span class="gm-qcat-count">${doneN}/${qs.length}</span><span class="gm-qcat-chev">▾</span>
+        </div>
+        <div class="gm-qcat-body${col?' collapsed':''}" id="qcb-${key}">${qs.map(questCard).join('')}</div>`;
+    };
+    const byCat={};
+    (quests||[]).filter(q=>q.frequency!=='epic').forEach(q=>{
+      (byCat[q.category_key]=byCat[q.category_key]||{name:q.category_name,qs:[]}).qs.push(q);
+    });
+    const catOrder=['health','productivity','creativity','finance'];
+    Object.values(byCat).forEach(c=>c.qs.sort((a,b)=>(a.frequency==='daily'?0:1)-(b.frequency==='daily'?0:1)));
+    const orderedKeys=[...catOrder.filter(k=>byCat[k]),...Object.keys(byCat).filter(k=>!catOrder.includes(k))];
+    let questHtml=orderedKeys.map(k=>catGroup(k,byCat[k].name,byCat[k].qs)).join('');
+    if(epicQuests.length)questHtml+=catGroup('milestones','Milestones',epicQuests);
+    const questList=document.getElementById('gm-quests-list');
+    if(questList)questList.innerHTML=questHtml||'<div style="font-size:12px;color:var(--text3);padding:4px 0">No quests yet</div>';
+
+    // ── Next best action nudge ──
+    // Picks one thing to do next: a streak-at-risk quest first (highest current
+    // streak wins, since that's the most to lose), else the highest-XP quest.
+    const catStreak={};
+    (streaks?.categories||[]).forEach(c=>{catStreak[c.key]=c.current_streak||0;});
+    const incompleteDaily=dailyQuests.filter(q=>!q.completed_today);
+    let nudgeQuest=null,nudgeReason=null;
+    if(incompleteDaily.length){
+      const atRisk=incompleteDaily.filter(q=>(catStreak[q.category_key]||0)>0)
+        .sort((a,b)=>(catStreak[b.category_key]||0)-(catStreak[a.category_key]||0));
+      if(atRisk.length){nudgeQuest=atRisk[0];nudgeReason='streak';}
+      else{nudgeQuest=[...incompleteDaily].sort((a,b)=>b.base_xp-a.base_xp)[0];nudgeReason='xp';}
+    }
+    const nudgeEl=document.getElementById('gm-nudge');
+    if(nudgeEl){
+      if(nudgeQuest){
+        const qName=sanitizeText(nudgeQuest.name,60);
+        const text=nudgeReason==='streak'
+          ?`Keep your ${catStreak[nudgeQuest.category_key]}-day ${sanitizeText(nudgeQuest.category_name,30)} streak alive — "${qName}"`
+          :`Biggest win available: "${qName}" (+${nudgeQuest.base_xp} XP)`;
+        nudgeEl.className='gm-nudge';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">${nudgeReason==='streak'?'🔥':'⚡'}</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">${text}</div></div><button class="gm-nudge-btn" onclick="gmCompleteQuest(${nudgeQuest.id},true,event)">Do it</button>`;
+        nudgeEl.style.display='';
+      }else if(dailyQuests.length){
+        nudgeEl.className='gm-nudge done';
+        nudgeEl.innerHTML=`<span class="gm-nudge-icon">🎉</span><div class="gm-nudge-body"><div class="gm-nudge-label">Next best action</div><div class="gm-nudge-text">All daily quests complete — nice work today</div></div>`;
+        nudgeEl.style.display='';
+      }else{
+        nudgeEl.style.display='none';
+      }
+    }
+
+    // ── Upcoming ──
+    const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
+    const di=new Date().getDay();const ai=di===0?6:di-1;
+    const todayEvs=evs[ai]||[];
+    const upEl=document.getElementById('gm-upcoming');
+    if(upEl){
+      if(!todayEvs.length){upEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No events today</div>';}
+      else{
+        const times={uni:'09:00',work:'18:00',stream:'20:00'};
+        upEl.innerHTML=todayEvs.map((e,i)=>`<div class="gm-ev"><span class="gm-ev-time">${times[e.c]||'—'}</span><span class="gm-ev-dot"></span><span class="gm-ev-name">${e.t}</span><button class="gm-ev-del" title="Remove" onclick="removeUpcomingEvent(${ai},${i})">×</button></div>`).join('');
+      }
+    }
+
+    // ── Achievements ──
+    const badgeEl=document.getElementById('gm-badges');
+    if(badgeEl&&badges){
+      const show=badges.slice(0,8);
+      badgeEl.innerHTML=show.map(b=>`<div class="gm-badge${b.unlocked?' unlocked':' locked'}" title="${b.name}: ${b.description||''}">${b.icon||'🏅'}</div>`).join('');
+    }
+
+    // ── Recent Activity ──
+    const actEl=document.getElementById('gm-activity');
+    if(actEl){
+      if(!activity||!activity.length){actEl.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No activity yet — complete your first quest!</div>';}
+      else{
+        actEl.innerHTML=activity.map(a=>{
+          const ago=_timeAgo(parseUtcTimestamp(a.completed_at));
+          return`<div class="gm-act-item"><div class="gm-act-icon">●</div><div class="gm-act-body"><div class="gm-act-name">Completed "${sanitizeText(a.quest_name,50)}"</div><div class="gm-act-meta">${ago}</div></div><div class="gm-act-xp">+${a.xp_awarded}XP</div></div>`;
+        }).join('');
+      }
+    }
+
+    // ── Section grid ──
+    const recentSleep=(st.sleep?.logs||[]).slice(-1)[0];
+    const sleepSum=recentSleep?`${sleepDuration(recentSleep.bed,recentSleep.wake).toFixed(1)}h`:'—';
+    const sums={finance:`${fmt(wealth)} total`,uni:`Exam: ${st.examDate}`,youtube:`${fmtK(st.yt.subs||0)} subs · ${fmtK(st.yt.views||0)} views`,dev:`${st.dev?.members||0} members · ${st.dev?.status||'—'}`,schedule:`${todayEvs.length} events today`,habits:`${habDone}/${st.habits.length} done`,sleep:`${sleepSum} last night`,fitness:`${st.fitnessGoals.filter(g=>!g.done).length} goals`,travel:`${st.trips.length} trips`,goals:`${st.goals.filter(g=>!g.done).length} active`,todos:`${[...st.genTodos,...Object.values(st.secTodos||{}).flat()].filter(t=>!t.done).length} pending`,journal:`${Object.keys(st.journals).length} entries`};
+    const vis=st.sections.filter(s=>s.visible);
+    const gridEl=document.getElementById('home-grid');
+    if(gridEl)gridEl.innerHTML=vis.map((s,i,arr)=>{const w=arr.length%2!==0&&i===arr.length-1;return`<div class="home-card${w?' wide':''}" onclick="goPage('${s.id}')"><span class="hc-icon">${s.icon||'📁'}</span><div class="hc-label">${s.label}</div><div class="hc-value">${sums[s.id]||'Tap to open'}</div><div class="hc-arrow">›</div></div>`;}).join('');
+
+  }).catch(e=>console.error('[renderHomeGamification]',e));
+}
+
+function _timeAgo(date){
+  const s=Math.round((Date.now()-date.getTime())/1000);
+  if(s<60)return'Just now';if(s<3600)return`${Math.floor(s/60)} min ago`;
+  if(s<86400)return`${Math.floor(s/3600)} hr ago`;return`${Math.floor(s/86400)}d ago`;
+}
+// db.js timestamps come from SQLite's datetime('now') as "YYYY-MM-DD HH:MM:SS" UTC with
+// no timezone marker. new Date() on that exact string is parsed as LOCAL time (not UTC)
+// by V8's non-ISO date-time fallback, so every such timestamp silently comes out wrong
+// by the local UTC offset. Appending 'Z' (after swapping the space for 'T') makes it a
+// real ISO-8601 UTC string so it parses correctly everywhere.
+function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
+// Local calendar-day string (YYYY-MM-DD) for a Date, using its LOCAL fields —
+// never toISOString().slice(0,10), which formats in UTC and silently shifts
+// the day for any non-UTC timezone (the same app-date/real-date mixing bug
+// class fixed throughout src/db.js and in computeLocalAppDate() below, but
+// still present at every "today"/date-key call site in the legacy
+// localStorage-backed habit history and sleep log until this fix — e.g. a
+// habit ticked at 11pm EST (already past UTC midnight) was misfiled into
+// tomorrow's heatmap bucket while maybeResetHabits(), which already used the
+// correct local toDateString(), hadn't rolled the day over yet).
+function localDateStr(d){return`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;}
+
 function renderHome(){
   renderSidebar();
-  const hr=new Date().getHours();
-  const g=hr<12?'Good morning':hr<17?'Good afternoon':'Good evening';
-  document.getElementById('hg').textContent=g+', '+st.userName+' 👋';
-  document.getElementById('hd').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
-  const done=st.habits.filter(h=>h.done).length;
-  const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
-  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
-  const di=new Date().getDay();const ai=di===0?6:di-1;
-  document.getElementById('home-sched').innerHTML=`<div class="overview-card" style="cursor:pointer;margin-bottom:0" onclick="goPage('schedule')"><div class="ov-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span>📅 This week</span><span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">Open schedule →</span></div><div class="sg" style="gap:4px">${days.map((d,i)=>`<div class="dc ${i===ai?'today':''}" style="min-height:82px"><div class="dn">${d}</div>${(evs[i]||[]).map(e=>`<div class="de ${evClass(e.c)}">${e.t}</div>`).join('')}</div>`).join('')}</div></div>`;
-  const ovStats=[];
-  if(st.focusAreas.includes('finance')||wealth>0)ovStats.push(`<div class="ov-stat"><div class="ov-val">${fmt(wealth)}</div><div class="ov-lbl">Total wealth</div></div>`);
-  ovStats.push(`<div class="ov-stat"><div class="ov-val">${done}/${st.habits.length}</div><div class="ov-lbl">Habits done</div></div>`);
-  if(st.focusAreas.includes('youtube'))ovStats.push(`<div class="ov-stat"><div class="ov-val">${satDays()}d</div><div class="ov-lbl">Until stream</div></div>`);
-  else ovStats.push(`<div class="ov-stat"><div class="ov-val">${st.goals.filter(g=>!g.done).length}</div><div class="ov-lbl">Active goals</div></div>`);
-  document.getElementById('home-ov').innerHTML=`<div class="overview-card"><div class="ov-label">Today at a glance</div><div class="ov-stats">${ovStats.join('')}</div></div>`;
-  const recentSleep=(st.sleep?.logs||[]).slice(-1)[0];
-  const sleepSum=recentSleep?`Last night: ${sleepDuration(recentSleep.bed,recentSleep.wake).toFixed(1)}h`:'No logs yet';
-  const sums={finance:`${fmt(wealth)} total`,uni:`Exam: ${st.examDate}`,youtube:`${st.yt.subs} subs · ${fmtK(st.yt.views)} views`,dev:`${st.dev.members} members · ${st.dev.status}`,schedule:`Stream in ${satDays()} days`,habits:`${done}/${st.habits.length} done today`,sleep:sleepSum,fitness:`${st.fitnessGoals.filter(g=>!g.done).length} goals active`,travel:`${st.trips.length} trip${st.trips.length!==1?'s':''} planned`,goals:`${st.goals.filter(g=>!g.done).length} active goals`,todos:`${[...st.setupTodos,...st.genTodos].filter(t=>!t.done).length} pending`,journal:`${Object.keys(st.journals).length} entries`};
-  const vis=st.sections.filter(s=>s.visible);
-  document.getElementById('home-grid').innerHTML=vis.map((s,i,arr)=>{const w=arr.length%2!==0&&i===arr.length-1;return`<div class="home-card${w?' wide':''}" onclick="goPage('${s.id}')"><span class="hc-icon">${s.icon||'📁'}</span><div class="hc-label">${s.label}</div><div class="hc-value">${sums[s.id]||'Tap to open'}</div><div class="hc-arrow">›</div></div>`;}).join('');
-  try{updateLiveStats();}catch(e){console.error('Live stats error:',e);}
+  renderHomeGamification();
 }
+
 function updateLiveStats(){
+  // Legacy shims — IDs are hidden in the DOM but updateLiveStats may still run
   const done=st.habits.filter(h=>h.done).length;
   const wealth=st.balances.bank+st.balances.savings+st.balances.trading;
   const recentSleep=(st.sleep?.logs||[]).slice(-1)[0];
   const sleepHours=recentSleep?sleepDuration(recentSleep.bed,recentSleep.wake).toFixed(1):'—';
   const subs=st.yt.subs||0;
-  document.getElementById('ls-subs').textContent=subs>0?fmtK(subs):'—';
-  document.getElementById('ls-subs-sub').textContent=subs>0?`${fmtK(st.yt.views||0)} views`:'Log your channel ID';
-  document.getElementById('ls-wealth').textContent=fmt(wealth);
-  document.getElementById('ls-wealth-sub').textContent=`${fmt(st.balances.bank||0)} bank`;
-  document.getElementById('ls-habits').textContent=`${done}/${st.habits.length}`;
-  document.getElementById('ls-habits-sub').textContent=done===st.habits.length?'All done! 🎉':st.habits.length-done+' remaining';
-  document.getElementById('ls-sleep').textContent=sleepHours+'h';
-  document.getElementById('ls-sleep-sub').textContent=recentSleep?`${recentSleep.bed}→${recentSleep.wake}`:'Log first night';
+  const setTxt=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  setTxt('ls-subs',subs>0?fmtK(subs):'—');setTxt('ls-subs-sub',subs>0?`${fmtK(st.yt.views||0)} views`:'');
+  setTxt('ls-wealth',fmt(wealth));setTxt('ls-wealth-sub',`${fmt(st.balances.bank||0)} bank`);
+  setTxt('ls-habits',`${done}/${st.habits.length}`);setTxt('ls-habits-sub',done===st.habits.length?'All done! 🎉':st.habits.length-done+' remaining');
+  setTxt('ls-sleep',sleepHours+'h');setTxt('ls-sleep-sub',recentSleep?`${recentSleep.bed}→${recentSleep.wake}`:'');
 }
 
 // ═══ LIVE STATS INTERVAL ═══
 let liveStatsInterval=null;
 function startLiveStatsUpdates(){
   if(liveStatsInterval)clearInterval(liveStatsInterval);
-  liveStatsInterval=setInterval(updateLiveStats,30000);
+  liveStatsInterval=setInterval(()=>{try{updateLiveStats();}catch(e){}},30000);
 }
 function stopLiveStatsUpdates(){
   if(liveStatsInterval){clearInterval(liveStatsInterval);liveStatsInterval=null;}
 }
 
+// ═══ GAME TAB ═══
+async function rGame(){
+  const el=document.getElementById('game-content');if(!el)return;
+  if(!window.sychboard){el.innerHTML='<div class="card"><div class="empty">Gamification data unavailable</div></div>';return;}
+  const[profile,streaks,badges,coins,history]=await Promise.all([
+    window.sychboard.profile.get(),
+    window.sychboard.streaks.get(),
+    window.sychboard.badges.list(),
+    window.sychboard.coins?window.sychboard.coins.get():0,
+    window.sychboard.xp?window.sychboard.xp.history(7):[]
+  ]);
+  if(!profile)return;
+  const pct=Math.min(1,profile.currentLevelXp/profile.xpToNext);
+  const CIRC=2*Math.PI*52;
+
+  // Hero
+  const hero=`<div class="card game-hero">
+    <div class="game-ring-wrap">
+      <svg class="game-ring" viewBox="0 0 120 120">
+        <circle class="game-ring-bg" cx="60" cy="60" r="52"/>
+        <circle class="game-ring-fill" id="game-ring-fill" cx="60" cy="60" r="52" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${CIRC.toFixed(1)}"/>
+      </svg>
+      <div class="game-ring-center"><div class="game-level-num" id="game-level">0</div><div class="game-level-label">LEVEL</div></div>
+    </div>
+    <div class="game-hero-info">
+      <div class="game-rank">${profile.rank}</div>
+      <div class="game-xp-line"><span id="game-xp-cur">0</span> / ${profile.xpToNext} XP to level ${profile.level+1}</div>
+      <div class="game-hero-stats">
+        <div class="metric"><div class="ml">Total XP</div><div class="mv" id="game-total-xp">0</div></div>
+        <div class="metric"><div class="ml">SychCoins</div><div class="mv" style="color:var(--amber)" id="game-coins">0</div></div>
+        <div class="metric"><div class="ml">Day Streak</div><div class="mv" id="game-gstreak">0</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Per-category streaks
+  const streakCards=(streaks?.categories||[]).map(c=>`
+    <div class="game-streak-card" style="--qc:${QCAT_COLORS[c.key]||'#8f92a1'}">
+      <div class="gsc-name"><span class="gm-qcat-dot"></span>${c.name}</div>
+      <div class="gsc-cur">${c.current_streak}<span class="gsc-unit">d</span></div>
+      <div class="gsc-meta">Longest ${c.longest_streak}d · ${c.freeze_tokens>0?`❄️×${c.freeze_tokens}`:'no freezes'}</div>
+    </div>`).join('');
+
+  // XP history bars (single series, white; selective label on the max day, value on hover)
+  const maxXp=Math.max(1,...history.map(h=>h.xp));
+  const bars=history.map(h=>{
+    const hPct=Math.round((h.xp/maxXp)*100);
+    const isMax=h.xp===maxXp&&h.xp>0;
+    return`<div class="gm-xph-col" title="${h.date}: ${h.xp} XP">
+      <span class="gm-xph-val${isMax?' show':''}">${h.xp}</span>
+      <div class="gm-xph-bar" style="--h:${Math.max(h.xp>0?4:2,hPct)}%"><div class="gm-xph-fill${h.xp===0?' zero':''}"></div></div>
+      <span class="gm-xph-day">${h.label}</span>
+    </div>`;
+  }).join('');
+
+  // Achievements — full grid, locked padlocked
+  const unlockedN=badges.filter(b=>b.unlocked).length;
+  const badgeGrid=badges.map(b=>`
+    <div class="game-badge${b.unlocked?' unlocked':' locked'}" title="${b.name}: ${b.description||''}${b.unlocked&&b.unlocked_at?` — unlocked ${parseUtcTimestamp(b.unlocked_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`:''}">
+      <div class="game-badge-icon">${b.icon||'🏅'}</div>
+      ${b.unlocked?'':'<div class="game-badge-lock">🔒</div>'}
+      <div class="game-badge-name">${b.name}</div>
+    </div>`).join('');
+
+  el.innerHTML=hero
+    +`<div class="card"><div class="card-title">Category Streaks</div><div class="game-streaks">${streakCards}</div></div>`
+    +`<div class="card"><div class="card-title">XP — Last 7 Days</div><div class="gm-xph">${bars}</div></div>`
+    +`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">Achievements</div><span class="chip chip-b">${unlockedN}/${badges.length}</span></div><div class="game-badges">${badgeGrid}</div></div>`;
+
+  // Animate in: ring draw, count-ups, bar growth
+  requestAnimationFrame(()=>{
+    const ring=document.getElementById('game-ring-fill');
+    if(ring)ring.style.strokeDashoffset=(CIRC*(1-pct)).toFixed(1);
+    tweenNum(document.getElementById('game-level'),profile.level,500);
+    tweenNum(document.getElementById('game-xp-cur'),profile.currentLevelXp,700);
+    tweenNum(document.getElementById('game-total-xp'),profile.totalXp,700);
+    tweenNum(document.getElementById('game-coins'),coins||0,700);
+    tweenNum(document.getElementById('game-gstreak'),streaks?.globalStreak||0,500);
+    document.querySelectorAll('.gm-xph-fill').forEach((f,i)=>setTimeout(()=>f.classList.add('grow'),60*i));
+  });
+}
+
+// ═══ SHOP ═══
+const SHOP_ITEMS=[
+  // Accent colours
+  {key:'accent_white',type:'accent',cat:'Accent Colours',name:'Soft White',cost:0,value:'#e8eaf0'},
+  {key:'accent_cyan',type:'accent',cat:'Accent Colours',name:'Cyan',cost:50,value:'#22d3ee'},
+  {key:'accent_purple',type:'accent',cat:'Accent Colours',name:'Purple',cost:75,value:'#8b5cf6'},
+  {key:'accent_red',type:'accent',cat:'Accent Colours',name:'Red',cost:75,value:'#ef4444'},
+  {key:'accent_emerald',type:'accent',cat:'Accent Colours',name:'Emerald',cost:75,value:'#34d399'},
+  {key:'accent_gold',type:'accent',cat:'Accent Colours',name:'Gold',cost:100,value:'#f59e0b'},
+  // Fonts
+  {key:'font_grotesk',type:'font',cat:'Fonts',name:'Space Grotesk',cost:0,value:"'Space Grotesk',-apple-system,sans-serif"},
+  {key:'font_inter',type:'font',cat:'Fonts',name:'Inter',cost:50,value:"'Inter',-apple-system,sans-serif"},
+  {key:'font_mono',type:'font',cat:'Fonts',name:'JetBrains Mono',cost:75,value:"'JetBrains Mono',monospace"},
+  // Backgrounds
+  {key:'bg_deepspace',type:'bg',cat:'Backgrounds',name:'Deep Space',cost:0,value:'deepspace'},
+  {key:'bg_nebula',type:'bg',cat:'Backgrounds',name:'Nebula',cost:100,value:'nebula'},
+  {key:'bg_carbon',type:'bg',cat:'Backgrounds',name:'Carbon Grid',cost:150,value:'carbon'},
+  {key:'bg_aurora',type:'bg',cat:'Backgrounds',name:'Aurora',cost:150,value:'aurora'},
+  // Card styles
+  {key:'card_standard',type:'card',cat:'Card Styles',name:'Standard',cost:0,value:'standard'},
+  {key:'card_glow',type:'card',cat:'Card Styles',name:'Glow Edge',cost:100,value:'glow'},
+  {key:'card_glass',type:'card',cat:'Card Styles',name:'Glass',cost:150,value:'glass'},
+  // Boot orb
+  {key:'orb_white',type:'orb',cat:'Boot Orb',name:'Ion White',cost:0,value:'white'},
+  {key:'orb_cyan',type:'orb',cat:'Boot Orb',name:'Cyan Core',cost:100,value:'cyan'},
+  {key:'orb_gold',type:'orb',cat:'Boot Orb',name:'Gold Halo',cost:150,value:'gold'},
+  // Consumables
+  {key:'freeze_token',type:'consumable',cat:'Consumables',name:'Streak Freeze',cost:150,value:'freeze',desc:'+1 freeze token for every category (max 3). Protects a missed day.'}
+];
+const EQUIP_DEFAULTS={accent:null,font:'font_grotesk',bg:'bg_deepspace',card:'card_standard',orb:'orb_white'};
+let shopEquips={...EQUIP_DEFAULTS};
+let shopOwned=[];
+
+async function loadEquips(){
+  if(!window.sychboard?.settings)return;
+  try{
+    const types=['accent','font','bg','card','orb'];
+    const vals=await Promise.all([...types.map(t=>window.sychboard.settings.get('equip_'+t)),window.sychboard.settings.get('shop_owned')]);
+    types.forEach((t,i)=>{if(vals[i])shopEquips[t]=vals[i];});
+    try{shopOwned=JSON.parse(vals[types.length]||'[]');}catch(e){shopOwned=[];}
+    applyEquips();
+  }catch(e){console.warn('[shop] loadEquips failed:',e.message);}
+}
+
+function applyEquips(){
+  const find=k=>SHOP_ITEMS.find(i=>i.key===k);
+  const acc=find(shopEquips.accent);
+  if(acc)applyColor(acc.value);
+  const f=find(shopEquips.font)||find('font_grotesk');
+  document.documentElement.style.setProperty('--font',f.value);
+  document.body.dataset.bg=(find(shopEquips.bg)||{value:'deepspace'}).value;
+  document.body.dataset.card=(find(shopEquips.card)||{value:'standard'}).value;
+  window._orbTheme=(find(shopEquips.orb)||{value:'white'}).value;
+}
+
+function shopItemOwned(item){return item.cost===0||shopOwned.includes(item.key);}
+
+async function rShop(){
+  const el=document.getElementById('shop-content');if(!el)return;
+  if(!window.sychboard){el.innerHTML='<div class="card"><div class="empty">Shop unavailable</div></div>';return;}
+  const coins=window.sychboard.coins?await window.sychboard.coins.get():0;
+  const preview=item=>{
+    if(item.type==='accent')return`<div class="shop-prev"><div class="shop-prev-dot" style="background:${item.value}"></div></div>`;
+    if(item.type==='font')return`<div class="shop-prev"><span class="shop-prev-font" style="font-family:${item.value}">Ag</span></div>`;
+    if(item.type==='bg')return`<div class="shop-prev shop-prev-bg" data-bgprev="${item.value}"></div>`;
+    if(item.type==='card')return`<div class="shop-prev"><div class="shop-prev-card" data-cardprev="${item.value}"></div></div>`;
+    if(item.type==='orb')return`<div class="shop-prev"><div class="shop-prev-orb" data-orbprev="${item.value}"></div></div>`;
+    return`<div class="shop-prev"><span style="font-size:22px">❄️</span></div>`;
+  };
+  const btn=item=>{
+    if(item.type==='consumable')
+      return`<button class="btn ${coins>=item.cost?'btn-p':''} btn-sm" onclick="buyShopItem('${item.key}')">Buy · ◈${item.cost}</button>`;
+    if(!shopItemOwned(item))
+      return`<button class="btn ${coins>=item.cost?'btn-p':''} btn-sm" onclick="buyShopItem('${item.key}')">Buy · ◈${item.cost}</button>`;
+    if(shopEquips[item.type]===item.key||(item.type==='accent'&&!shopEquips.accent&&item.key==='accent_white'))
+      return`<button class="btn btn-sm shop-equipped" disabled>Equipped ✓</button>`;
+    return`<button class="btn btn-sm" onclick="equipShopItem('${item.key}')">Equip</button>`;
+  };
+  const cats=[...new Set(SHOP_ITEMS.map(i=>i.cat))];
+  el.innerHTML=`
+    <div class="card shop-header-card">
+      <div>
+        <div class="card-title" style="margin-bottom:4px">Customisation Shop</div>
+        <div style="font-size:12px;color:var(--text2)">Earn SychCoins by completing quests and levelling up.</div>
+      </div>
+      <div class="shop-balance" id="shop-coins"><span class="gm-coin-icon">◈</span><span id="shop-coins-num">${coins}</span></div>
+    </div>`
+    +cats.map(cat=>`<div class="card">
+      <div class="card-title">${cat}</div>
+      <div class="shop-grid">${SHOP_ITEMS.filter(i=>i.cat===cat).map(item=>`
+        <div class="shop-item${shopItemOwned(item)&&item.type!=='consumable'?' owned':''}">
+          ${preview(item)}
+          <div class="shop-item-name">${item.name}</div>
+          ${item.desc?`<div class="shop-item-desc">${item.desc}</div>`:''}
+          ${btn(item)}
+        </div>`).join('')}</div>
+    </div>`).join('');
+}
+
+async function buyShopItem(key){
+  const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
+  if(item.type==='consumable'){
+    const res=await window.sychboard.shop.purchaseFreeze();
+    if(!res?.ok){
+      if(res?.error==='insufficient'){shakeShopBalance();toast('Not enough SychCoins');}
+      else toast('Purchase failed');
+      return;
+    }
+    toast('❄️ Streak Freeze added to all categories');
+    coinBurst('#shop-coins');
+    rShop();
+    return;
+  }
+  const res=await window.sychboard.shop.purchase(key,item.cost);
+  if(!res?.ok){
+    if(res?.error==='insufficient'){shakeShopBalance();toast('Not enough SychCoins');}
+    else if(res?.error==='already_owned')toast('Already owned');
+    else toast('Purchase failed');
+    return;
+  }
+  shopOwned=res.owned||shopOwned;
+  coinBurst('#shop-coins');
+  toast(`Purchased ${item.name}!`);
+  await equipShopItem(key);
+}
+
+async function equipShopItem(key){
+  const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
+  shopEquips[item.type]=key;
+  try{await window.sychboard.settings.set('equip_'+item.type,key);}catch(e){}
+  applyEquips();
+  rShop();
+}
+
+function shakeShopBalance(){
+  const el=document.getElementById('shop-coins')||document.getElementById('gm-coins-widget');
+  if(!el||typeof gsap==='undefined')return;
+  gsap.fromTo(el,{x:-5},{x:0,duration:0.4,ease:'elastic.out(1,0.3)'});
+}
+
+// ═══ SCHEDULE EDITING (Upcoming widget) ═══
+function addEventFromModal(){
+  const day=parseInt(document.getElementById('ev-day').value,10);
+  const name=sanitizeText(document.getElementById('ev-name').value,60).trim();
+  const type=document.getElementById('ev-type').value;
+  if(!name){toast('Enter an event name');return;}
+  initSchedEvents();
+  st.scheduleEvents[day].push({t:name,c:type});
+  save();
+  closeModal('modal-event');
+  document.getElementById('ev-name').value='';
+  renderHomeGamification();
+  toast('Event added');
+}
+function removeUpcomingEvent(dayIdx,evIdx){
+  if(!st.scheduleEvents?.[dayIdx])return;
+  st.scheduleEvents[dayIdx].splice(evIdx,1);
+  save();
+  renderHomeGamification();
+}
+const DAY_NAMES=['mon','tue','wed','thu','fri','sat','sun'];
+function dayIndexOf(d){
+  const s=String(d).trim().toLowerCase();
+  if(/^[0-6]$/.test(s))return parseInt(s,10);
+  const i=DAY_NAMES.findIndex(n=>s.startsWith(n));
+  return i;
+}
+
 // ═══ AI ═══
+// ── MCP live tools (sychboard-mcp via main process) ──
+let _mcpTools=null;
+async function getMcpTools(){
+  if(_mcpTools!==null)return _mcpTools;
+  try{
+    const r=await window.sychboard?.mcp?.listTools();
+    if(r&&r.ok){_mcpTools=r.tools||[];return _mcpTools;}
+    if(r)console.warn('[mcp] unavailable:',r.error);
+  }catch(e){console.warn('[mcp] unavailable:',e.message);}
+  return [];
+}
+function escAttr(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Cosmetic only — chat-bubble copy for known tools. Falls back to the raw
+// tool name for anything not listed, so new tools never break silently.
+const TOOL_FRIENDLY_NAMES={
+  get_system_status:'Checking system status',
+  get_chuck_bird_status:'Checking Chuck Bird bot status',
+  list_recent_project_files:'Checking recent project files',
+  restart_chuck_bird:'Restarting Chuck Bird bot',
+  git_diff:'Reading git diff',
+  git_commit:'Committing changes',
+  git_push:'Pushing to remote',
+};
+function friendlyToolName(name){return TOOL_FRIENDLY_NAMES[name]||name;}
+// Ephemeral approval bubble in the chat — resolves true/false, not saved to history.
+// `description` (from the tool's MCP metadata) is shown as-is so write/risky
+// actions like restart_chuck_bird show their real command, not a vague label.
+function askToolApproval(name,args,description){
+  return new Promise(res=>{
+    const msgs=document.getElementById('chat-msgs');
+    if(!msgs){res(false);return;}
+    const argStr=Object.keys(args||{}).length?JSON.stringify(args):'';
+    const el=document.createElement('div');
+    el.className='ai-msg ai';
+    el.innerHTML=`<div class="ai-bubble">🔧 <b>${escAttr(friendlyToolName(name))}</b>${argStr?` <span style="opacity:.6;font-size:11px">${escAttr(argStr)}</span>`:''}${description?`<div style="opacity:.65;font-size:11px;margin-top:4px">${escAttr(description)}</div>`:''}<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-p btn-sm" data-act="allow">Allow</button><button class="btn btn-sm" data-act="deny">Deny</button></div></div>`;
+    const done=(ok)=>{
+      el.querySelector('.ai-bubble').innerHTML=`🔧 <b>${escAttr(friendlyToolName(name))}</b> — ${ok?'allowed, running…':'denied'}`;
+      res(ok);
+    };
+    el.querySelector('[data-act="allow"]').addEventListener('click',()=>done(true));
+    el.querySelector('[data-act="deny"]').addEventListener('click',()=>done(false));
+    msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+  });
+}
+function toolNote(name,status){
+  const msgs=document.getElementById('chat-msgs');if(!msgs)return;
+  const icons={ok:'✓',error:'✗',denied:'⛔'};
+  const el=document.createElement('div');
+  el.className='ai-msg ai';
+  el.innerHTML=`<div class="ai-bubble" style="opacity:.65;font-size:12px">🔧 ${escAttr(friendlyToolName(name))} ${icons[status]||''}</div>`;
+  msgs.appendChild(el);msgs.scrollTop=msgs.scrollHeight;
+}
+async function runMcpToolCall(tc){
+  const name=tc.function?.name;
+  let args={};
+  try{args=JSON.parse(tc.function?.arguments||'{}');}catch(e){}
+  const meta=(_mcpTools||[]).find(t=>t.name===name);
+  if(!meta)return`Error: unknown tool "${name}". Only use the tools you were given.`;
+  let approved=true;
+  if(meta.mode!=='auto')approved=await askToolApproval(name,args,meta.description);
+  if(!approved)return'The user denied this tool call. Do not retry it; answer without it.';
+  try{
+    const r=await window.sychboard.mcp.callTool(name,args,true);
+    toolNote(name,r&&!r.isError?'ok':'error');
+    return(r&&r.text)||'Error: tool returned no result.';
+  }catch(e){toolNote(name,'error');return'Error: '+(e.message||e);}
+}
 async function callGroq(messages){
   const key=getGroqKey();
   if(!key)return null;
@@ -631,11 +1276,28 @@ async function callGroq(messages){
   const activeGoals=st.goals.filter(g=>!g.done);
   const todayJournal=st.journals[new Date().toDateString()]||'';
   const recentJournals=Object.entries(st.journals).slice(-3).map(([d,t])=>`${d}: "${t.slice(0,80)}..."`).join('; ');
-  const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:[];
+  const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
   const now=new Date();const di=now.getDay();const ai=di===0?6:di-1;
   const timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const todayEvs=(evs[ai]||[]).map(e=>e.t).join(', ')||'nothing scheduled';
-  const sys=`You are SychBoard AI — a personal life assistant for ${st.userName}. You have FULL access to their real data and should use it proactively. Be concise, warm, and specific. Under 120 words unless asked for detail.
+  const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const weekSched=evs.map((d,i)=>`${dayLabels[i]}${i===ai?' (TODAY)':''}: ${(d||[]).map(e=>e.t).join(', ')||'free'}`).join('\n');
+  // Gamification snapshot (level, streak, pending quests) from the SQLite side
+  let gamCtx='';
+  try{
+    if(window.sychboard){
+      const[gp,gs,gq]=await Promise.all([window.sychboard.profile.get(),window.sychboard.streaks.get(),window.sychboard.quests.list()]);
+      if(gp){
+        const pending=(gq||[]).filter(q=>q.frequency==='daily'&&!q.completed_today).map(q=>`${q.name} (+${q.base_xp}XP)`).slice(0,12);
+        gamCtx=`
+=== GAME PROGRESS ===
+Level ${gp.level} (${gp.rank}) | ${gp.currentLevelXp}/${gp.xpToNext} XP to next level | Total XP: ${gp.totalXp} | Global day streak: ${gs?.globalStreak||0} (longest ${gs?.globalLongest||0})
+Pending daily quests today: ${pending.join(', ')||'all done!'}
+`;
+      }
+    }
+  }catch(e){}
+  const sys=`You are SychBoard AI — a personal life assistant for ${st.userName}. Below is their real personal data (finances, habits, goals, schedule, etc.) — reference it proactively in conversation, e.g. noticing patterns unprompted. Be concise, warm, and specific. Under 120 words unless asked for detail. Stay in character as their assistant at all times — if asked how you're doing/feeling, answer warmly and personally (e.g. reference their day or data), never with a generic disclaimer about being an AI/language model/not having feelings; that reads as cold and robotic, the opposite of this assistant's purpose. NOTE: if you're also given LIVE TOOLS further below, those follow separate, stricter rules — "use data proactively" here refers only to the data in this block, never to calling a tool.
 
 === FINANCES ===
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
@@ -666,8 +1328,11 @@ Completed: ${st.goals.filter(g=>g.done).length}
 
 === SCHEDULE ===
 Today (${now.toLocaleDateString('en-GB',{weekday:'long'})}, Current Time: ${timeStr}): ${todayEvs}
+Full week:
+${weekSched}
 Days until Saturday stream: ${satDays()}
 *Note: It is currently ${timeStr}. If an event has already passed, refer to it in the past tense (e.g. "How did your 11:30 session go?"). If it is coming up, remind them to prepare.*
+${gamCtx}
 
 === TODOS ===
 Total pending: ${pendingTodos} | Today's focus: ${st.todayFocus||'not set'}
@@ -698,15 +1363,35 @@ DATA ACTIONS — embed these tags when the user gives information or asks to upd
   [ADD_SUBSCRIPTION:name:amount:day] e.g. [ADD_SUBSCRIPTION:Netflix:10.99:15]
   [REMOVE_HABIT:name] — delete a habit by name (partial match)
   [SET_YT_CHANNEL:name] — update the YouTube channel name
+  [ADD_EVENT:day:name:type] — add a schedule event. day=Mon..Sun, type=uni|work|stream|other. e.g. user says "I have a dentist appointment Thursday at 3" → [ADD_EVENT:Thu:Dentist 3pm:other]
+  [REMOVE_EVENT:day:name] — remove a schedule event by partial name match on that day. Use when plans are cancelled or changed (for changes: REMOVE then ADD).
 
-NAVIGATION — use [NAVIGATE:sectionId] after updating data OR when user asks to open a section. IDs: ${navSections}.`;
+NAVIGATION — use [NAVIGATE:sectionId] ONLY when the user explicitly asks to go to, open, or show a section (e.g. "show me finance", "take me to habits"). Do NOT emit [NAVIGATE] for data updates alone — just confirm the change and stay put. IDs: ${navSections}.`;
   try{
-    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'system',content:sys},...messages],max_tokens:400,temperature:0.7})});
-    const d=await res.json();
-    const reply=d.choices?.[0]?.message?.content||null;
-    if(reply)console.log('[groq raw]',reply);
-    return reply;
-  }catch(e){return null;}
+    const mcpTools=await getMcpTools();
+    const tools=mcpTools.length?mcpTools.map(t=>({type:'function',function:{name:t.name,description:t.description,parameters:t.inputSchema}})):undefined;
+    const fullSys=tools?sys+`\n\nLIVE TOOLS — you also have real callable tools (provided separately, not the tags above). They fetch live data: Chuck Bird bot health, this PC's CPU/RAM/disk, recently modified project files. STRICT RULES: call a tool ONLY if the user's LATEST message explicitly names that specific live data — e.g. "what's my CPU doing", "check disk space", "is Chuck up", "check the bot". Casual conversational phrases directed at YOU — "how are you doing", "how's it going", "what's up", "you good?" — are greetings, not status requests, and must NEVER trigger a tool call even though they sound status-adjacent. For everything else — greetings, small talk, data updates, questions about finances/habits/goals/schedule or anything already in your context — reply normally with NO tool call. Never re-call a tool to refresh an answer you already gave earlier in the conversation unless the user explicitly asks you to check again. When you do call one, answer from its JSON result in plain English; never invent tool output or tool names.`:sys;
+    const convo=[{role:'system',content:fullSys},...messages];
+    for(let round=0;round<4;round++){
+      const body={model:'llama-3.3-70b-versatile',messages:convo,max_tokens:500,temperature:0.7};
+      if(tools){body.tools=tools;body.tool_choice='auto';}
+      const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body)});
+      const d=await res.json();
+      const m=d.choices?.[0]?.message;
+      if(!m)return null;
+      if(m.tool_calls?.length){
+        convo.push(m);
+        for(const tc of m.tool_calls){
+          convo.push({role:'tool',tool_call_id:tc.id,content:await runMcpToolCall(tc)});
+        }
+        continue;
+      }
+      const reply=m.content||null;
+      if(reply)console.log('[groq raw]',reply);
+      return reply;
+    }
+    return null;
+  }catch(e){console.error('[groq]',e);return null;}
 }
 function parseNav(text){
   if(!text)return{clean:text,sectionId:null};
@@ -747,6 +1432,8 @@ function parseActions(text){
     .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:parseFloat(amount)||0,day:parseInt(day)||1});return'';})
     .replace(/\[REMOVE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'remove_habit',val:v.trim().toLowerCase()});return'';})
     .replace(/\[SET_YT_CHANNEL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_yt_channel',val:v.trim()});return'';})
+    .replace(/\[ADD_EVENT:([^:]+):([^:]+):?([^\]]*)\]/gi,(_,d,n,t)=>{actions.push({type:'add_event',day:d.trim(),name:n.trim(),etype:(t||'').trim().toLowerCase()});return'';})
+    .replace(/\[REMOVE_EVENT:([^:]+):([^\]]+)\]/gi,(_,d,n)=>{actions.push({type:'remove_event',day:d.trim(),name:n.trim().toLowerCase()});return'';})
     .replace(/\s{2,}/g,' ').trim();
   if(actions.length)console.log('[actions] parsed:',actions);
   return{clean,actions};
@@ -758,24 +1445,41 @@ function executeActions(actions){
     if(a.type==='set_balance'&&!isNaN(a.amount)){st.balances[a.field]=a.amount;changed=true;console.log('[actions] set_balance',a.field,'=',a.amount);}
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
-    else if(a.type==='set_exam_date'){st.examDate=a.val;changed=true;console.log('[actions] set_exam_date',a.val);}
-    else if(a.type==='add_todo'){st.genTodos.push({text:a.val,done:false});changed=true;}
-    else if(a.type==='add_habit'){st.habits.push({label:a.val,done:false});changed=true;}
-    else if(a.type==='add_goal'){st.goals.push({text:a.val,category:a.cat,done:false});changed=true;}
+    else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
+    else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
+    else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
+    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
     else if(a.type==='complete_habit'){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
-    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:a.date,hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
-    else if(a.type==='add_trip'){st.trips.push({dest:a.dest,date:a.date,budget:a.budget,done:false});changed=true;}
+    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
+    else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
-    else if(a.type==='log_sleep'){const today=new Date().toISOString().slice(0,10);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
+    else if(a.type==='log_sleep'){const today=localDateStr(new Date());const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
     else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
     else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
-    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:a.name,amount:a.amount,date:a.day});changed=true;}
+    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
     else if(a.type==='remove_habit'){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
     else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
+    else if(a.type==='add_event'){
+      const di=dayIndexOf(a.day);
+      if(di>=0){
+        initSchedEvents();
+        const c=['uni','work','stream'].includes(a.etype)?a.etype:'';
+        st.scheduleEvents[di].push({t:sanitizeText(a.name,80),c});
+        changed=true;console.log('[actions] add_event',a.day,a.name);
+      }
+    }
+    else if(a.type==='remove_event'){
+      const di=dayIndexOf(a.day);
+      if(di>=0&&st.scheduleEvents?.[di]){
+        const before=st.scheduleEvents[di].length;
+        st.scheduleEvents[di]=st.scheduleEvents[di].filter(e=>!e.t.toLowerCase().includes(a.name));
+        if(st.scheduleEvents[di].length!==before){changed=true;console.log('[actions] remove_event',a.day,a.name);}
+      }
+    }
   });
   if(changed){
     save();
@@ -785,6 +1489,8 @@ function executeActions(actions){
     if(ap==='finance')rFinance();
     if(ap==='youtube')rYT();
     if(ap==='todos')rMasterTodos();
+    if(ap==='schedule')rSchedule();
+    if(ap==='home')renderHomeGamification();
     try{updateLiveStats();}catch(e){}
   }
 }
@@ -807,8 +1513,8 @@ async function homeAI(){
   const {clean: r1, sectionId} = parseNav(r);
   const {clean, actions} = parseActions(r1);
   executeActions(actions);
-  if(el)el.textContent=clean;
-  if(sectionId)setTimeout(()=>goPage(sectionId), 400);
+  if(el){el.textContent=clean;el.style.display=clean?'':'none';}
+  if(sectionId&&actions.length===0)setTimeout(()=>goPage(sectionId),400);
 }
 function fmtTs(ts){
   if(!ts)return'';
@@ -837,6 +1543,7 @@ function rAI(){
   const chips=document.getElementById('ai-chip-list');
   if(chips){
     const prompts=[
+      'How is the Chuck Bird bot doing?',
       st.balances.bank>0?`My bank balance is now ${fmt(st.balances.bank+100)}`:'Set my bank balance to £1,500',
       st.yt.subs>0?`I just hit ${st.yt.subs+50} subscribers`:'I hit 500 subscribers today',
       `Add a todo to ${['review my notes','check my goals','update my budget'][new Date().getDay()%3]}`,
@@ -875,13 +1582,28 @@ function clearChat(){
   st.chatHistory=[];save();rAI();
 }
 
+async function setLaunchOnStartup(enabled){
+  if(!window.electronAPI?.setLoginItemSettings)return;
+  const r=await window.electronAPI.setLoginItemSettings(enabled);
+  if(r?.ok)toast(enabled?'Launch on startup enabled':'Launch on startup disabled');
+  else{
+    toast('Could not update startup setting');
+    const t=document.getElementById('startup-toggle');if(t)t.checked=!enabled;
+  }
+}
+
 // ═══ SETTINGS ═══
 function rSettings(){
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
+  const fxt=document.getElementById('fx-toggle');if(fxt)fxt.checked=st.fxEnabled!==false;
+  const st_=document.getElementById('startup-toggle');
+  if(st_&&window.electronAPI?.getLoginItemSettings){
+    window.electronAPI.getLoginItemSettings().then(r=>{st_.checked=!!r?.openAtLogin;}).catch(()=>{});
+  }
   const sw=document.getElementById('accent-swatches');
   if(sw){
-    const cols=['#8b5cf6','#3d8ef0','#2ecc8a','#f05090','#f0a832','#f05050'];
+    const cols=['#e8eaf0','#8b5cf6','#22d3ee','#2ecc8a','#f0a832','#f05090'];
     sw.innerHTML=cols.map(c=>`<div class="settings-swatch" style="width:34px;height:34px;border-radius:50%;background:${c};cursor:pointer;border:2.5px solid ${c===st.accentColor?'#fff':'transparent'};box-shadow:${c===st.accentColor?'0 0 0 3px rgba(255,255,255,0.18)':'none'};transition:all 0.18s;flex-shrink:0" onclick="applyColor('${c}');document.querySelectorAll('.settings-swatch').forEach(s=>{s.style.borderColor='transparent';s.style.boxShadow='none'});this.style.borderColor='#fff';this.style.boxShadow='0 0 0 3px rgba(255,255,255,0.18)'" title="${c}"></div>`).join('');
   }
   let devPanel = '';
@@ -897,11 +1619,13 @@ function rSettings(){
   const ns=document.getElementById('notif-settings');
   if(ns){
     const row=(id,label,toggleKey,timeKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><input type="time" id="${id}-time" class="notif-time" value="${st.notifSettings[timeKey]}"><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
+    const rowNoTime=(id,label,toggleKey)=>`<div class="notif-row"><div class="notif-label">${label}</div><label class="toggle"><input type="checkbox" id="${id}-toggle" ${st.notifSettings[toggleKey]?'checked':''}><span class="toggle-slider"></span></label></div>`;
     ns.innerHTML=
       row('notif-bed','🌙 Bedtime reminder','bedReminder','bedReminderTime')+
       row('notif-morning','☀️ Morning brief','morningBrief','morningBriefTime')+
       row('notif-habit','✅ Habit check-in','habitReminder','habitReminderTime')+
       row('notif-nudge','💡 AI nudge (needs AI key)','aiNudge','aiNudgeTime')+
+      rowNoTime('notif-quest-reset','🔄 Daily quest reset','questReset')+
       `<div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-p btn-sm" onclick="saveNotifSettings()">Save notification settings</button><button class="btn btn-sm" onclick="testNotif()">Send test</button></div>`;
     document.getElementById('set-inj').innerHTML = `<div class="si"><div class="sl">Groq API key</div><div class="ss">Powers all AI features. Get a free key at console.groq.com</div><input type="password" id="groq-key-in" placeholder="gsk_..." value="${st.apiKeys.groq||''}" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveGroqKey()">Save</button></div>${devPanel}`;
   }
@@ -933,15 +1657,51 @@ function saveDevKeys() {
   save(); toast('Developer keys saved!');
   if(st.apiKeys.ytChannelId) fetchYTData();
 }
-function exportData(){
-  const data={};
+async function exportData(){
+  const localStorageData={};
   for(let i=0;i<localStorage.length;i++){
-    const k=localStorage.key(i);if(k.startsWith('sb4_'))data[k]=localStorage.getItem(k);
+    const k=localStorage.key(i);if(k.startsWith('sb4_'))localStorageData[k]=localStorage.getItem(k);
   }
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  let game=null;
+  if(window.sychboard?.data?.exportGame){
+    try{
+      const r=await window.sychboard.data.exportGame();
+      if(r?.ok)game=r.data;
+      else toast('Warning: game progress (XP/streaks/badges) could not be included');
+    }catch(e){toast('Warning: game progress (XP/streaks/badges) could not be included');}
+  }
+  const payload={sychboard_backup:true,version:1,exported_at:new Date().toISOString(),localStorage:localStorageData,game};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download=`sychboard-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();URL.revokeObjectURL(url);toast('Backup exported!');
+}
+function triggerImportData(){
+  document.getElementById('import-file-input')?.click();
+}
+async function handleImportFile(input){
+  const file=input.files?.[0];input.value='';
+  if(!file)return;
+  let payload;
+  try{
+    const text=await file.text();
+    payload=JSON.parse(text);
+  }catch(e){toast('Import failed: not a valid backup file');return;}
+  if(!payload||typeof payload!=='object'||!payload.sychboard_backup||typeof payload.localStorage!=='object'){
+    toast('Import failed: not a SychBoard backup file');return;
+  }
+  showConfirm('Restore this backup?','This overwrites all current data (finance, habits, journal, XP/streaks/badges, everything) with the backup\'s contents. Cannot be undone.',async()=>{
+    try{
+      for(const k of Object.keys(localStorage)){if(k.startsWith('sb4_'))localStorage.removeItem(k);}
+      for(const [k,v] of Object.entries(payload.localStorage)){if(k.startsWith('sb4_'))localStorage.setItem(k,v);}
+      if(payload.game&&window.sychboard?.data?.importGame){
+        const r=await window.sychboard.data.importGame(payload.game);
+        if(!r?.ok){toast('Restored local data, but game progress import failed: '+(r?.error||'unknown error'));setTimeout(()=>location.reload(),2000);return;}
+      }
+      toast('Backup restored — reloading…');
+      setTimeout(()=>location.reload(),1200);
+    }catch(e){toast('Import failed: '+e.message);}
+  });
 }
 
 // ═══ FINANCE ═══
@@ -962,7 +1722,7 @@ async function fetchT212Portfolio(){
   if(pr.error||cr.error){
     t212Cache={error:pr.error||cr.error,fetchedAt:Date.now()};
   }else if(pr.status===401||cr.status===401){
-    t212Cache={error:'Invalid API key — check TRADING212_API_KEY in .env',fetchedAt:Date.now()};
+    t212Cache={error:'Invalid API key — check your Trading 212 key in Settings',fetchedAt:Date.now()};
   }else if(pr.status===429||cr.status===429){
     t212Cache={error:'Rate limited — wait a moment and try again',fetchedAt:Date.now()};
   }else{
@@ -1113,7 +1873,7 @@ function rUni(){
   if(edit)edit.style.display='none';
   rSecTodos('uni');
 }
-function updateExamDate(){st.examDate=document.getElementById('exam-in').value||'TBC';save();rUni();toast('Exam date saved');}
+function updateExamDate(){st.examDate=sanitizeText(document.getElementById('exam-in').value,50)||'TBC';save();rUni();toast('Exam date saved');}
 function saveUniNotes(){st.uniNotes=document.getElementById('uni-notes').value;save();rUni();toast('Notes saved');}
 
 // ═══ YOUTUBE ═══
@@ -1151,7 +1911,7 @@ async function fetchYTData(){
   const ytFetch=(path)=>window.electronAPI?.fetchYouTube(path, st.apiKeys.ytApi);
   const vidEl=document.getElementById('yt-videos');
   if(!ytFetch){if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Live stats require the desktop app</div>';return;}
-  if(!channelId){if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Set YOUTUBE_CHANNEL_ID in .env</div>';return;}
+  if(!channelId){if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Set your YouTube Channel ID in Settings</div>';return;}
   if(ytApiCache&&!ytApiCache.error&&Date.now()-ytApiCache.fetchedAt<5*60*1000){renderYTVideos(ytApiCache);return;}
   const btn=document.getElementById('yt-fetch-btn');
   if(btn){btn.textContent='…';btn.disabled=true;}
@@ -1290,7 +2050,7 @@ function rDev(){
 }
 function saveDevNotes(){if(!st.dev)st.dev={};st.dev.notes=document.getElementById('dev-notes').value;save();rDev();toast('Notes saved');}
 function updateDev(){const m=parseInt(document.getElementById('dev-m1i').value);if(m)st.dev.members=m;st.dev.status=document.getElementById('dev-si').value;save();rDev();toast('Project updated');}
-function addDevTodo(){const v=document.getElementById('dev-ti').value.trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
+function addDevTodo(){const v=sanitizeText(document.getElementById('dev-ti').value,200).trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
 
 // ═══ SCHEDULE ═══
 function rSchedule(){
@@ -1314,7 +2074,7 @@ function rSchedEvents(){
 }
 function addSchedEvent(){
   const di=parseInt(document.getElementById('sched-ev-day').value);
-  const txt=document.getElementById('sched-ev-txt').value.trim();
+  const txt=sanitizeText(document.getElementById('sched-ev-txt').value,60).trim();
   if(!txt)return;
   const type=document.getElementById('sched-ev-type').value;
   st.scheduleEvents[di].push({t:txt,c:type});
@@ -1337,7 +2097,7 @@ function rHabits(){
   const hm=document.getElementById('habit-heatmap');
   if(hm){
     const days=[];
-    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
     hm.innerHTML=days.map(d=>{
       const rec=st.habitHistory[d];
       let cls=''; let txt='No data';
@@ -1350,7 +2110,7 @@ function rHabits(){
     }).join('');
   }
 }
-function recordHabitHistory(){const today=new Date().toISOString().slice(0,10);const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
+function recordHabitHistory(){const today=localDateStr(new Date());const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
 function togHabit(i){
   const wasAllDone=st.habits.length>0&&st.habits.every(h=>h.done);
   st.habits[i].done=!st.habits[i].done;save();rHabits();
@@ -1358,17 +2118,22 @@ function togHabit(i){
   recordHabitHistory();save();rHabits();
 }
 function rmHabit(i){st.habits.splice(i,1);save();rHabits();}
-function addHabit(){const v=document.getElementById('new-habit-in').value.trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
+function addHabit(){const v=sanitizeText(document.getElementById('new-habit-in').value,100).trim();if(!v)return;st.habits.push({label:v,done:false});document.getElementById('new-habit-in').value='';save();rHabits();}
 function resetHabits(){st.habits.forEach(h=>h.done=false);recordHabitHistory();save();rHabits();}
 
 // ═══ FITNESS ═══
 function rFitness(){
   const fn=document.getElementById('fitness-notes');if(fn)fn.value=st.fitnessNotes||'';
+  const disp=document.getElementById('fitness-notes-display');
+  const edit=document.getElementById('fitness-notes-edit');
+  if(disp){disp.innerHTML=st.fitnessNotes?parseMD(st.fitnessNotes):emptyState('📝','Click to add notes...');disp.style.display='block';}
+  if(edit)edit.style.display='none';
   const fl=document.getElementById('fitness-goals-list');
   if(fl)fl.innerHTML=st.fitnessGoals.length?st.fitnessGoals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.fitnessGoals[${i}].done=!st.fitnessGoals[${i}].done;save();rFitness()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><button class="del-btn" onclick="st.fitnessGoals.splice(${i},1);save();rFitness()">✕</button></div>`).join(''):'<div class="empty">No goals yet</div>';
   rSecTodos('fitness');
 }
-function addFitnessGoal(){const v=document.getElementById('fg-in').value.trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
+function saveFitnessNotes(){st.fitnessNotes=document.getElementById('fitness-notes').value;save();rFitness();toast('Notes saved');}
+function addFitnessGoal(){const v=sanitizeText(document.getElementById('fg-in').value,150).trim();if(!v)return;st.fitnessGoals.push({text:v,done:false});document.getElementById('fg-in').value='';save();rFitness();}
 
 // ═══ TRAVEL ═══
 function rTravel(){
@@ -1395,7 +2160,7 @@ function rGoals(){
   const cats={'life':'chip-g','fitness':'chip-g','finance':'chip-b','youtube':'chip-a','uni':'chip-b','dev':'chip-a'};
   document.getElementById('goals-list').innerHTML=st.goals.length?st.goals.map((g,i)=>`<div class="gi ${g.done?'done':''}"><div class="gc" onclick="st.goals[${i}].done=!st.goals[${i}].done;save();rGoals()">${g.done?'✓':''}</div><span class="gt">${g.text}</span><span class="chip ${cats[g.category]||'chip-b'}">${g.category}</span><button class="del-btn" onclick="st.goals.splice(${i},1);save();rGoals()">✕</button></div>`).join(''):emptyState('🎯','No goals yet','What are you working toward?');
 }
-function addGoal(){const t=document.getElementById('goal-in').value.trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
+function addGoal(){const t=sanitizeText(document.getElementById('goal-in').value,150).trim();const c=document.getElementById('goal-cat').value;if(!t)return;st.goals.push({text:t,category:c,done:false});document.getElementById('goal-in').value='';save();rGoals();}
 
 // ═══ TODOS ═══
 function rSecTodos(sec){
@@ -1403,7 +2168,7 @@ function rSecTodos(sec){
   const el=document.getElementById('todos-'+sec);if(!el)return;
   el.innerHTML=st.secTodos[sec].length?st.secTodos[sec].map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.secTodos['${sec}'][${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.secTodos['${sec}'].splice(${i},1);save();rSecTodos('${sec}')">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
 }
-function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:inp.value.trim(),done:false});inp.value='';save();rSecTodos(sec);}
+function addSecTodo(sec){const inp=document.getElementById('ti-'+sec);if(!inp||!inp.value.trim())return;if(!st.secTodos[sec])st.secTodos[sec]=[];st.secTodos[sec].push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rSecTodos(sec);}
 function rMasterTodos(){
   const secs=['finance','uni','youtube','schedule','fitness','travel'];
   const labs={finance:'Finance',uni:'Uni',youtube:'YouTube',schedule:'Schedule',fitness:'Fitness',travel:'Travel'};
@@ -1413,7 +2178,7 @@ function rMasterTodos(){
   html+=`<div class="card"><div class="card-header"><div class="card-title" style="margin-bottom:0">General</div></div>${st.genTodos.length?st.genTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.genTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.genTodos.splice(${i},1);save();rMasterTodos()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>'}<div class="ta-row"><input type="text" id="gen-ti" placeholder="Add general todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addGenTodo()">Add</button></div></div>`;
   document.getElementById('master-todos').innerHTML=html||'<div class="card"><div class="empty">No todos yet</div></div>';
 }
-function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:inp.value.trim(),done:false});inp.value='';save();rMasterTodos();}
+function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.value.trim())return;st.genTodos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rMasterTodos();}
 
 // ═══ JOURNAL ═══
 function rJournal(){
@@ -1458,8 +2223,8 @@ function dropSec(e,targetId){
 }
 function togVis(id){const s=st.sections.find(x=>x.id===id);if(s)s.visible=!s.visible;save();rManage();}
 function openRename(id){renamingId=id;const s=st.sections.find(x=>x.id===id);document.getElementById('rename-val').value=s?s.label:'';openModal('modal-rename');}
-function doRename(){if(!renamingId)return;const name=document.getElementById('rename-val').value.trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
-function doAddSec(){const name=document.getElementById('add-name').value.trim();const type=document.getElementById('add-type').value;const icon=document.getElementById('add-icon').value||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
+function doRename(){if(!renamingId)return;const name=sanitizeText(document.getElementById('rename-val').value,60).trim();const s=st.sections.find(x=>x.id===renamingId);if(s&&name)s.label=name;save();closeModal('modal-rename');rManage();renamingId=null;}
+function doAddSec(){const name=sanitizeText(document.getElementById('add-name').value,60).trim();const type=document.getElementById('add-type').value;const icon=sanitizeText(document.getElementById('add-icon').value,10)||'📁';if(!name)return;const id='cs_'+Date.now();st.sections.push({id,label:name,icon,core:false,visible:true,type});st.customSecs[id]={name,type,todos:[],notes:'',trackers:[]};document.getElementById('add-name').value='';document.getElementById('add-icon').value='';save();closeModal('modal-add');goHome();}
 function promptDelSec(id){showConfirm('Delete section?','Permanently deletes this section and all its data.',()=>{st.sections=st.sections.filter(x=>x.id!==id);delete st.customSecs[id];save();rManage();goHome();});}
 
 // ═══ CUSTOM ═══
@@ -1468,13 +2233,13 @@ function rCustom(id){
   const pg=document.getElementById('page-custom');
   const hdr=`<div class="sc">`;
   if(cs.type==='notes'||cs.type==='freeform'){
-    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Notes</div><textarea id="cs-n-${id}" style="min-height:160px">${cs.notes||''}</textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.customSecs['${id}'].notes=document.getElementById('cs-n-${id}').value;save()">Save</button></div>`+(cs.type==='notes'?`<div class="card"><div class="card-title">Todos</div><div id="cs-tl-${id}">${(cs.todos||[]).map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.customSecs['${id}'].todos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.customSecs['${id}'].todos.splice(${i},1);save();rCustom('${id}')">✕</button></div>`).join('')||'<div class="empty">No todos yet</div>'}</div><div class="ta-row"><input type="text" id="cs-ti-${id}" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addCsTodo('${id}')">Add</button></div></div>`:'')+`</div>`;
+    pg.innerHTML=hdr+`<div class="card"><div class="card-title">Notes</div><textarea id="cs-n-${id}" style="min-height:160px">${cs.notes||''}</textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.customSecs['${id}'].notes=sanitizeText(document.getElementById('cs-n-${id}').value,5000);save()">Save</button></div>`+(cs.type==='notes'?`<div class="card"><div class="card-title">Todos</div><div id="cs-tl-${id}">${(cs.todos||[]).map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.customSecs['${id}'].todos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.customSecs['${id}'].todos.splice(${i},1);save();rCustom('${id}')">✕</button></div>`).join('')||'<div class="empty">No todos yet</div>'}</div><div class="ta-row"><input type="text" id="cs-ti-${id}" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addCsTodo('${id}')">Add</button></div></div>`:'')+`</div>`;
   } else {
     pg.innerHTML=hdr+`<div class="card"><div class="card-title">Trackers</div><div class="mr2">${(cs.trackers||[]).map((t,i)=>`<div class="metric" style="position:relative"><div class="ml">${t.label}</div><div class="mv">${t.value}${t.suffix||''}</div><button onclick="st.customSecs['${id}'].trackers.splice(${i},1);save();rCustom('${id}')" style="position:absolute;top:5px;right:5px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px">✕</button></div>`).join('')||'<div style="font-size:12px;color:var(--text2)">No trackers yet</div>'}</div><div class="ir3" style="gap:8px;margin-top:10px"><div><div class="fl">Label</div><input type="text" id="cs-tl-${id}" placeholder="Weight"></div><div><div class="fl">Value</div><input type="text" id="cs-tv-${id}" placeholder="75"></div><div><div class="fl">Suffix</div><input type="text" id="cs-ts-${id}" placeholder="kg"></div></div><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="addCsTracker('${id}')">Add tracker</button></div></div>`;
   }
 }
-function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:inp.value.trim(),done:false});inp.value='';save();rCustom(id);}
-function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:l.value.trim(),value:v?v.value:'',suffix:s?s.value:''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
+function addCsTodo(id){const inp=document.getElementById('cs-ti-'+id);if(!inp||!inp.value.trim())return;st.customSecs[id].todos.push({text:sanitizeText(inp.value,200).trim(),done:false});inp.value='';save();rCustom(id);}
+function addCsTracker(id){const l=document.getElementById('cs-tl-'+id);const v=document.getElementById('cs-tv-'+id);const s=document.getElementById('cs-ts-'+id);if(!l||!l.value.trim())return;st.customSecs[id].trackers.push({label:sanitizeText(l.value,60).trim(),value:v?sanitizeText(v.value,60).trim():'',suffix:s?sanitizeText(s.value,20).trim():''});l.value='';if(v)v.value='';if(s)s.value='';save();rCustom(id);}
 
 // ═══ SLEEP ═══
 function sleepDuration(bed,wake){
@@ -1519,9 +2284,9 @@ function sleepContext(){
 function logSleep(){
   const bed=document.getElementById('sleep-bed')?.value;
   const wake=document.getElementById('sleep-wake')?.value;
-  const note=document.getElementById('sleep-note')?.value?.trim()||'';
+  const note=sanitizeText(document.getElementById('sleep-note')?.value?.trim()||'',100);
   if(!bed||!wake){toast('Enter bed and wake times');return;}
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const existing=st.sleep.logs.findIndex(l=>l.date===today);
   const entry={date:today,bed,wake,note};
   if(existing>=0)st.sleep.logs[existing]=entry;
@@ -1540,17 +2305,17 @@ function saveSleepTargets(){
 }
 function clearOldSleepLogs(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-30);
-  const cut=cutoff.toISOString().slice(0,10);
+  const cut=localDateStr(cutoff);
   st.sleep.logs=st.sleep.logs.filter(l=>l.date>=cut);
   save();rSleep();toast('Old logs cleared');
 }
 function renderSleepChart(){
   const el=document.getElementById('sleep-chart');if(!el)return;
   const days=[];
-  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
   const logMap={};(st.sleep.logs||[]).forEach(l=>{logMap[l.date]=l;});
   const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const maxH=10;
   const chartH=88;
   const bars=days.map(date=>{
@@ -1572,7 +2337,7 @@ function renderSleepChart(){
   el.innerHTML=`<div style="position:relative"><div style="display:flex;gap:4px;align-items:flex-start">${bars.join('')}</div><div style="position:absolute;bottom:${targetBarH+22}px;left:0;right:0;height:1px;background:rgba(139,92,246,0.25);pointer-events:none"></div></div>`;
 }
 function rSleep(){
-  const today=new Date().toISOString().slice(0,10);
+  const today=localDateStr(new Date());
   const bedEl=document.getElementById('sleep-bed');
   const wakeEl=document.getElementById('sleep-wake');
   const todayLog=st.sleep.logs.find(l=>l.date===today);
@@ -1667,7 +2432,30 @@ function checkNotifications(){
   }
   if(ns.aiNudge&&t===ns.aiNudgeTime&&nl.aiNudge!==today){sendAINudge();}
 }
+// Local mirror of db.js's getAppDate() rollover math, so the renderer can detect a
+// quest-reset boundary without polling the DB for the app-date on every tick.
+function computeLocalAppDate(rolloverHour){
+  const now=new Date();
+  if(now.getHours()<rolloverHour)now.setDate(now.getDate()-1);
+  return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
+}
+async function checkQuestReset(){
+  if(!window.sychboard)return;
+  try{
+    const rh=parseInt(await window.sychboard.settings.get('day_rollover_hour'))||4;
+    const appDate=computeLocalAppDate(rh);
+    if(st.lastAppDate&&st.lastAppDate!==appDate){
+      if(st.notifSettings.questReset)sendNotif('🔄 Daily quests reset','A new day has started — your daily quests are ready!');
+      const ap=document.querySelector('.page.active')?.id?.replace('page-','');
+      if(ap==='home')renderHomeGamification();
+      if(ap==='game')rGame();
+    }
+    if(st.lastAppDate!==appDate){st.lastAppDate=appDate;save();}
+  }catch(e){console.error('[quest-reset]',e.message);}
+}
 function initNotifications(){
+  checkQuestReset();
+  setInterval(checkQuestReset,60000);
   if(!('Notification'in window))return;
   checkNotifications();
   setInterval(checkNotifications,60000);
@@ -1681,6 +2469,7 @@ function saveNotifSettings(){
   st.notifSettings.habitReminderTime=document.getElementById('notif-habit-time')?.value||'20:00';
   st.notifSettings.aiNudge=document.getElementById('notif-nudge-toggle')?.checked??false;
   st.notifSettings.aiNudgeTime=document.getElementById('notif-nudge-time')?.value||'12:00';
+  st.notifSettings.questReset=document.getElementById('notif-quest-reset-toggle')?.checked??true;
   save();toast('Notification settings saved');
 }
 function testNotif(){
@@ -1739,14 +2528,24 @@ function fireConfetti(){
 // ═══ INIT ═══
 load();
 pomL = st.pomodoro.focus * 60; // Initialize timer based on saved settings
-applyColor(st.accentColor||'#8b5cf6');
-if(!st.onboarded){
-  document.getElementById('boot').style.display='none';
-  document.getElementById('onboarding').classList.add('show');
-  updateObProgress();
-} else {
-  startBoot();
-}
+applyColor(st.accentColor||'#e8eaf0');
+(async()=>{
+  // Fill empty API key slots from .env (main process) — Settings-saved keys always take priority
+  try{
+    if(window.electronAPI?.getEnvKeys){
+      const ek=await window.electronAPI.getEnvKeys();
+      if(ek)Object.entries(ek).forEach(([k,v])=>{if(v&&!st.apiKeys[k])st.apiKeys[k]=v;});
+    }
+  }catch(e){console.warn('[env] key load failed:',e?.message);}
+  try{await loadEquips();}catch(e){console.warn('[shop] equips load failed:',e?.message);}
+  if(!st.onboarded){
+    document.getElementById('boot').style.display='none';
+    document.getElementById('onboarding').classList.add('show');
+    updateObProgress();
+  } else {
+    startBoot();
+  }
+})();
 
 // ═══ AUTO-UPDATE ═══
 if(window.electronAPI?.onUpdaterDebug){
@@ -1767,6 +2566,8 @@ if(window.electronAPI?.onUpdateAvailable){
     b.innerHTML=`<div class="ub-text"><strong>Update available</strong>v${version} is downloading...</div><div class="ub-actions"><button class="btn btn-sm" onclick="document.getElementById('update-banner').classList.remove('show')">✕</button></div>`;
     b.classList.add('show');
   });
+}
+if(window.electronAPI?.onUpdateDownloaded){
   window.electronAPI.onUpdateDownloaded(()=>{
     const b=document.getElementById('update-banner');
     if(!b)return;

@@ -5,42 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SychBoard</title>
 <link rel="manifest" href="manifest.json">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:;">
-<meta name="theme-color" content="#8b5cf6">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https: wss:;">
+<meta name="theme-color" content="#050508">
 <meta name="description" content="Your personal AI dashboard">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SychBoard">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <!-- BOOT -->
 <div id="boot">
-  <canvas id="boot-stars"></canvas>
-  <canvas id="boot-waves"></canvas>
-  <div class="boot-content" id="boot-content">
-    <div class="boot-welcome">Welcome, <strong id="boot-name">there</strong></div>
-    <div class="boot-ai-box">
-      <div class="boot-ai-label"><span class="ai-dot"></span>SYSTEM</div>
-      <div class="boot-msgs" id="boot-msgs"></div>
-      <div class="boot-chat-row">
-        <input type="text" id="boot-chat-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')bootSend()">
-        <button onclick="bootSend()">→</button>
-      </div>
-    </div>
-    <div class="boot-sections" id="boot-sections">
-      <div class="boot-sec-toggle" onclick="toggleBootSecs()">
-        <span>Jump to a section</span>
-        <span class="boot-sec-arrow" id="boot-sec-arrow">▾</span>
-      </div>
-      <div class="boot-sec-list" id="boot-sec-list"></div>
+  <canvas id="boot-particles"></canvas>
+  <div class="boot-ui">
+    <canvas id="boot-orb"></canvas>
+    <div class="boot-title" id="boot-title"><span class="bt">S</span><span class="bt">Y</span><span class="bt">C</span><span class="bt">H</span><span class="bt">B</span><span class="bt">O</span><span class="bt">A</span><span class="bt">R</span><span class="bt">D</span></div>
+    <div class="boot-welcome" id="boot-welcome">Welcome, <strong id="boot-name">there</strong></div>
+    <div class="boot-response" id="boot-response"></div>
+    <div class="boot-input-wrap" id="boot-input-wrap">
+      <input type="text" id="boot-chat-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')bootSend()">
+      <button onclick="bootSend()">→</button>
     </div>
   </div>
-  <div class="boot-launch" id="boot-launch">
-    <button onclick="enterApp()">Launch Dashboard →</button>
-  </div>
+  <button class="boot-launch-btn" id="boot-launch" onclick="enterApp()">Launch Dashboard →</button>
 </div>
 
 <!-- ONBOARDING -->
@@ -76,12 +68,12 @@
       <div class="ob-title">Pick your accent colour</div>
       <div class="ob-sub">This sets the vibe of your whole dashboard.</div>
       <div class="ob-colors" id="ob-colors">
-        <div class="ob-color" style="background:#3d8ef0" onclick="pickColor(this,'#3d8ef0','rgba(61,142,240,0.15)')"></div>
+        <div class="ob-color selected" style="background:#e8eaf0" onclick="pickColor(this,'#e8eaf0','rgba(232,234,240,0.10)')"></div>
+        <div class="ob-color" style="background:#8b5cf6" onclick="pickColor(this,'#8b5cf6','rgba(139,92,246,0.15)')"></div>
+        <div class="ob-color" style="background:#22d3ee" onclick="pickColor(this,'#22d3ee','rgba(34,211,238,0.12)')"></div>
         <div class="ob-color" style="background:#2ecc8a" onclick="pickColor(this,'#2ecc8a','rgba(46,204,138,0.12)')"></div>
-        <div class="ob-color" style="background:#f05090" onclick="pickColor(this,'#f05090','rgba(240,80,144,0.12)')"></div>
         <div class="ob-color" style="background:#f0a832" onclick="pickColor(this,'#f0a832','rgba(240,168,50,0.12)')"></div>
-        <div class="ob-color selected" style="background:#8b5cf6" onclick="pickColor(this,'#8b5cf6','rgba(139,92,246,0.15)')"></div>
-        <div class="ob-color" style="background:#f05050" onclick="pickColor(this,'#f05050','rgba(240,80,80,0.12)')"></div>
+        <div class="ob-color" style="background:#f05090" onclick="pickColor(this,'#f05090','rgba(240,80,144,0.12)')"></div>
       </div>
       <button class="ob-next" onclick="obFinish()">Let's go 🚀</button>
       <button class="ob-back" onclick="obBack(3)">← Back</button>
@@ -113,6 +105,17 @@
     <div class="mbtns" style="margin-top:10px"><button class="btn btn-full" onclick="closeModal('modal-rename')">Cancel</button><button class="btn btn-p btn-full" onclick="doRename()">Save</button></div>
   </div>
 </div>
+<div id="modal-event" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt">Add event</div>
+    <div class="ir3" style="gap:8px;margin-bottom:12px">
+      <div><div class="fl">Day</div><select id="ev-day"><option value="0">Mon</option><option value="1">Tue</option><option value="2">Wed</option><option value="3">Thu</option><option value="4">Fri</option><option value="5">Sat</option><option value="6">Sun</option></select></div>
+      <div><div class="fl">Event</div><input type="text" id="ev-name" placeholder="Dentist 3pm"></div>
+      <div><div class="fl">Type</div><select id="ev-type"><option value="">Other</option><option value="uni">Uni</option><option value="work">Work</option><option value="stream">Stream</option></select></div>
+    </div>
+    <div class="mbtns"><button class="btn btn-full" onclick="closeModal('modal-event')">Cancel</button><button class="btn btn-p btn-full" onclick="addEventFromModal()">Add</button></div>
+  </div>
+</div>
 <div id="modal-sleep-target" class="modal-overlay">
   <div class="modal"><div class="mh"></div>
     <div class="mt">Sleep targets</div>
@@ -121,6 +124,18 @@
       <div><div class="fl">Target hours</div><input type="number" id="sleep-target-hours" min="5" max="12" step="0.5" placeholder="8"></div>
     </div>
     <div class="mbtns"><button class="btn btn-full" onclick="closeModal('modal-sleep-target')">Cancel</button><button class="btn btn-p btn-full" onclick="saveSleepTargets()">Save</button></div>
+  </div>
+</div>
+<div id="modal-game-intro" class="modal-overlay">
+  <div class="modal"><div class="mh"></div>
+    <div class="mt">🎮 New: The Game System</div>
+    <div class="mb" style="margin-bottom:14px">SychBoard now turns your daily habits into a game. Here's the short version:</div>
+    <div class="si"><div class="sl">✅ Quests</div><div class="ss">Complete Daily/Weekly quests across Health, Productivity, Creativity and Finance to earn XP.</div></div>
+    <div class="si"><div class="sl">⭐ Levels &amp; Rank</div><div class="ss">XP adds up to level you up and raise your rank, shown at the top of Home.</div></div>
+    <div class="si"><div class="sl">🔥 Streaks</div><div class="ss">Keep a category streak alive by completing at least one quest in it each day. Freeze tokens protect one missed day.</div></div>
+    <div class="si"><div class="sl">◈ SychCoins</div><div class="ss">Earn coins alongside XP and spend them in the Shop on cosmetics and streak freezes.</div></div>
+    <div class="si" style="border-bottom:none;padding-bottom:0"><div class="sl">🏅 Badges</div><div class="ss" style="margin-bottom:0">Unlock achievements for milestones — check the Game tab any time.</div></div>
+    <div class="mbtns"><button class="btn btn-p btn-full" onclick="closeGameIntro()">Got it, let's go</button></div>
   </div>
 </div>
 
@@ -150,54 +165,130 @@
 <div class="main-scroll" id="main-scroll">
 
 <div id="page-home" class="page active">
-  <div class="sc">
-  <div class="home-greeting" id="hg"></div>
-  <div class="home-date" id="hd"></div>
-  <div id="home-sched"></div>
-  <div id="home-ov"></div>
-  <div class="live-stats">
-    <div class="live-stat accent">
-      <div class="live-stat-label">🎬 YouTube</div>
-      <div class="live-stat-value" id="ls-subs">—</div>
-      <div class="live-stat-sub" id="ls-subs-sub"></div>
-    </div>
-    <div class="live-stat accent">
-      <div class="live-stat-label">💰 Net Worth</div>
-      <div class="live-stat-value" id="ls-wealth">—</div>
-      <div class="live-stat-sub" id="ls-wealth-sub"></div>
-    </div>
-    <div class="live-stat">
-      <div class="live-stat-label">✅ Habits</div>
-      <div class="live-stat-value" id="ls-habits">—</div>
-      <div class="live-stat-sub" id="ls-habits-sub"></div>
-    </div>
-    <div class="live-stat">
-      <div class="live-stat-label">😴 Sleep</div>
-      <div class="live-stat-value" id="ls-sleep">—</div>
-      <div class="live-stat-sub" id="ls-sleep-sub"></div>
-    </div>
-  </div>
-  <div class="card" style="margin:14px 0 0;padding:18px 20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.12em;display:flex;align-items:center;gap:7px"><span class="ai-dot" id="pom-dot" style="background:var(--text3);animation:none"></span> Focus Timer</div>
-      <div id="pom-status" style="font-size:10px;color:var(--text2);font-weight:600">Ready</div>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div id="pom-time" style="font-size:32px;font-weight:700;color:var(--text);letter-spacing:-1px;font-variant-numeric:tabular-nums;line-height:1">25:00</div>
-      <div style="display:flex;gap:6px">
-        <button class="btn btn-sm" id="pom-mode-btn" onclick="togglePomMode()">Break</button>
-        <button class="btn btn-p btn-sm" id="pom-start-btn" style="min-width:60px" onclick="togglePom()">Start</button>
+  <div class="gm-home">
+
+    <!-- ── Header: greeting + level + streak ── -->
+    <div class="gm-header">
+      <div class="gm-header-left">
+        <div class="gm-greeting-label" id="gm-greeting-label">GOOD MORNING, OPERATOR</div>
+        <div class="gm-title">SychBoard</div>
+      </div>
+      <div class="gm-header-right">
+        <div class="gm-level-widget">
+          <div class="gm-lw-top">
+            <span class="gm-lw-rank" id="gm-rank">Novice</span>
+            <span class="gm-lw-xptext"><span id="gm-xp-cur">0</span> / <span id="gm-xp-max">100</span> XP</span>
+          </div>
+          <div class="gm-lw-mid">
+            <span class="gm-lw-levellabel">LEVEL</span>
+            <span class="gm-lw-levelnum" id="gm-level">1</span>
+          </div>
+          <div class="gm-xp-bar"><div class="gm-xp-fill" id="gm-xp-fill"></div></div>
+        </div>
+        <div class="gm-coins-widget" id="gm-coins-widget" title="SychCoins — earn by completing quests, spend in the Shop" onclick="goPage('shop')">
+          <div class="gm-cw-num"><span class="gm-coin-icon">◈</span><span id="gm-coins-num">0</span></div>
+          <div class="gm-cw-label">SYCHCOINS</div>
+        </div>
+        <div class="gm-streak-widget" id="gm-streak-widget">
+          <div class="gm-sw-num" id="gm-streak-num">0</div>
+          <div class="gm-sw-label">DAY STREAK</div>
+          <div class="gm-sw-sub" id="gm-streak-sub">Personal best</div>
+        </div>
       </div>
     </div>
+
+    <!-- ── Stat cards ── -->
+    <div class="gm-stat-row">
+      <div class="gm-stat-card" onclick="goPage('finance')">
+        <div class="gm-sc-top">
+          <div class="gm-sc-type">FINANCES</div>
+          <div class="gm-sc-delta" id="gm-fin-delta"></div>
+        </div>
+        <div class="gm-sc-val" id="gm-fin-val">£0</div>
+        <canvas class="gm-sparkline" id="gm-spark-fin" width="180" height="36"></canvas>
+      </div>
+      <div class="gm-stat-card" onclick="goPage('youtube')">
+        <div class="gm-sc-top">
+          <div class="gm-sc-type">YOUTUBE</div>
+          <div class="gm-sc-delta" id="gm-yt-delta"></div>
+        </div>
+        <div class="gm-sc-val" id="gm-yt-val">0 subs</div>
+        <canvas class="gm-sparkline" id="gm-spark-yt" width="180" height="36"></canvas>
+      </div>
+      <div class="gm-stat-card" onclick="goPage('habits')">
+        <div class="gm-sc-top">
+          <div class="gm-sc-type">FITNESS</div>
+          <div class="gm-sc-delta" id="gm-fit-delta"></div>
+        </div>
+        <div class="gm-sc-val" id="gm-fit-val">0 habits</div>
+        <canvas class="gm-sparkline" id="gm-spark-fit" width="180" height="36"></canvas>
+      </div>
+    </div>
+
+    <!-- ── Main content: quests left, panels right ── -->
+    <div class="gm-content-row">
+
+      <!-- Left: Daily Quests -->
+      <div class="gm-quests-panel">
+        <div class="gm-panel-hd">
+          <div class="gm-panel-title">Daily Quests</div>
+          <div class="gm-quests-prog" id="gm-quests-prog">0/0 complete</div>
+        </div>
+        <div class="gm-nudge" id="gm-nudge" style="display:none"></div>
+        <div id="gm-quests-list"></div>
+        <!-- AI bar inside quests panel -->
+        <div class="gm-ai-bar" style="margin-top:18px">
+          <span class="ai-dot" style="flex-shrink:0"></span>
+          <input type="text" id="ai-in" placeholder="Ask AI anything..." onkeydown="if(event.key==='Enter')homeAI()">
+          <button onclick="homeAI()">→</button>
+        </div>
+        <div class="home-ai-reply" id="ai-sug"></div>
+        <!-- Focus timer (compact) -->
+        <div class="gm-pom-bar" style="margin-top:14px">
+          <span class="ai-dot" id="pom-dot" style="background:var(--text3);animation:none;flex-shrink:0"></span>
+          <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em">Focus</span>
+          <span id="pom-time" style="font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;flex:1;text-align:center">25:00</span>
+          <span id="pom-status" style="font-size:10px;color:var(--text2)">Ready</span>
+          <button class="btn btn-sm" id="pom-mode-btn" onclick="togglePomMode()">Break</button>
+          <button class="btn btn-p btn-sm" id="pom-start-btn" style="min-width:54px" onclick="togglePom()">Start</button>
+        </div>
+      </div>
+
+      <!-- Right panels -->
+      <div class="gm-right-col">
+        <div class="gm-panel">
+          <div class="gm-panel-hd" style="margin-bottom:12px">
+            <div class="gm-panel-title" style="margin-bottom:0">Upcoming</div>
+            <button class="gm-mini-btn" onclick="openModal('modal-event')" title="Add event">+</button>
+          </div>
+          <div id="gm-upcoming"></div>
+        </div>
+        <div class="gm-panel">
+          <div class="gm-panel-title">Achievements</div>
+          <div class="gm-badges-grid" id="gm-badges"></div>
+        </div>
+        <div class="gm-panel">
+          <div class="gm-panel-title">Recent Activity</div>
+          <div id="gm-activity"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section grid (below main content) -->
+    <div class="gm-sections">
+      <div class="sec-label" style="margin:0 0 10px">YOUR SECTIONS</div>
+      <div class="home-grid" id="home-grid"></div>
+      <div class="home-actions"><button class="btn btn-p btn-full" onclick="openModal('modal-add')">+ Add section</button><button class="btn" onclick="goPage('manage')">Manage</button></div>
+    </div>
+
   </div>
-  <div class="ai-card">
-    <div class="ai-label"><span class="ai-dot"></span>AI Assistant</div>
-    <div class="ai-suggestion" id="ai-sug">Loading AI suggestion...</div>
-    <div class="ai-input-row"><input type="text" class="ai-input" id="ai-in" placeholder="Ask anything..." onkeydown="if(event.key==='Enter')homeAI()"><button class="send-btn" onclick="homeAI()">→</button></div>
-  </div>
-  <div class="sec-label">YOUR SECTIONS</div>
-  <div class="home-grid" id="home-grid"></div>
-  <div class="home-actions"><button class="btn btn-p btn-full" onclick="openModal('modal-add')">+ Add section</button><button class="btn" onclick="goPage('manage')">Manage</button></div>
+  <!-- Hidden compatibility shims for live-stats IDs -->
+  <div style="display:none" aria-hidden="true">
+    <div id="hg"></div><div id="hd"></div><div id="home-sched"></div><div id="home-ov"></div>
+    <div id="ls-subs"></div><div id="ls-subs-sub"></div>
+    <div id="ls-wealth"></div><div id="ls-wealth-sub"></div>
+    <div id="ls-habits"></div><div id="ls-habits-sub"></div>
+    <div id="ls-sleep"></div><div id="ls-sleep-sub"></div>
   </div>
 </div>
 
@@ -324,7 +415,13 @@
       <div class="ta-row"><input type="text" id="fg-in" placeholder="New fitness goal..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addFitnessGoal()">Add</button></div>
     </div>
     <div class="card"><div class="card-title">Fitness todos</div><div id="todos-fitness"></div><div class="ta-row"><input type="text" id="ti-fitness" placeholder="Add todo..." style="flex:1"><button class="btn btn-p btn-sm" onclick="addSecTodo('fitness')">Add</button></div></div>
-    <div class="card"><div class="card-title">Notes</div><textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.fitnessNotes=document.getElementById('fitness-notes').value;save()">Save</button></div>
+    <div class="card"><div class="card-title">Notes</div>
+      <div id="fitness-notes-display" style="font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6;cursor:pointer" onclick="this.style.display='none';document.getElementById('fitness-notes-edit').style.display='block';document.getElementById('fitness-notes').focus()"></div>
+      <div id="fitness-notes-edit" style="display:none">
+        <textarea id="fitness-notes" placeholder="Workouts, progress, notes..."></textarea>
+        <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="saveFitnessNotes()">Save</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -395,7 +492,7 @@
 
 <div id="page-settings" class="page">
   <div class="sc"><div class="card">
-    <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=document.getElementById('name-in').value||st.userName;save();toast('Name saved')">Save</button></div>
+    <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=sanitizeText(document.getElementById('name-in').value,100)||st.userName;save();toast('Name saved')">Save</button></div>
     <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.defaultWage=parseFloat(document.getElementById('wage-in').value)||st.defaultWage;save();toast('Wage saved')">Save</button></div>
     <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
       <div id="accent-swatches" style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
@@ -408,7 +505,19 @@
       <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="savePomSettings()">Save Timer</button>
     </div>
     <div id="set-inj"></div>
-    <div class="si"><div class="sl">Data Export</div><div class="ss">Download a local backup of all your SychBoard data.</div><button class="btn btn-sm" style="margin-top:8px" onclick="exportData()">Export Backup (.json)</button></div>
+    <div class="si"><div class="sl">Data Backup</div><div class="ss">Download or restore a full local backup — finance, habits, journal, everything, plus game progress (XP, streaks, badges, SychCoins).</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="exportData()">Export Backup (.json)</button>
+        <button class="btn btn-sm" onclick="triggerImportData()">Restore from Backup…</button>
+      </div>
+      <input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="handleImportFile(this)">
+    </div>
+    <div class="si"><div class="sl">Celebration effects</div><div class="ss">Confetti and a chime when you complete a quest.</div>
+      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="fx-toggle" onchange="st.fxEnabled=this.checked;save();if(this.checked){confettiBurst();playChime();}"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="si"><div class="sl">Launch on startup</div><div class="ss">Open SychBoard automatically when you log into Windows.</div>
+      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="startup-toggle" onchange="setLaunchOnStartup(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
     <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>
@@ -451,6 +560,10 @@
   </div>
 </div>
 
+<div id="page-game" class="page"><div class="sc" id="game-content"></div></div>
+
+<div id="page-shop" class="page"><div class="sc" id="shop-content"></div></div>
+
 <div id="page-custom" class="page"></div>
 
 </div>
@@ -478,6 +591,8 @@
 </div>
 
 <div id="update-banner"></div>
+<script src="three.min.js"></script>
+<script src="gsap.min.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>
