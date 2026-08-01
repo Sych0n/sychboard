@@ -183,6 +183,7 @@ ipcMain.handle('youtube-fetch', (_, ytPath, apiKey) => {
     const fullPath = `/youtube/v3${ytPath}${sep}key=${encodeURIComponent(apiKey)}`
     const options = { hostname: 'www.googleapis.com', path: fullPath }
     const req = https.get(options, res => {
+      res.setEncoding('utf8')
       let raw = ''
       res.on('data', c => { raw += c })
       res.on('end', () => {
@@ -237,6 +238,7 @@ ipcMain.handle('youtube-oauth-start', async (_, clientId, clientSecret) => {
         const postData = new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }).toString()
         const opts = { hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) } }
         const r = https.request(opts, res2 => {
+          res2.setEncoding('utf8')
           let raw = ''
           res2.on('data', c => { raw += c })
           res2.on('end', () => {
@@ -270,6 +272,7 @@ ipcMain.handle('youtube-oauth-refresh', (_, clientId, clientSecret, refreshToken
     const postData = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: refreshToken, grant_type: 'refresh_token' }).toString()
     const opts = { hostname: 'oauth2.googleapis.com', path: '/token', method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(postData) } }
     const r = https.request(opts, res => {
+      res.setEncoding('utf8')
       let raw = ''
       res.on('data', c => { raw += c })
       res.on('end', () => {
@@ -301,6 +304,7 @@ ipcMain.handle('youtube-analytics-fetch', (_, ytPath, accessToken) => {
   return new Promise(resolve => {
     const options = { hostname: 'youtubeanalytics.googleapis.com', path: ytPath, headers: { Authorization: `Bearer ${accessToken}` } }
     const req = https.get(options, res => {
+      res.setEncoding('utf8')
       let raw = ''
       res.on('data', c => { raw += c })
       res.on('end', () => {
