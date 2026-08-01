@@ -81,7 +81,16 @@ function createWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    // Only hand off http(s) URLs to the OS — window.open() with an untrusted
+    // file:// or other scheme would otherwise let shell.openExternal launch
+    // arbitrary local files/programs via their default handler.
+    let scheme = ''
+    try { scheme = new URL(url).protocol } catch (e) {}
+    if (scheme === 'http:' || scheme === 'https:') {
+      shell.openExternal(url)
+    } else {
+      console.error('[window] Blocked window.open to non-http(s) URL:', url)
+    }
     return { action: 'deny' }
   })
 }
