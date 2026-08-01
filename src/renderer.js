@@ -1966,7 +1966,7 @@ function renderYTVideos(data){
   if(ts&&data?.fetchedAt){const d=new Date(data.fetchedAt);ts.textContent=d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
   if(data?.error){el.innerHTML=`<div style="color:var(--red);font-size:12px;padding:4px 0">${data.error}</div>`;return;}
   if(!data?.videos?.length){el.innerHTML='<div class="empty">No videos found</div>';return;}
-  el.innerHTML=data.videos.map(v=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.3">${v.title}</div><div style="display:flex;gap:12px;font-size:12px;color:var(--text2)"><span style="color:var(--accent2)">${fmtK(v.views)} views</span><span>👍 ${fmtK(v.likes)}</span><span>💬 ${fmtK(v.comments)}</span><span style="margin-left:auto;color:var(--text3)">${v.published}</span></div></div>`).join('');
+  el.innerHTML=data.videos.map(v=>`<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.3">${escAttr(v.title)}</div><div style="display:flex;gap:12px;font-size:12px;color:var(--text2)"><span style="color:var(--accent2)">${fmtK(v.views)} views</span><span>👍 ${fmtK(v.likes)}</span><span>💬 ${fmtK(v.comments)}</span><span style="margin-left:auto;color:var(--text3)">${escAttr(v.published)}</span></div></div>`).join('');
 }
 let ytAccessToken=null,ytTokenExpiry=0;
 async function getYTAccessToken(){
