@@ -25,6 +25,19 @@ import { fileURLToPath } from "node:url";
 const execFileP = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// powershell.exe is a real OS process with no knowledge of Electron's asar
+// virtual filesystem — a "-File" path pointing inside app.asar fails to open.
+// electron-builder's asarUnpack (see package.json) copies this script next
+// to the archive at app.asar.unpacked/...; this maps __dirname onto that
+// real path when running packaged, and is a no-op in dev (no "app.asar" in
+// __dirname there).
+const COMMIT_DIALOG_PS1 = path.join(
+  __dirname.includes(`app.asar${path.sep}`) || __dirname.endsWith("app.asar")
+    ? __dirname.replace("app.asar", "app.asar.unpacked")
+    : __dirname,
+  "commit-dialog.ps1",
+);
+
 const permissions = JSON.parse(
   fs.readFileSync(path.join(__dirname, "permissions.json"), "utf8"),
 );
@@ -175,7 +188,7 @@ async function confirmCommitMessage(toolName, repoLabel, diffText, draftMessage)
       "powershell.exe",
       [
         "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-        "-File", path.join(__dirname, "commit-dialog.ps1"),
+        "-File", COMMIT_DIALOG_PS1,
         "-RepoLabel", repoLabel, "-DiffPath", diffPath, "-MsgPath", msgPath, "-OutPath", outPath,
       ],
       { timeout: 300_000 },

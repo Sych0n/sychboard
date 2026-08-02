@@ -45,6 +45,9 @@
       "assets/**/*",
       "sychboard-mcp/**/*",
       "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "sychboard-mcp/commit-dialog.ps1"
     ]
   },
   "devDependencies": {
