@@ -43,6 +43,7 @@
       "preload.js",
       "src/**/*",
       "assets/**/*",
+      "sychboard-mcp/**/*",
       "node_modules/**/*"
     ]
   },
