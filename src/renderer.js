@@ -1830,8 +1830,8 @@ function rShifts(){
   if(!st.shifts.length){el.innerHTML=emptyState('💼','No shifts logged yet','Add your first shift above');document.getElementById('shift-totals').innerHTML='';return;}
   el.innerHTML=st.shifts.map((s,i)=>`<div class="shi"><span style="font-weight:600">${s.date}</span><span style="color:var(--text2)">${s.hours}h @ ${fmt(s.wage)}/hr</span><span style="color:var(--green);font-weight:700">${fmt(s.hours*s.wage)}</span><button class="btn btn-sm" style="color:var(--red);border-color:var(--red);background:var(--red-light)" onclick="rmShift(${i})">✕</button></div>`).join('');
   const all=st.shifts.reduce((a,s)=>a+s.hours*s.wage,0);
-  const now=new Date();const ms=new Date(now.getFullYear(),now.getMonth(),1);
-  const mon=st.shifts.filter(s=>new Date(s.date+' '+now.getFullYear())>=ms).reduce((a,s)=>a+s.hours*s.wage,0);
+  const now=new Date();const ms=new Date(now.getFullYear(),now.getMonth(),1);const me=new Date(now.getFullYear(),now.getMonth()+1,1);
+  const mon=st.shifts.filter(s=>{const sd=new Date(s.date+' '+now.getFullYear());return sd>=ms&&sd<me;}).reduce((a,s)=>a+s.hours*s.wage,0);
   document.getElementById('shift-totals').innerHTML=`<div class="metric"><div class="ml">All time</div><div class="mv">${fmt(all)}</div></div><div class="metric"><div class="ml">This month</div><div class="mv green">${fmt(mon)}</div></div>`;
 }
 function addShift(){
