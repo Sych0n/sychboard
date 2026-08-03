@@ -1,5 +1,6 @@
 const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
+const { pathToFileURL } = require('url')
 const https = require('https')
 const http = require('http')
 const db = require('./src/db')
@@ -78,6 +79,24 @@ function createWindow() {
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
     console.error(`[window] Load failed: ${errorCode} - ${errorDescription}`)
+  })
+
+  const appUrl = pathToFileURL(indexPath).href
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Top-level navigation should never leave the app's own index.html — an
+    // unhandled navigation (e.g. a link click or an injected redirect) would
+    // otherwise replace the whole app UI with arbitrary remote/local content
+    // inside this privileged window. Mirrors setWindowOpenHandler below:
+    // hand http(s) off to the OS browser, block everything else.
+    if (url === appUrl) return
+    event.preventDefault()
+    let scheme = ''
+    try { scheme = new URL(url).protocol } catch (e) {}
+    if (scheme === 'http:' || scheme === 'https:') {
+      shell.openExternal(url)
+    } else {
+      console.error('[window] Blocked navigation to disallowed URL:', url)
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
