@@ -764,4 +764,29 @@ function importGameData(data) {
   }
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory, exportGameData, importGameData }
+// Wipes all user-generated game progress (profile/streaks/xp/completions/
+// badges/settings) back to fresh-install defaults, in one transaction. Does
+// not touch the static quest/category/badge catalog (reseeded by migrate()).
+function clearGameData() {
+  const doClear = _db.transaction(() => {
+    _db.prepare('DELETE FROM quest_completions').run()
+    _db.prepare('DELETE FROM xp_log').run()
+    _db.prepare('DELETE FROM badge_unlocks').run()
+    _db.prepare('DELETE FROM streaks').run()
+    _db.prepare('DELETE FROM settings').run()
+    _db.prepare("UPDATE profile SET display_name='Operator', total_xp=0, current_level=1, sychcoins=0 WHERE id=1").run()
+    _db.prepare('INSERT INTO streaks (category_id) SELECT id FROM categories').run()
+    _db.prepare("INSERT INTO settings VALUES ('day_rollover_hour','4')").run()
+    _db.prepare("INSERT INTO settings VALUES ('soft_reset_enabled','1')").run()
+    _db.prepare("INSERT INTO settings VALUES ('shop_owned','[]')").run()
+  })
+
+  try {
+    doClear()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+}
+
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory, exportGameData, importGameData, clearGameData }

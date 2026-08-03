@@ -32,7 +32,8 @@ contextBridge.exposeInMainWorld('sychboard', {
   },
   data: {
     exportGame: () => ipcRenderer.invoke('data:export-game'),
-    importGame: (data) => ipcRenderer.invoke('data:import-game', data)
+    importGame: (data) => ipcRenderer.invoke('data:import-game', data),
+    clearGame: () => ipcRenderer.invoke('data:clear-game')
   }
 })
 

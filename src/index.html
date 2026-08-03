@@ -520,7 +520,7 @@
     </div>
     <div class="si"><div class="sl">Notifications</div><div class="ss">Set times for daily reminders. Toggle each on/off and set the time it fires.</div><div id="notif-settings"></div></div>
     <div class="si"><div class="sl">Re-run onboarding</div><div class="ss">Reset and go through setup again.</div><button class="btn btn-sm" onclick="showConfirm('Re-run onboarding?','This will reset your sections to match your new selections.',()=>{localStorage.removeItem('sb4_onboarded');location.reload()})">Re-run</button></div>
-    <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',()=>{localStorage.clear();location.reload()})">Clear data</button></div>
+    <div class="si"><div class="sl">Clear all data</div><div class="ss">Wipes everything and resets SychBoard.</div><button class="btn btn-d btn-sm" onclick="showConfirm('Clear all data?','Permanently deletes all your data. Cannot be undone.',async()=>{try{await window.sychboard.data.clearGame()}catch(e){console.error(e)}localStorage.clear();location.reload()})">Clear data</button></div>
   </div></div>
 </div>
 
