@@ -1814,7 +1814,8 @@ function rFinance(){
   if(!t212Cache||t212Cache.error||Date.now()-t212Cache.fetchedAt>5*60*1000)fetchT212Portfolio();
 }
 function updHol(i){
-  st.holidays[i]={name:document.getElementById('hn-'+i).value||st.holidays[i].name,date:document.getElementById('hd-'+i).value||'',target:parseFloat(document.getElementById('ht-'+i).value)||0,saved:parseFloat(document.getElementById('hs-'+i).value)||0};
+  const rawName=document.getElementById('hn-'+i).value;
+  st.holidays[i]={name:rawName?sanitizeText(rawName,40).trim():st.holidays[i].name,date:sanitizeText(document.getElementById('hd-'+i).value,30).trim(),target:parseFloat(document.getElementById('ht-'+i).value)||0,saved:parseFloat(document.getElementById('hs-'+i).value)||0};
   save();rFinance();
 }
 function updateBal(){
