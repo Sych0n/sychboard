@@ -41,6 +41,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "mcp-client.js",
       "src/**/*",
       "assets/**/*",
       "sychboard-mcp/**/*",
