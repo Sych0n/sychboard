@@ -2500,6 +2500,7 @@ function togglePom(){
   const dot=document.getElementById('pom-dot');
   const stat=document.getElementById('pom-status');
   if(pomR){
+    if(pomL<=0){pomL=pomM==='focus'?st.pomodoro.focus*60:st.pomodoro.break*60;updatePom();}
     btn.textContent='Pause';
     dot.style.background=pomM==='focus'?'var(--accent)':'var(--green)';
     dot.style.animation='aidot 2s infinite';
