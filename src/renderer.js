@@ -1306,7 +1306,7 @@ Pending daily quests today: ${pending.join(', ')||'all done!'}
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
 ${t212Context()}
 Upcoming shifts: ${st.shifts.slice(0,3).map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
-Subscriptions: ${(st.subscriptions||[]).map(s=>{const d=(s.date-now.getDate()+31)%31;return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
+Subscriptions: ${(st.subscriptions||[]).map(s=>{const d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(now.getFullYear(),now.getMonth(),s.date);if(due<d0)due=new Date(now.getFullYear(),now.getMonth()+1,s.date);const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
 Holidays: ${st.holidays.map(h=>`${h.name} (saved £${h.saved}/${h.target})`).join(', ')}
 
 === YOUTUBE ===
