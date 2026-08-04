@@ -445,7 +445,10 @@ function initSchedEvents(){
   }
 }
 
+let _appEntered=false;
 function enterApp(){
+  if(_appEntered)return;
+  _appEntered=true;
   if(window.electronAPI)document.body.classList.add('electron-inset');
   if(bootOrbAnim){cancelAnimationFrame(bootOrbAnim);bootOrbAnim=null;}
   if(bootParticlesAnim){cancelAnimationFrame(bootParticlesAnim);bootParticlesAnim=null;}
