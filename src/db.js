@@ -617,8 +617,24 @@ function getProfile() {
 
 function getStreaks() {
   const categories = _db.prepare(`SELECT s.*, c.name, c.key, c.icon, c.color FROM streaks s JOIN categories c ON s.category_id=c.id`).all()
-  // Global engagement streak: consecutive days with any completion
   const appDate = getAppDate()
+  // Per-category current_streak is only updated inside completeQuest/uncompleteQuest,
+  // i.e. only when that category is actually touched — so it never decays on its own
+  // and stays stuck at its last value indefinitely once a category goes cold (unlike
+  // the global streak below, which was already fixed to check liveness on every
+  // read). Apply the same "1-day gap alive, 2+ broken" threshold here for display,
+  // without touching the stored value: completeQuest independently recomputes the
+  // real transition from last_completion_date the next time that category is
+  // actually completed, so this is read-only and can't desync that logic.
+  const yesterdayForCats = parseLocalDate(appDate)
+  yesterdayForCats.setDate(yesterdayForCats.getDate() - 1)
+  const yesterdayForCatsStr = formatLocalDate(yesterdayForCats)
+  for (const c of categories) {
+    if (c.last_completion_date && c.last_completion_date !== appDate && c.last_completion_date !== yesterdayForCatsStr) {
+      c.current_streak = 0
+    }
+  }
+  // Global engagement streak: consecutive days with any completion
   let globalStreak = 0, globalLongest = 0
   const completionDates = _db.prepare(`SELECT DISTINCT app_date FROM quest_completions ORDER BY app_date DESC LIMIT 400`).all().map(r => r.app_date)
   if (completionDates.length) {
