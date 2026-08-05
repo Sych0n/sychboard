@@ -60,6 +60,7 @@ function ensureStarted() {
     })
     child.on('error', (err) => { console.error('[mcp] spawn error:', err.message); teardown('MCP server failed to start') })
     child.on('exit', (code) => { console.error('[mcp] server exited with code', code); teardown('MCP server exited') })
+    child.stdout.setEncoding('utf8')
     child.stderr.on('data', (d) => console.log('[mcp-server]', String(d).trim()))
 
     let buf = ''
