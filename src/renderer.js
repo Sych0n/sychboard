@@ -927,6 +927,8 @@ function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
 // tomorrow's heatmap bucket while maybeResetHabits(), which already used the
 // correct local toDateString(), hadn't rolled the day over yet).
 function localDateStr(d){return`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;}
+// Monday of the local Mon-Sun calendar week containing d, mirroring db.js's isoWeekRange().
+function mondayOfWeek(d){const dow=d.getDay();const monday=new Date(d);monday.setDate(monday.getDate()+(dow===0?-6:1-dow));return localDateStr(monday);}
 
 function renderHome(){
   renderSidebar();
@@ -1908,7 +1910,8 @@ function rYT(){
     }
   }
   const YT_CHECKS=['Record Saturday stream','Clip moments for Shorts','Edit long form highlight','Upload long form','Post Shorts (aim 3)','Check analytics'];
-  if(!st.yt.weekChecks||st.yt.weekChecks.length!==YT_CHECKS.length)st.yt.weekChecks=YT_CHECKS.map(()=>false);
+  const ytWeekStart=mondayOfWeek(new Date());
+  if(!st.yt.weekChecks||st.yt.weekChecks.length!==YT_CHECKS.length||st.yt.weekChecksWeekStart!==ytWeekStart){st.yt.weekChecks=YT_CHECKS.map(()=>false);st.yt.weekChecksWeekStart=ytWeekStart;save();}
   document.getElementById('yt-checklist').innerHTML=YT_CHECKS.map((item,i)=>`<div class="todo-item ${st.yt.weekChecks[i]?'checked':''}"><input type="checkbox" ${st.yt.weekChecks[i]?'checked':''} onchange="st.yt.weekChecks[${i}]=this.checked;save();this.closest('.todo-item').classList.toggle('checked',this.checked)"><span>${item}</span></div>`).join('');
   rSecTodos('youtube');
   if(st.yt.apiVideos?.length)renderYTVideos({videos:st.yt.apiVideos});
