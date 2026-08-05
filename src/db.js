@@ -243,6 +243,15 @@ function migrate() {
     `},
     { version: 4, sql: `
       ALTER TABLE quest_completions ADD COLUMN freeze_used INTEGER NOT NULL DEFAULT 0;
+    `},
+    { version: 5, sql: `
+      -- Epic/milestone quests ("Pass theory test", "Hit a savings milestone", etc.)
+      -- are one-time achievements, but the v2 seed INSERTs never set repeatable and
+      -- silently took the column's repeatable=1 default, making them re-completable
+      -- once per day forever (the "hide after first completion" filter in
+      -- listQuests() only fires when repeatable=0). Fix existing rows retroactively;
+      -- new epic quests must set repeatable=0 explicitly going forward.
+      UPDATE quests SET repeatable = 0 WHERE frequency = 'epic';
     `}
   ]
 
@@ -314,6 +323,16 @@ function completeQuest(questId) {
       'SELECT 1 FROM quest_completions WHERE quest_id=? AND app_date BETWEEN ? AND ?'
     ).get(questId, weekStart, weekEnd)
     if (doneThisWeek) throw new Error('Weekly quest already completed this week')
+  }
+
+  // Non-repeatable epic quests: one completion ever, not one per day. listQuests()
+  // already hides them from the UI after their first completion, but that's a
+  // display-only filter — without this check, driving the IPC bridge directly
+  // (or a future repeatable=0 quest completed before its first daily reset) can
+  // still re-award XP for it every day forever.
+  if (quest.frequency === 'epic' && quest.repeatable !== 1) {
+    const doneEver = _db.prepare('SELECT 1 FROM quest_completions WHERE quest_id=?').get(questId)
+    if (doneEver) throw new Error('Epic quest already completed')
   }
 
   const streak = _db.prepare('SELECT * FROM streaks WHERE category_id = ?').get(quest.category_id)
