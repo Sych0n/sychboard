@@ -437,7 +437,15 @@ function getBootMsg(){
 
 function maybeResetHabits(){
   const today=new Date().toDateString();
-  if(st.lastHabitReset!==today){st.habits.forEach(h=>h.done=false);st.lastHabitReset=today;save();}
+  if(st.lastHabitReset!==today){st.habits.forEach(h=>h.done=false);st.lastHabitReset=today;save();return true;}
+  return false;
+}
+function checkHabitReset(){
+  if(maybeResetHabits()){
+    const ap=document.querySelector('.page.active')?.id?.replace('page-','');
+    if(ap==='habits')rHabits();
+    if(ap==='home')renderHomeGamification();
+  }
 }
 function initSchedEvents(){
   if(!st.scheduleEvents||st.scheduleEvents.length!==7){
@@ -2460,6 +2468,8 @@ async function checkQuestReset(){
 function initNotifications(){
   checkQuestReset();
   setInterval(checkQuestReset,60000);
+  checkHabitReset();
+  setInterval(checkHabitReset,60000);
   if(!('Notification'in window))return;
   checkNotifications();
   setInterval(checkNotifications,60000);
