@@ -2064,7 +2064,15 @@ function rDev(){
   document.getElementById('dev-todos').innerHTML=st.devTodos.length?st.devTodos.map((t,i)=>`<div class="todo-item ${t.done?'checked':''}"><input type="checkbox" ${t.done?'checked':''} onchange="st.devTodos[${i}].done=this.checked;save()"><span>${t.text}</span><button class="del-btn" onclick="st.devTodos.splice(${i},1);save();rDev()">✕</button></div>`).join(''):'<div class="empty">No todos yet</div>';
 }
 function saveDevNotes(){if(!st.dev)st.dev={};st.dev.notes=document.getElementById('dev-notes').value;save();rDev();toast('Notes saved');}
-function updateDev(){const m=parseInt(document.getElementById('dev-m1i').value);if(m)st.dev.members=m;st.dev.status=document.getElementById('dev-si').value;save();rDev();toast('Project updated');}
+function updateDev(){
+  const raw=document.getElementById('dev-m1i').value;
+  if(raw.trim()!==''){
+    const m=parseInt(raw);
+    if(!isNaN(m)&&m>=0)st.dev.members=m;
+  }
+  st.dev.status=document.getElementById('dev-si').value;
+  save();rDev();toast('Project updated');
+}
 function addDevTodo(){const v=sanitizeText(document.getElementById('dev-ti').value,200).trim();if(!v)return;st.devTodos.push({text:v,done:false});document.getElementById('dev-ti').value='';save();rDev();}
 
 // ═══ SCHEDULE ═══
