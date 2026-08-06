@@ -2282,10 +2282,12 @@ function sleepQuality(bed,dur){
 }
 function sleepConsistency(logs){
   if(logs.length<2)return 100;
-  const mins=logs.map(l=>{const[h,m]=l.bed.split(':').map(Number);let v=h*60+m;if(v<6*60)v+=1440;return v;});
-  const mean=mins.reduce((a,b)=>a+b,0)/mins.length;
-  const std=Math.sqrt(mins.reduce((a,b)=>a+(b-mean)**2,0)/mins.length);
-  return Math.max(0,Math.round(100-std*1.2));
+  const angles=logs.map(l=>{const[h,m]=l.bed.split(':').map(Number);return(h*60+m)/1440*2*Math.PI;});
+  const sumCos=angles.reduce((a,b)=>a+Math.cos(b),0);
+  const sumSin=angles.reduce((a,b)=>a+Math.sin(b),0);
+  const r=Math.sqrt(sumCos*sumCos+sumSin*sumSin)/angles.length;
+  const circStdMin=Math.sqrt(-2*Math.log(Math.max(r,1e-9)))*(1440/(2*Math.PI));
+  return Math.max(0,Math.round(100-circStdMin*1.2));
 }
 function sleepContext(){
   const logs=(st.sleep?.logs||[]).slice(-7);
