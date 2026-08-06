@@ -2457,7 +2457,8 @@ function computeLocalAppDate(rolloverHour){
 async function checkQuestReset(){
   if(!window.sychboard)return;
   try{
-    const rh=parseInt(await window.sychboard.settings.get('day_rollover_hour'))||4;
+    const rawRh=parseInt(await window.sychboard.settings.get('day_rollover_hour'));
+    const rh=Number.isInteger(rawRh)&&rawRh>=0&&rawRh<=23?rawRh:4;
     const appDate=computeLocalAppDate(rh);
     if(st.lastAppDate&&st.lastAppDate!==appDate){
       if(st.notifSettings.questReset)sendNotif('🔄 Daily quests reset','A new day has started — your daily quests are ready!');
