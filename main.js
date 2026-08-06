@@ -449,6 +449,7 @@ ipcMain.handle('settings:get', (_, key) => {
 })
 ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
+  if (key === 'day_rollover_hour' && !(Number.isInteger(value) && value >= 0 && value <= 23)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
 ipcMain.handle('data:export-game', () => {

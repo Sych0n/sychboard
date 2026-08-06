@@ -66,8 +66,18 @@ function isoWeekRange(dateStr) {
   return [formatLocalDate(monday), formatLocalDate(sunday)]
 }
 
+function getRolloverHour() {
+  // Clamped: an out-of-range stored value (e.g. >=24, reachable only via a direct
+  // IPC call or a hand-edited/corrupted backup, since there's no UI for this
+  // setting) would otherwise make getAppDate()'s `now.getHours() < rolloverHour`
+  // check permanently true or permanently false, silently freezing the app-date
+  // one day in the past forever.
+  const raw = parseInt(_db?.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+  return Number.isInteger(raw) && raw >= 0 && raw <= 23 ? raw : 4
+}
+
 function getAppDate() {
-  const rolloverHour = parseInt(_db?.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+  const rolloverHour = getRolloverHour()
   const now = new Date()
   if (now.getHours() < rolloverHour) now.setDate(now.getDate() - 1)
   return formatLocalDate(now)
@@ -430,7 +440,7 @@ function completeQuest(questId) {
     const catDailyTotal = _db.prepare(`SELECT COUNT(*) as n FROM quests WHERE category_id=? AND frequency='daily' AND active=1`).get(quest.category_id)?.n ?? 0
     const catDoneToday = _db.prepare(`SELECT COUNT(*) as n FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND q.frequency='daily' AND qc.app_date=?`).get(quest.category_id, appDate)?.n ?? 0
     if (catDailyTotal > 0 && catDoneToday === catDailyTotal) {
-      const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+      const rolloverHour = getRolloverHour()
       // occurred_at is stored in UTC (SQLite's datetime('now')); 'localtime' must
       // convert it to the OS-local wall clock BEFORE the rollover-hour shift, or
       // this disagrees with getAppDate() (which shifts local time) for any
@@ -613,7 +623,7 @@ function getXpHistory(days = 7) {
   // occurred_at is stored in UTC (SQLite's datetime('now')) — 'localtime' must
   // convert to the OS-local wall clock before the rollover shift, or this
   // disagrees with getAppDate() for any non-UTC timezone near the rollover hour.
-  const rolloverHour = parseInt(_db.prepare("SELECT value FROM settings WHERE key='day_rollover_hour'").get()?.value ?? '4')
+  const rolloverHour = getRolloverHour()
   _db.prepare(`SELECT date(occurred_at, 'localtime', ?) as d, SUM(CASE WHEN amount>0 THEN amount ELSE 0 END) as xp FROM xp_log GROUP BY d ORDER BY d DESC LIMIT 60`)
     .all(`-${rolloverHour} hours`).forEach(r => { map[r.d] = r.xp })
   const out = []
