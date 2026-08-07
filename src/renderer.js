@@ -2275,7 +2275,7 @@ function sleepDuration(bed,wake){
 function sleepQuality(bed,dur){
   const[h,m]=bed.split(':').map(Number);
   let bedM=h*60+m;
-  if(bedM<6*60)bedM+=1440;
+  if(bedM<12*60)bedM+=1440;
   if(dur<6||bedM>25*60)return'poor';
   if(dur<7||bedM>23*60+30)return'ok';
   return'good';
