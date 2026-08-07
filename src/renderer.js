@@ -1828,7 +1828,7 @@ function rFinance(){
 }
 function updHol(i){
   const rawName=document.getElementById('hn-'+i).value;
-  st.holidays[i]={name:rawName?sanitizeText(rawName,40).trim():st.holidays[i].name,date:sanitizeText(document.getElementById('hd-'+i).value,30).trim(),target:parseFloat(document.getElementById('ht-'+i).value)||0,saved:parseFloat(document.getElementById('hs-'+i).value)||0};
+  st.holidays[i]={name:rawName?sanitizeText(rawName,40).trim():st.holidays[i].name,date:sanitizeText(document.getElementById('hd-'+i).value,30).trim(),target:validateNumber(document.getElementById('ht-'+i).value,0,9999999),saved:validateNumber(document.getElementById('hs-'+i).value,0,9999999)};
   save();rFinance();
 }
 function updateBal(){
