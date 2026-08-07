@@ -927,6 +927,9 @@ function parseUtcTimestamp(s){return new Date(s.replace(' ','T')+'Z');}
 // tomorrow's heatmap bucket while maybeResetHabits(), which already used the
 // correct local toDateString(), hadn't rolled the day over yet).
 function localDateStr(d){return`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`;}
+// Clamps a billing day-of-month (1-31) to the real last day of the given month, so day-29/30/31
+// subscriptions don't overflow into (or skip) the following month when that month is shorter.
+function clampDayOfMonth(y,m,day){return Math.min(day,new Date(y,m+1,0).getDate());}
 // Monday of the local Mon-Sun calendar week containing d, mirroring db.js's isoWeekRange().
 function mondayOfWeek(d){const dow=d.getDay();const monday=new Date(d);monday.setDate(monday.getDate()+(dow===0?-6:1-dow));return localDateStr(monday);}
 
@@ -1316,7 +1319,7 @@ Pending daily quests today: ${pending.join(', ')||'all done!'}
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
 ${t212Context()}
 Upcoming shifts: ${st.shifts.slice(0,3).map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
-Subscriptions: ${(st.subscriptions||[]).map(s=>{const d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(now.getFullYear(),now.getMonth(),s.date);if(due<d0)due=new Date(now.getFullYear(),now.getMonth()+1,s.date);const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
+Subscriptions: ${(st.subscriptions||[]).map(s=>{const d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(now.getFullYear(),now.getMonth(),clampDayOfMonth(now.getFullYear(),now.getMonth(),s.date));if(due<d0){const y=now.getFullYear(),m=now.getMonth()+1;due=new Date(y,m,clampDayOfMonth(y,m,s.date));}const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
 Holidays: ${st.holidays.map(h=>`${h.name} (saved £${h.saved}/${h.target})`).join(', ')}
 
 === YOUTUBE ===
