@@ -167,12 +167,20 @@ document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModa
 function showConfirm(t,b,cb){document.getElementById('mc-t').textContent=t;document.getElementById('mc-b').textContent=b;confirmCb=cb;openModal('modal-confirm');}
 function closeGameIntro(){st.gameIntroSeen=true;save();closeModal('modal-game-intro');}
 
-let _toastTimer;
+let _toastTimer;let _toastQueue=[];let _toastShowing=false;
 function toast(msg){
+  _toastQueue.push(msg);
+  if(!_toastShowing)_showNextToast();
+}
+function _showNextToast(){
+  if(!_toastQueue.length){_toastShowing=false;return;}
+  _toastShowing=true;
+  const msg=_toastQueue.shift();
   let el=document.getElementById('toast');
   if(!el){el=document.createElement('div');el.id='toast';document.body.appendChild(el);}
   el.textContent=msg;el.classList.add('show');
-  clearTimeout(_toastTimer);_toastTimer=setTimeout(()=>el.classList.remove('show'),1800);
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(()=>{el.classList.remove('show');setTimeout(_showNextToast,150);},1800);
 }
 function applyColor(hex){
   const glowMap={'#e8eaf0':'rgba(232,234,240,0.10)','#ffffff':'rgba(255,255,255,0.10)','#22d3ee':'rgba(34,211,238,0.12)','#8b5cf6':'rgba(139,92,246,0.15)','#3d8ef0':'rgba(61,142,240,0.15)','#2ecc8a':'rgba(46,204,138,0.12)','#f05090':'rgba(240,80,144,0.12)','#f0a832':'rgba(240,168,50,0.12)','#a855f7':'rgba(168,85,247,0.12)','#f05050':'rgba(240,80,80,0.12)'};
