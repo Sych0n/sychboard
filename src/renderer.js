@@ -1459,7 +1459,7 @@ function parseActions(text){
     .replace(/\[ADD_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'add_habit',val:v.trim()});return'';})
     .replace(/\[ADD_GOAL:([^\]]+)\]/gi,(_,v)=>{const[t,c]=(v+'|general').split('|');actions.push({type:'add_goal',val:t.trim(),cat:(c||'general').trim()});return'';})
     .replace(/\[COMPLETE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_habit',val:v.trim().toLowerCase()});return'';})
-    .replace(/\[ADD_SHIFT:([^:]+):([^:]+):([^\]]+)\]/gi,(_,d,h,w)=>{actions.push({type:'add_shift',date:d.trim(),hours:parseFloat(h)||0,wage:parseFloat(w)||0});return'';})
+    .replace(/\[ADD_SHIFT:([^:]+):([^:]+):([^\]]+)\]/gi,(_,d,h,w)=>{const wp=parseFloat(w);actions.push({type:'add_shift',date:d.trim(),hours:parseFloat(h)||0,wage:isNaN(wp)?null:wp});return'';})
     .replace(/\[ADD_TRIP:([^:]+):([^:]+):([^\]]+)\]/gi,(_,dest,date,budget)=>{actions.push({type:'add_trip',dest:dest.trim(),date:date.trim(),budget:parseFloat(budget)||0});return'';})
     .replace(/\[SET_FOCUS:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_focus',val:v.trim()});return'';})
     .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{actions.push({type:'log_sleep',bed:`${bh.trim().padStart(2,'0')}:${bm.trim().padStart(2,'0')}`,wake:`${wh.trim().padStart(2,'0')}:${wm.trim().padStart(2,'0')}`});return'';})
@@ -1490,7 +1490,7 @@ function executeActions(actions){
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
-    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:a.wage||st.defaultWage});changed=true;}
+    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:(a.wage!=null&&a.wage>=0)?a.wage:st.defaultWage});changed=true;}
     else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
     else if(a.type==='log_sleep'){const today=localDateStr(new Date());const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
@@ -1874,7 +1874,8 @@ function rShifts(){
 function addShift(){
   const d=sanitizeText(document.getElementById('sh-d').value,50).trim();
   const h=validateNumber(document.getElementById('sh-h').value,0,24);
-  const w=validateNumber(document.getElementById('sh-w').value,0,100)||st.defaultWage;
+  const wRaw=document.getElementById('sh-w').value.trim();
+  const w=wRaw===''?st.defaultWage:validateNumber(wRaw,0,100);
   if(!d||!h){toast('Date and hours required');return;}
   st.shifts.unshift({date:d,hours:h,wage:w});
   document.getElementById('sh-d').value='';
