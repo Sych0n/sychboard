@@ -1930,7 +1930,13 @@ function rYT(){
   else if(!!st.apiKeys.ytRefreshToken&&!st.yt.impressions28d)fetchYTAnalytics();
   else renderYTVideos(ytApiCache);
 }
-function updateYT(){const s=parseInt(document.getElementById('yt-si').value);const v=parseInt(document.getElementById('yt-vi').value);const h=parseInt(document.getElementById('yt-hi').value);if(s)st.yt.subs=s;if(v)st.yt.views=v;if(h)st.yt.hours=h;save();rYT();toast('Stats updated');}
+function updateYT(){
+  const si=document.getElementById('yt-si').value,vi=document.getElementById('yt-vi').value,hi=document.getElementById('yt-hi').value;
+  if(si.trim()!==''){const s=parseInt(si);if(!isNaN(s)&&s>=0)st.yt.subs=s;}
+  if(vi.trim()!==''){const v=parseInt(vi);if(!isNaN(v)&&v>=0)st.yt.views=v;}
+  if(hi.trim()!==''){const h=parseInt(hi);if(!isNaN(h)&&h>=0)st.yt.hours=h;}
+  save();rYT();toast('Stats updated');
+}
 let ytApiCache=null;
 async function fetchYTData(){
   const channelId=st.apiKeys.ytChannelId;
