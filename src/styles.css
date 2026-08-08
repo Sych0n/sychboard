@@ -572,6 +572,7 @@ input::placeholder,textarea::placeholder{color:var(--text3)}
   .mr2{gap:7px}
   .ai-chat-msgs{max-height:calc(100vh - 260px)}
   #toast{bottom:76px}
+  #update-banner{bottom:76px;left:12px;right:12px;max-width:none}
   .btn,.hi,.todo-item,.gi,.sb-item{min-height:44px}
   .icon-btn{width:44px;height:44px}
   .del-btn{min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center}
