@@ -398,9 +398,21 @@ async function bootSend(){
   const msg=inp.value.trim();if(!msg)return;inp.value='';
   bootChatHistory.push({role:'user',content:msg});
 
-  // Show user message dimmed while waiting
+  // Show user message dimmed while waiting. Built via textContent (not
+  // innerHTML with the raw string interpolated) — same escaping guarantee
+  // showBootResponse() already uses for the AI's reply, since this is the
+  // user's own typed text and the boot chat is the very first input surface
+  // in the app.
   const respEl=document.getElementById('boot-response');
-  if(respEl){respEl.innerHTML=`<span class="boot-word" style="opacity:0.45;font-style:italic">${msg}</span>`;}
+  if(respEl){
+    respEl.innerHTML='';
+    const span=document.createElement('span');
+    span.className='boot-word';
+    span.style.opacity='0.45';
+    span.style.fontStyle='italic';
+    span.textContent=msg;
+    respEl.appendChild(span);
+  }
 
   if(window._bootOrb){window._bootOrb.mode='thinking';window._bootOrb.pulseSpeed=0.05;}
 
