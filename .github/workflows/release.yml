@@ -29,7 +29,6 @@ jobs:
           npm version patch --no-git-tag-version
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          if [ -f preload.js ]; then sed -i "s/|| '[0-9]*\.[0-9]*\.[0-9]*'/|| '$NEW_VERSION'/" preload.js || true; fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "chore: bump version to $NEW_VERSION" || true
