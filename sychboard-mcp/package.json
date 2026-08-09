@@ -1,7 +1,7 @@
 {
   "name": "sychboard-mcp",
   "version": "0.1.0",
-  "description": "SychBoard's local MCP server — Phase 1 of the personal AI OS. Read-only tools only.",
+  "description": "SychBoard's local MCP server — the personal AI OS. Mostly read-only tools, plus confirm-gated write actions (restart, git commit/push).",
   "private": true,
   "type": "module",
   "main": "server.js",

@@ -1,9 +1,11 @@
 # sychboard-mcp
 
-Phase 1 of turning SychBoard into a personal AI OS: a minimal local MCP
-(Model Context Protocol) server, stdio transport, **read-only tools only**.
-Any MCP-compatible client (Claude Code today, SychBoard's own AI Assistant
-panel next) can connect and call these tools.
+Turning SychBoard into a personal AI OS: a minimal local MCP
+(Model Context Protocol) server, stdio transport. Started as Phase 1
+read-only tools; now also has three confirm-gated write/action tools
+(restart, git commit, git push) added once the server-side permission
+enforcement below was in place. Any MCP-compatible client (Claude Code
+today, SychBoard's own AI Assistant panel) can connect and call these tools.
 
 ## Tools
 
@@ -12,6 +14,10 @@ panel next) can connect and call these tools.
 | `get_chuck_bird_status` | Chuck Bird bot health: systemd state, uptime, cog count | Read-only SSH to the prod box (`systemctl is-active` + `journalctl` grep — the bot has no HTTP health endpoint yet) |
 | `get_system_status` | CPU / RAM / disk usage of this machine | `os` module + one `Get-CimInstance` PowerShell query |
 | `list_recent_project_files` | Most recently modified files under a path | Filesystem walk; names/mtimes/sizes only, never contents; path must be inside the home dir |
+| `restart_chuck_bird` | **WRITE.** Restarts the live production Chuck Bird bot, briefly interrupting connected players | `sudo systemctl restart chuckbird` over SSH on the prod box — no other command, no other access |
+| `git_diff` | Stages all changes and returns the diff | Scoped to the sychboard/chuck-bird repos only, no free-text path input |
+| `git_commit` | **WRITE.** Commits staged changes | Scoped to sychboard/chuck-bird only; approved via a custom native dialog (`commit-dialog.ps1`) showing the real diff and an editable AI-drafted message; never `--amend`, never rewrites history |
+| `git_push` | **WRITE.** Pushes the current branch to `origin` | Scoped to sychboard/chuck-bird only; never `--force`, never deletes branches; refuses `main`/`master` unless the caller explicitly names that exact branch and it matches the actual current branch |
 
 ## Permissions
 
@@ -19,10 +25,13 @@ panel next) can connect and call these tools.
 
 - a tool with **no entry** or an unrecognized mode (e.g. `"deny"`) is refused
   **server-side** — it errors instead of running.
-- `"confirm"` vs `"auto"` is the client's job: Claude Code prompts before
-  unapproved tools by default, and the in-app assistant will read this same
-  file once it's wired up. Everything starts on `"confirm"`; loosen
-  per-tool once proven reliable.
+- `"confirm"` mode is enforced by the **server itself**, not the connecting
+  client: `confirmPermission()`/`confirmCommitMessage()` in `server.js` use
+  MCP elicitation when the client supports it, falling back to a native OS
+  confirm dialog the server process spawns directly — so a compromised or
+  script-driven client can't skip approval by claiming a call is
+  pre-approved. `"auto"` mode is pre-approved with no prompt. Everything
+  currently ships on `"confirm"`; loosen per-tool only once proven reliable.
 
 ## Setup
 
@@ -43,8 +52,10 @@ var if it ever moves.
 
 ## Explicitly out of scope (Phase 2+)
 
-Write/destructive tools, multi-model routing, video pipeline, smart home,
-habit-learning. Read-only first, always.
+`restart_chuck_bird`/`git_commit`/`git_push` above are now in scope
+(confirm-gated write tools, added once server-side enforcement existed).
+Still out of scope: multi-model routing, video pipeline, smart home,
+habit-learning.
 
 ## In-app integration (done)
 
