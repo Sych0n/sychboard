@@ -59,8 +59,6 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
-    "electron-updater": "^6.8.3",
-    "gsap": "^3.15.0",
-    "three": "^0.149.0"
+    "electron-updater": "^6.8.3"
   }
 }
