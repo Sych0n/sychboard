@@ -2166,7 +2166,9 @@ function rHabits(){
   const hm=document.getElementById('habit-heatmap');
   if(hm){
     const days=[];
-    for(let i=29;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
+    const base=new Date();
+    if(base.getHours()<_rolloverHour)base.setDate(base.getDate()-1);
+    for(let i=29;i>=0;i--){const d=new Date(base);d.setDate(d.getDate()-i);days.push(localDateStr(d));}
     hm.innerHTML=days.map(d=>{
       const rec=st.habitHistory[d];
       let cls=''; let txt='No data';
