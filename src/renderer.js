@@ -1480,7 +1480,7 @@ function executeActions(actions){
   actions.forEach(a=>{
     if(a.type==='set_balance'&&!isNaN(a.amount)){st.balances[a.field]=a.amount;changed=true;console.log('[actions] set_balance',a.field,'=',a.amount);}
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
-    else if(a.type==='update_yt'&&!isNaN(a.amount)){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
+    else if(a.type==='update_yt'&&!isNaN(a.amount)&&a.amount>=0){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
     else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
     else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
     else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
