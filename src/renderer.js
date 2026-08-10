@@ -455,9 +455,24 @@ function getBootMsg(){
   return `${g}, ${st.userName}. ${summary} What are we working on today?`;
 }
 
+// Cached mirror of db.js's day_rollover_hour (default 4am), kept in sync by
+// checkQuestReset()'s own fetch each 60s tick and refreshed once at boot.
+// maybeResetHabits()/recordHabitHistory() both key off this (not real
+// midnight) so the legacy habit "done" state and its heatmap history agree
+// with each other AND with the SQLite quest/streak system on what "today"
+// is — previously they used real local midnight, 4 hours ahead of the
+// quest system's own app-date boundary by default.
+let _rolloverHour=4;
+async function refreshRolloverHour(){
+  if(!window.sychboard)return;
+  try{
+    const rawRh=parseInt(await window.sychboard.settings.get('day_rollover_hour'));
+    _rolloverHour=Number.isInteger(rawRh)&&rawRh>=0&&rawRh<=23?rawRh:4;
+  }catch(e){}
+}
 function maybeResetHabits(){
-  const today=new Date().toDateString();
-  if(st.lastHabitReset!==today){st.habits.forEach(h=>h.done=false);st.lastHabitReset=today;save();return true;}
+  const appDate=computeLocalAppDate(_rolloverHour);
+  if(st.lastHabitReset!==appDate){st.habits.forEach(h=>h.done=false);st.lastHabitReset=appDate;save();return true;}
   return false;
 }
 function checkHabitReset(){
@@ -489,6 +504,7 @@ function enterApp(){
   boot.classList.add('out');
   app.classList.add('show');
   applyColor(st.accentColor);
+  refreshRolloverHour();
   maybeResetHabits();
   initSchedEvents();
   renderSidebar();
@@ -2163,7 +2179,7 @@ function rHabits(){
     }).join('');
   }
 }
-function recordHabitHistory(){const today=localDateStr(new Date());const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
+function recordHabitHistory(){const today=computeLocalAppDate(_rolloverHour);const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;st.habitHistory[today]={d:done,t:total};}
 function togHabit(i){
   const wasAllDone=st.habits.length>0&&st.habits.every(h=>h.done);
   st.habits[i].done=!st.habits[i].done;save();rHabits();
@@ -2499,6 +2515,7 @@ async function checkQuestReset(){
   try{
     const rawRh=parseInt(await window.sychboard.settings.get('day_rollover_hour'));
     const rh=Number.isInteger(rawRh)&&rawRh>=0&&rawRh<=23?rawRh:4;
+    _rolloverHour=rh;
     const appDate=computeLocalAppDate(rh);
     if(st.lastAppDate&&st.lastAppDate!==appDate){
       if(st.notifSettings.questReset)sendNotif('🔄 Daily quests reset','A new day has started — your daily quests are ready!');
