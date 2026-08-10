@@ -494,7 +494,7 @@
 <div id="page-settings" class="page">
   <div class="sc"><div class="card">
     <div class="si"><div class="sl">Your name</div><input type="text" id="name-in" style="margin-top:8px"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.userName=sanitizeText(document.getElementById('name-in').value,100)||st.userName;save();toast('Name saved')">Save</button></div>
-    <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="st.defaultWage=parseFloat(document.getElementById('wage-in').value)||st.defaultWage;save();toast('Wage saved')">Save</button></div>
+    <div class="si"><div class="sl">Default wage (£/hr)</div><input type="number" id="wage-in" style="margin-top:8px" step="0.01"><button class="btn btn-p btn-sm" style="margin-top:8px" onclick="const v=parseFloat(document.getElementById('wage-in').value);if(!isNaN(v)&amp;&amp;v>=0){st.defaultWage=v;save();toast('Wage saved')}">Save</button></div>
     <div class="si"><div class="sl">Accent colour</div><div class="ss">Change your dashboard accent.</div>
       <div id="accent-swatches" style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap"></div>
     </div>
