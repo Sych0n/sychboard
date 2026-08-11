@@ -901,7 +901,7 @@ function renderHomeGamification(){
 
     // ── Upcoming ──
     const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
-    const di=new Date().getDay();const ai=di===0?6:di-1;
+    const ai=appWeekdayIndex();
     const todayEvs=evs[ai]||[];
     const upEl=document.getElementById('gm-upcoming');
     if(upEl){
@@ -2125,7 +2125,7 @@ function addDevTodo(){const v=sanitizeText(document.getElementById('dev-ti').val
 function rSchedule(){
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
-  const di=new Date().getDay();const ai=di===0?6:di-1;
+  const ai=appWeekdayIndex();
   document.getElementById('sched-grid').innerHTML=days.map((d,i)=>`<div class="dc ${i===ai?'today':''}"><div class="dn">${d}</div>${(evs[i]||[]).map(e=>`<div class="de ${evClass(e.c)}">${e.t}</div>`).join('')}</div>`).join('');
   const tf=document.getElementById('today-focus');if(tf)tf.value=st.todayFocus||'';
   rSchedEvents();
@@ -2515,6 +2515,13 @@ function computeLocalAppDate(rolloverHour){
   const now=new Date();
   if(now.getHours()<rolloverHour)now.setDate(now.getDate()-1);
   return `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
+}
+// Mon=0..Sun=6 weekday index for the app-date (rollover-aware), not the wall-clock date —
+// keeps the Schedule grid/Home Upcoming widget's "today" agreeing with Quests/Habits/Journal/Sleep.
+function appWeekdayIndex(){
+  const[y,m,d]=computeLocalAppDate(_rolloverHour).split('-').map(Number);
+  const dow=new Date(y,m-1,d).getDay();
+  return dow===0?6:dow-1;
 }
 async function checkQuestReset(){
   if(!window.sychboard)return;
