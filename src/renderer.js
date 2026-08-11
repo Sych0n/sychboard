@@ -1326,7 +1326,7 @@ async function callGroq(messages){
   const habitsPending=st.habits.filter(h=>!h.done);
   const pendingTodos=[...st.genTodos,...Object.values(st.secTodos).flat()].filter(t=>!t.done).length;
   const activeGoals=st.goals.filter(g=>!g.done);
-  const todayJournal=st.journals[new Date().toDateString()]||'';
+  const todayJournal=st.journals[computeLocalAppDate(_rolloverHour)]||'';
   const recentJournals=Object.entries(st.journals).slice(-3).map(([d,t])=>`${d}: "${t.slice(0,80)}..."`).join('; ');
   const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
   const now=new Date();const di=now.getDay();const ai=di===0?6:di-1;
@@ -2253,7 +2253,7 @@ function addGenTodo(){const inp=document.getElementById('gen-ti');if(!inp||!inp.
 
 // ═══ JOURNAL ═══
 function rJournal(){
-  const today=new Date().toDateString();
+  const today=computeLocalAppDate(_rolloverHour);
   const jt=document.getElementById('journal-title');if(jt)jt.textContent='Today — '+today;
   const jx=document.getElementById('journal-text');if(jx)jx.value=st.journals[today]||'';
   const past=Object.entries(st.journals).filter(([k])=>k!==today).reverse().slice(0,7);
@@ -2272,7 +2272,7 @@ async function generateJournalPrompt(){
     box.textContent = clean; box.style.display = 'block';
   } else { toast('Failed to get prompt'); }
 }
-function saveJournal(){const today=new Date().toDateString();st.journals[today]=document.getElementById('journal-text').value;save();rJournal();}
+function saveJournal(){const today=computeLocalAppDate(_rolloverHour);st.journals[today]=document.getElementById('journal-text').value;save();rJournal();}
 
 // ═══ MANAGE ═══
 function rManage(){
