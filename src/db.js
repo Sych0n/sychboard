@@ -50,6 +50,16 @@ function parseLocalDate(s) {
   return new Date(y, m - 1, d)
 }
 
+// A "now" timestamp in the same UTC "YYYY-MM-DD HH:MM:SS" shape SQLite's own
+// datetime('now') produces — required for imported/backfilled rows, since
+// renderer.js's parseUtcTimestamp() only knows how to turn *that* shape into
+// real ISO-8601 (it swaps the space for 'T' and appends 'Z'); a plain
+// toISOString() fallback already has a 'T'/'Z'/milliseconds and comes out
+// unparseable ("Invalid Date") once parseUtcTimestamp appends its own 'Z'.
+function sqliteNow() {
+  return new Date().toISOString().slice(0, 19).replace('T', ' ')
+}
+
 // Returns [mondayStr, sundayStr] for the Mon-Sun calendar week containing the
 // given YYYY-MM-DD app-date. Used instead of SQLite's strftime('%Y-%W', ...),
 // which numbers weeks from Jan 1 (not true ISO-8601 weeks) — two calendar-
@@ -783,21 +793,21 @@ function importGameData(data) {
     const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used) VALUES (?,?,?,?,?,?,?)')
     for (const c of quest_completions) {
       if (!Number.isInteger(c?.quest_id) || typeof c?.app_date !== 'string') continue
-      insCompletion.run(c.quest_id, c.app_date, typeof c.completed_at === 'string' ? c.completed_at : new Date().toISOString(),
+      insCompletion.run(c.quest_id, c.app_date, typeof c.completed_at === 'string' ? c.completed_at : sqliteNow(),
         Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0)
     }
 
     const insXp = _db.prepare('INSERT INTO xp_log (occurred_at,amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?,?)')
     for (const x of xp_log) {
       if (typeof x?.source_type !== 'string') continue
-      insXp.run(typeof x.occurred_at === 'string' ? x.occurred_at : new Date().toISOString(), Math.round(Number(x.amount) || 0),
+      insXp.run(typeof x.occurred_at === 'string' ? x.occurred_at : sqliteNow(), Math.round(Number(x.amount) || 0),
         x.source_type, Number.isInteger(x.source_id) ? x.source_id : null, Math.round(Number(x.running_total) || 0), typeof x.reason === 'string' ? x.reason : null)
     }
 
     const insBadge = _db.prepare('INSERT OR IGNORE INTO badge_unlocks (badge_id,unlocked_at) VALUES (?,?)')
     for (const b of badge_unlocks) {
       if (!Number.isInteger(b?.badge_id)) continue
-      insBadge.run(b.badge_id, typeof b.unlocked_at === 'string' ? b.unlocked_at : new Date().toISOString())
+      insBadge.run(b.badge_id, typeof b.unlocked_at === 'string' ? b.unlocked_at : sqliteNow())
     }
   })
 
