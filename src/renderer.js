@@ -1476,7 +1476,7 @@ function parseActions(text){
     .replace(/\[ADD_GOAL:([^\]]+)\]/gi,(_,v)=>{const[t,c]=(v+'|general').split('|');actions.push({type:'add_goal',val:t.trim(),cat:(c||'general').trim()});return'';})
     .replace(/\[COMPLETE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_habit',val:v.trim().toLowerCase()});return'';})
     .replace(/\[ADD_SHIFT:([^:]+):([^:]+):([^\]]+)\]/gi,(_,d,h,w)=>{const wp=parseFloat(w);actions.push({type:'add_shift',date:d.trim(),hours:parseFloat(h)||0,wage:isNaN(wp)?null:wp});return'';})
-    .replace(/\[ADD_TRIP:([^:]+):([^:]+):([^\]]+)\]/gi,(_,dest,date,budget)=>{actions.push({type:'add_trip',dest:dest.trim(),date:date.trim(),budget:parseFloat(budget)||0});return'';})
+    .replace(/\[ADD_TRIP:([^:]+):([^:]+):([^\]]+)\]/gi,(_,dest,date,budget)=>{actions.push({type:'add_trip',dest:dest.trim(),date:date.trim(),budget:Math.min(Math.max(parseFloat(budget)||0,0),99999)});return'';})
     .replace(/\[SET_FOCUS:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_focus',val:v.trim()});return'';})
     .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{actions.push({type:'log_sleep',bed:`${bh.trim().padStart(2,'0')}:${bm.trim().padStart(2,'0')}`,wake:`${wh.trim().padStart(2,'0')}:${wm.trim().padStart(2,'0')}`});return'';})
     .replace(/\[COMPLETE_GOAL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_goal',val:v.trim().toLowerCase()});return'';})
