@@ -1329,7 +1329,7 @@ async function callGroq(messages){
   const todayJournal=st.journals[computeLocalAppDate(_rolloverHour)]||'';
   const recentJournals=Object.entries(st.journals).slice(-3).map(([d,t])=>`${d}: "${t.slice(0,80)}..."`).join('; ');
   const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
-  const now=new Date();const di=now.getDay();const ai=di===0?6:di-1;
+  const now=new Date();const ai=appWeekdayIndex();
   const timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const todayEvs=(evs[ai]||[]).map(e=>e.t).join(', ')||'nothing scheduled';
   const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
