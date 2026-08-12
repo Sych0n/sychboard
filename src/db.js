@@ -272,6 +272,17 @@ function migrate() {
       -- listQuests() only fires when repeatable=0). Fix existing rows retroactively;
       -- new epic quests must set repeatable=0 explicitly going forward.
       UPDATE quests SET repeatable = 0 WHERE frequency = 'epic';
+    `},
+    { version: 6, sql: `
+      -- The 7-day-streak-milestone freeze-token grant (completeQuest) had no
+      -- record of which completion granted it, so uncompleteQuest could only
+      -- refund tokens *consumed* to bridge a gap (freeze_used), never claw back
+      -- one *granted* by the completion being undone. A repeated
+      -- complete-streak-to-7/uncomplete cycle farmed unlimited (capped at 3)
+      -- free freeze tokens per category with the streak itself always
+      -- correctly reverting to 6. Track the grant explicitly so it can be
+      -- reverted the same way freeze_used already is.
+      ALTER TABLE quest_completions ADD COLUMN milestone_token_granted INTEGER NOT NULL DEFAULT 0;
     `}
   ]
 
@@ -408,7 +419,16 @@ function completeQuest(questId) {
     }
 
     const longest = Math.max(newStreak, streak?.longest_streak ?? 0)
-    if (newStreak % 7 === 0 && newStreak > currentStreak) tokens = Math.min(tokens + 1, 3)
+    let milestoneTokenGranted = false
+    if (newStreak % 7 === 0 && newStreak > currentStreak) {
+      // Only actually a *grant* (worth clawing back on uncomplete) if it moved
+      // the count — once already capped at 3, a further milestone is a no-op.
+      if (tokens < 3) milestoneTokenGranted = true
+      tokens = Math.min(tokens + 1, 3)
+    }
+    if (milestoneTokenGranted) {
+      _db.prepare('UPDATE quest_completions SET milestone_token_granted=1 WHERE quest_id=? AND app_date=?').run(questId, appDate)
+    }
 
     if (streak && lastDate !== appDate) {
       _db.prepare(`UPDATE streaks SET current_streak=?,longest_streak=?,last_completion_date=?,freeze_tokens=? WHERE category_id=?`)
@@ -557,10 +577,16 @@ function uncompleteQuest(questId) {
       // If this completion was the one that bridged a missed day by spending a
       // freeze token, undoing it must refund the token — otherwise a
       // complete->uncomplete cycle permanently burns a token for nothing, since
-      // the streak effect it paid for is being reverted right here.
+      // the streak effect it paid for is being reverted right here. Symmetrically,
+      // if this completion was the one that *granted* a 7-day-milestone token,
+      // undoing it must claw that token back too — otherwise a repeated
+      // complete-to-7/uncomplete cycle farms unlimited (capped) free freeze
+      // tokens while the streak itself always correctly reverts to 6.
       const freezeRestored = !!completion.freeze_used
-      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=?, freeze_tokens=MIN(3,freeze_tokens+?) WHERE category_id=?`)
-        .run(prevCompletion, freezeRestored ? 1 : 0, quest.category_id)
+      const milestoneClawback = !!completion.milestone_token_granted
+      const tokenDelta = (freezeRestored ? 1 : 0) - (milestoneClawback ? 1 : 0)
+      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=?, freeze_tokens=MAX(0,MIN(3,freeze_tokens+?)) WHERE category_id=?`)
+        .run(prevCompletion, tokenDelta, quest.category_id)
     }
   })()
 
@@ -741,7 +767,7 @@ function setSetting(key, value) {
 function exportGameData() {
   return {
     profile: _db.prepare('SELECT display_name, total_xp, current_level, sychcoins FROM profile WHERE id=1').get(),
-    quest_completions: _db.prepare('SELECT quest_id, app_date, completed_at, xp_awarded, streak_bonus_pct, notes, freeze_used FROM quest_completions').all(),
+    quest_completions: _db.prepare('SELECT quest_id, app_date, completed_at, xp_awarded, streak_bonus_pct, notes, freeze_used, milestone_token_granted FROM quest_completions').all(),
     streaks: _db.prepare('SELECT category_id, current_streak, longest_streak, last_completion_date, freeze_tokens FROM streaks').all(),
     xp_log: _db.prepare('SELECT occurred_at, amount, source_type, source_id, running_total, reason FROM xp_log').all(),
     badge_unlocks: _db.prepare('SELECT badge_id, unlocked_at FROM badge_unlocks').all(),
@@ -790,11 +816,11 @@ function importGameData(data) {
         typeof s.last_completion_date === 'string' ? s.last_completion_date : null, Math.min(3, Math.max(0, Math.round(Number(s.freeze_tokens) || 0))))
     }
 
-    const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used) VALUES (?,?,?,?,?,?,?)')
+    const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used,milestone_token_granted) VALUES (?,?,?,?,?,?,?,?)')
     for (const c of quest_completions) {
       if (!Number.isInteger(c?.quest_id) || typeof c?.app_date !== 'string') continue
       insCompletion.run(c.quest_id, c.app_date, typeof c.completed_at === 'string' ? c.completed_at : sqliteNow(),
-        Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0)
+        Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0, c.milestone_token_granted ? 1 : 0)
     }
 
     const insXp = _db.prepare('INSERT INTO xp_log (occurred_at,amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?,?)')
