@@ -2182,17 +2182,17 @@ function rmSchedEvent(di,ei){
 
 // ═══ HABITS ═══
 function rHabits(){
-  const hd=document.getElementById('habit-date');if(hd)hd.textContent=new Date().toDateString();
+  const base=new Date();
+  if(base.getHours()<_rolloverHour)base.setDate(base.getDate()-1);
+  const hd=document.getElementById('habit-date');if(hd)hd.textContent=base.toDateString();
   document.getElementById('habit-grid').innerHTML=st.habits.length?st.habits.map((h,i)=>`<div class="hi ${h.done?'done':''}" onclick="togHabit(${i})"><div class="hck">${h.done?'✓':''}</div><span style="flex:1">${h.label}</span><span onclick="event.stopPropagation();rmHabit(${i})" style="font-size:13px;color:var(--text3);cursor:pointer;padding:0 2px">✕</span></div>`).join(''):emptyState('✅','No habits yet','Add one below to start tracking');
   const done=st.habits.filter(h=>h.done).length;const total=st.habits.length||1;
   document.getElementById('habit-stats').innerHTML=`<div class="metric"><div class="ml">Done today</div><div class="mv">${done}/${st.habits.length}</div></div><div class="metric"><div class="ml">Completion</div><div class="mv green">${Math.round(done/total*100)}%</div></div>`;
-  
+
   // Heatmap render
   const hm=document.getElementById('habit-heatmap');
   if(hm){
     const days=[];
-    const base=new Date();
-    if(base.getHours()<_rolloverHour)base.setDate(base.getDate()-1);
     for(let i=29;i>=0;i--){const d=new Date(base);d.setDate(d.getDate()-i);days.push(localDateStr(d));}
     hm.innerHTML=days.map(d=>{
       const rec=st.habitHistory[d];
