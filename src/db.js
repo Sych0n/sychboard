@@ -599,24 +599,26 @@ function getCoins() {
   return _db.prepare('SELECT sychcoins FROM profile WHERE id=1').get()?.sychcoins ?? 0
 }
 
-// Server-side prices for cosmetic shop items — must stay in sync with SHOP_ITEMS
-// in src/renderer.js. The renderer's catalog exists only client-side, so without
-// this, purchaseItem() had to trust whatever `cost` the IPC caller supplied for
-// whatever `itemKey` it supplied; anyone driving the IPC bridge directly (e.g.
-// devtools console) could buy any real item for 0 coins, or "own" a made-up key,
-// by simply passing a different cost — same trust gap as the negative-cost bug
-// fixed 2026-07-22, just for the price itself rather than its sign.
+// Server-side prices + equip-slot types for cosmetic shop items — must stay in
+// sync with SHOP_ITEMS in src/renderer.js. The renderer's catalog exists only
+// client-side, so without this, purchaseItem() had to trust whatever `cost` the
+// IPC caller supplied for whatever `itemKey` it supplied; anyone driving the IPC
+// bridge directly (e.g. devtools console) could buy any real item for 0 coins,
+// or "own" a made-up key, by simply passing a different cost — same trust gap as
+// the negative-cost bug fixed 2026-07-22, just for the price itself rather than
+// its sign. `type` additionally backs equipItem()'s ownership check below.
 const SHOP_CATALOG = {
-  accent_white: 0, accent_cyan: 50, accent_purple: 75, accent_red: 75, accent_emerald: 75, accent_gold: 100,
-  font_grotesk: 0, font_inter: 50, font_mono: 75,
-  bg_deepspace: 0, bg_nebula: 100, bg_carbon: 150, bg_aurora: 150,
-  card_standard: 0, card_glow: 100, card_glass: 150,
-  orb_white: 0, orb_cyan: 100, orb_gold: 150
+  accent_white: { cost: 0, type: 'accent' }, accent_cyan: { cost: 50, type: 'accent' }, accent_purple: { cost: 75, type: 'accent' }, accent_red: { cost: 75, type: 'accent' }, accent_emerald: { cost: 75, type: 'accent' }, accent_gold: { cost: 100, type: 'accent' },
+  font_grotesk: { cost: 0, type: 'font' }, font_inter: { cost: 50, type: 'font' }, font_mono: { cost: 75, type: 'font' },
+  bg_deepspace: { cost: 0, type: 'bg' }, bg_nebula: { cost: 100, type: 'bg' }, bg_carbon: { cost: 150, type: 'bg' }, bg_aurora: { cost: 150, type: 'bg' },
+  card_standard: { cost: 0, type: 'card' }, card_glow: { cost: 100, type: 'card' }, card_glass: { cost: 150, type: 'card' },
+  orb_white: { cost: 0, type: 'orb' }, orb_cyan: { cost: 100, type: 'orb' }, orb_gold: { cost: 150, type: 'orb' }
 }
 
 function purchaseItem(itemKey, cost) {
-  const price = SHOP_CATALOG[itemKey]
-  if (price === undefined) return { ok: false, error: 'unknown_item' }
+  const entry = SHOP_CATALOG[itemKey]
+  if (entry === undefined) return { ok: false, error: 'unknown_item' }
+  const price = entry.cost
   const doBuy = _db.transaction(() => {
     const coins = getCoins()
     let owned = []
@@ -629,6 +631,27 @@ function purchaseItem(itemKey, cost) {
     return { ok: true, coins: coins - price, owned }
   })
   return doBuy()
+}
+
+// Equips a cosmetic into its slot (equip_accent/font/bg/card/orb in settings),
+// server-side gated on ownership — the actual write path a purchased/free item
+// takes to become active. Before this, equipShopItem() in the renderer wrote
+// straight through the generic `settings:set` IPC channel with no ownership
+// check anywhere (client or server): SHOP_ITEMS' cost/ownership gating lived
+// only in the renderer's own button-rendering logic, so driving the IPC bridge
+// directly (e.g. window.sychboard.settings.set('equip_bg','bg_aurora')) could
+// equip any real cosmetic for 0 coins — the same "don't trust the client" gap
+// purchaseItem()'s SHOP_CATALOG closed for buying, just left open for equipping.
+function equipItem(itemKey) {
+  const entry = SHOP_CATALOG[itemKey]
+  if (entry === undefined) return { ok: false, error: 'unknown_item' }
+  if (entry.cost > 0) {
+    let owned = []
+    try { owned = JSON.parse(getSetting('shop_owned') || '[]') } catch (e) { owned = [] }
+    if (!owned.includes(itemKey)) return { ok: false, error: 'not_owned' }
+  }
+  setSetting('equip_' + entry.type, itemKey)
+  return { ok: true, type: entry.type }
 }
 
 // Buys a Streak Freeze consumable: checks balance, deducts coins, and grants the
@@ -870,4 +893,4 @@ function clearGameData() {
   }
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, getXpHistory, exportGameData, importGameData, clearGameData }
+module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, equipItem, getXpHistory, exportGameData, importGameData, clearGameData }

@@ -19,7 +19,8 @@ contextBridge.exposeInMainWorld('sychboard', {
   },
   shop: {
     purchase: (itemKey, cost) => ipcRenderer.invoke('shop:purchase', itemKey, cost),
-    purchaseFreeze: () => ipcRenderer.invoke('shop:purchase-freeze')
+    purchaseFreeze: () => ipcRenderer.invoke('shop:purchase-freeze'),
+    equip: (itemKey) => ipcRenderer.invoke('shop:equip', itemKey)
   },
   xp: { history: (days) => ipcRenderer.invoke('xp:history', days) },
   settings: {

@@ -1208,8 +1208,12 @@ async function buyShopItem(key){
 
 async function equipShopItem(key){
   const item=SHOP_ITEMS.find(i=>i.key===key);if(!item||!window.sychboard)return;
+  if(!shopItemOwned(item))return;
+  try{
+    const res=await window.sychboard.shop.equip(key);
+    if(!res?.ok)return;
+  }catch(e){return;}
   shopEquips[item.type]=key;
-  try{await window.sychboard.settings.set('equip_'+item.type,key);}catch(e){}
   applyEquips();
   rShop();
 }

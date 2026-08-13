@@ -439,6 +439,10 @@ ipcMain.handle('shop:purchase', (_, itemKey, cost) => {
 ipcMain.handle('shop:purchase-freeze', () => {
   try { return db.purchaseFreeze() } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
 })
+ipcMain.handle('shop:equip', (_, itemKey) => {
+  if (!isNonEmptyString(itemKey)) return { ok:false, error:'invalid_input' }
+  try { return db.equipItem(itemKey) } catch(e) { console.error('[db]',e.message); return { ok:false, error:'db_error' } }
+})
 ipcMain.handle('xp:history', (_, days) => {
   if (days !== undefined && !isFiniteNumber(days)) return []
   try { return db.getXpHistory(days) } catch(e) { console.error('[db]',e.message); return [] }
@@ -450,6 +454,9 @@ ipcMain.handle('settings:get', (_, key) => {
 ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   if (key === 'day_rollover_hour' && !(Number.isInteger(value) && value >= 0 && value <= 23)) return
+  // equip_* slots must go through the ownership-checked shop:equip handler —
+  // writing them directly here would bypass that check entirely.
+  if (key.startsWith('equip_')) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
 ipcMain.handle('data:export-game', () => {
