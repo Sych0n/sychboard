@@ -144,6 +144,17 @@ function sanitizeText(str,maxLen=500){
   s=s.replace(/[<>\"']/g,c=>({'<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));
   return s;
 }
+function sanitizeImportedValue(v,depth=0){
+  if(depth>10)return null;
+  if(typeof v==='string')return sanitizeText(v,10000);
+  if(Array.isArray(v))return v.map(x=>sanitizeImportedValue(x,depth+1));
+  if(v&&typeof v==='object'){
+    const out={};
+    for(const key of Object.keys(v))out[key]=sanitizeImportedValue(v[key],depth+1);
+    return out;
+  }
+  return v;
+}
 function validateNumber(val,min=0,max=999999){
   const n=parseFloat(val)||0;
   return Math.max(min,Math.min(max,n));
@@ -1749,7 +1760,17 @@ async function handleImportFile(input){
   showConfirm('Restore this backup?','This overwrites all current data (finance, habits, journal, XP/streaks/badges, everything) with the backup\'s contents. Cannot be undone.',async()=>{
     try{
       for(const k of Object.keys(localStorage)){if(k.startsWith('sb4_'))localStorage.removeItem(k);}
-      for(const [k,v] of Object.entries(payload.localStorage)){if(k.startsWith('sb4_'))localStorage.setItem(k,v);}
+      // journals/chatHistory are HTML-escaped at render time (parseMD/msgBubble), so they're
+      // deliberately left raw here — re-sanitizing would double-escape them on restore. Every
+      // other field is rendered via raw innerHTML in various places and must be re-sanitized
+      // here, since a backup file is untrusted input that bypasses each field's own
+      // sanitizeText()-on-write call in the normal UI (e.g. addTrip/addHabit/addGoal).
+      for(const [k,v] of Object.entries(payload.localStorage)){
+        if(!k.startsWith('sb4_')||typeof v!=='string')continue;
+        if(k==='sb4_journals'||k==='sb4_chatHistory'){localStorage.setItem(k,v);continue;}
+        try{ localStorage.setItem(k,JSON.stringify(sanitizeImportedValue(JSON.parse(v)))); }
+        catch(e){ /* malformed entry for this key — skip rather than store unparseable/unsafe data */ }
+      }
       if(payload.game&&window.sychboard?.data?.importGame){
         const r=await window.sychboard.data.importGame(payload.game);
         if(!r?.ok){toast('Restored local data, but game progress import failed: '+(r?.error||'unknown error'));setTimeout(()=>location.reload(),2000);return;}
