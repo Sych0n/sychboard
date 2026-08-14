@@ -832,6 +832,23 @@ function importGameData(data) {
     if (getSetting('soft_reset_enabled') == null) insSetting.run('soft_reset_enabled', '1')
     if (getSetting('shop_owned') == null) insSetting.run('shop_owned', '[]')
 
+    // equipItem()'s ownership check (2026-08-13) only guards the live shop:equip
+    // IPC path — a restored backup writes equip_* settings directly via the loop
+    // above with no such check, so a crafted/hand-edited file could equip any
+    // paid cosmetic with shop_owned left empty, bypassing the SychCoins economy
+    // the same way the pre-fix equip path did. Re-validate every restored
+    // equip_* slot against the (now-finalized) shop_owned list here.
+    let restoredOwned = []
+    try { restoredOwned = JSON.parse(getSetting('shop_owned') || '[]') } catch (e) { restoredOwned = [] }
+    const delSetting = _db.prepare('DELETE FROM settings WHERE key=?')
+    for (const type of ['accent', 'font', 'bg', 'card', 'orb']) {
+      const key = 'equip_' + type
+      const val = getSetting(key)
+      if (val == null) continue
+      const entry = SHOP_CATALOG[val]
+      if (!entry || entry.type !== type || (entry.cost > 0 && !restoredOwned.includes(val))) delSetting.run(key)
+    }
+
     const insStreak = _db.prepare('INSERT INTO streaks (category_id,current_streak,longest_streak,last_completion_date,freeze_tokens) VALUES (?,?,?,?,?)')
     for (const s of streaks) {
       if (!Number.isInteger(s?.category_id)) continue
