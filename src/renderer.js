@@ -1498,7 +1498,7 @@ function parseActions(text){
     .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{actions.push({type:'log_sleep',bed:`${bh.trim().padStart(2,'0')}:${bm.trim().padStart(2,'0')}`,wake:`${wh.trim().padStart(2,'0')}:${wm.trim().padStart(2,'0')}`});return'';})
     .replace(/\[COMPLETE_GOAL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_goal',val:v.trim().toLowerCase()});return'';})
     .replace(/\[DELETE_TODO:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'delete_todo',val:v.trim().toLowerCase()});return'';})
-    .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:parseFloat(amount)||0,day:parseInt(day)||1});return'';})
+    .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:parseFloat(amount)||0,day:Math.min(Math.max(parseInt(day)||1,1),31)});return'';})
     .replace(/\[REMOVE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'remove_habit',val:v.trim().toLowerCase()});return'';})
     .replace(/\[SET_YT_CHANNEL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_yt_channel',val:v.trim()});return'';})
     .replace(/\[ADD_EVENT:([^:]+):([^:]+):?([^\]]*)\]/gi,(_,d,n,t)=>{actions.push({type:'add_event',day:d.trim(),name:n.trim(),etype:(t||'').trim().toLowerCase()});return'';})
