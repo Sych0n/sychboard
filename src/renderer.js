@@ -1346,6 +1346,8 @@ async function callGroq(messages){
   const evs=st.scheduleEvents&&st.scheduleEvents.length===7?st.scheduleEvents:DEFAULT_SCHED_EVENTS;
   const now=new Date();const ai=appWeekdayIndex();
   const timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const[apY,apM,apD]=computeLocalAppDate(_rolloverHour).split('-').map(Number);
+  const weekdayLong=new Date(apY,apM-1,apD).toLocaleDateString('en-GB',{weekday:'long'});
   const todayEvs=(evs[ai]||[]).map(e=>e.t).join(', ')||'nothing scheduled';
   const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const weekSched=evs.map((d,i)=>`${dayLabels[i]}${i===ai?' (TODAY)':''}: ${(d||[]).map(e=>e.t).join(', ')||'free'}`).join('\n');
@@ -1394,7 +1396,7 @@ Active (${activeGoals.length}): ${activeGoals.slice(0,6).map(g=>`[${g.category}]
 Completed: ${st.goals.filter(g=>g.done).length}
 
 === SCHEDULE ===
-Today (${now.toLocaleDateString('en-GB',{weekday:'long'})}, Current Time: ${timeStr}): ${todayEvs}
+Today (${weekdayLong}, Current Time: ${timeStr}): ${todayEvs}
 Full week:
 ${weekSched}
 Days until Saturday stream: ${satDays()}
