@@ -1933,8 +1933,10 @@ function rSubs(){
 }
 function addSub(){
   const n=sanitizeText(document.getElementById('sub-name').value,50).trim();
-  const a=validateNumber(document.getElementById('sub-amt').value,0.01,99999);
-  const d=validateNumber(document.getElementById('sub-day').value,1,31);
+  const aRaw=document.getElementById('sub-amt').value.trim();
+  const dRaw=document.getElementById('sub-day').value.trim();
+  const a=aRaw===''?0:validateNumber(aRaw,0.01,99999);
+  const d=dRaw===''?0:validateNumber(dRaw,1,31);
   if(!n||!a||!d){toast('Name, amount, and day required');return;}
   st.subscriptions.push({name:n,amount:a,date:d});
   document.getElementById('sub-name').value='';
