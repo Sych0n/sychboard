@@ -1484,7 +1484,7 @@ function parseActions(text){
   if(!text)return{clean:text,actions:[]};
   const actions=[];
   const clean=text
-    .replace(/\[SET_BALANCE:(bank|savings|trading):([^\]]+)\]/gi,(_,f,v)=>{actions.push({type:'set_balance',field:f.toLowerCase(),amount:toNum(v)});return'';})
+    .replace(/\[SET_BALANCE:(bank|savings|trading):([^\]]+)\]/gi,(_,f,v)=>{actions.push({type:'set_balance',field:f.toLowerCase(),amount:validateNumber(v,0,9999999)});return'';})
     .replace(/\[ADD_BALANCE:(bank|savings|trading):([^\]]+)\]/gi,(_,f,v)=>{actions.push({type:'add_balance',field:f.toLowerCase(),amount:toNum(v)});return'';})
     .replace(/\[UPDATE_YT:(subs|views|hours):([^\]]+)\]/gi,(_,f,v)=>{actions.push({type:'update_yt',field:f.toLowerCase(),amount:toNum(v)});return'';})
     .replace(/\[SET_EXAM_DATE:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_exam_date',val:v.trim()});return'';})
@@ -1512,7 +1512,7 @@ function executeActions(actions){
   let changed=false;
   actions.forEach(a=>{
     if(a.type==='set_balance'&&!isNaN(a.amount)){st.balances[a.field]=a.amount;changed=true;console.log('[actions] set_balance',a.field,'=',a.amount);}
-    else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=(st.balances[a.field]||0)+a.amount;changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
+    else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=Math.max(0,Math.min(9999999,(st.balances[a.field]||0)+a.amount));changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)&&a.amount>=0){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
     else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
     else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
