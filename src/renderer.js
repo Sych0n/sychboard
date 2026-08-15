@@ -1526,7 +1526,7 @@ function executeActions(actions){
     else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
     else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
     else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
-    else if(a.type==='complete_habit'){
+    else if(a.type==='complete_habit'&&a.val){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
@@ -1535,10 +1535,10 @@ function executeActions(actions){
     else if(a.type==='add_trip'){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
     else if(a.type==='log_sleep'){const today=computeLocalAppDate(_rolloverHour);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
-    else if(a.type==='complete_goal'){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
-    else if(a.type==='delete_todo'){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
+    else if(a.type==='complete_goal'&&a.val){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
+    else if(a.type==='delete_todo'&&a.val){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
     else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
-    else if(a.type==='remove_habit'){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
+    else if(a.type==='remove_habit'&&a.val){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
     else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
     else if(a.type==='add_event'){
       const di=dayIndexOf(a.day);
@@ -1549,7 +1549,7 @@ function executeActions(actions){
         changed=true;console.log('[actions] add_event',a.day,a.name);
       }
     }
-    else if(a.type==='remove_event'){
+    else if(a.type==='remove_event'&&a.name){
       const di=dayIndexOf(a.day);
       if(di>=0&&st.scheduleEvents?.[di]){
         const before=st.scheduleEvents[di].length;
