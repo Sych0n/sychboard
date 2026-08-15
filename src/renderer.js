@@ -1495,7 +1495,15 @@ function parseActions(text){
     .replace(/\[ADD_SHIFT:([^:]+):([^:]+):([^\]]+)\]/gi,(_,d,h,w)=>{const wp=parseFloat(w);actions.push({type:'add_shift',date:d.trim(),hours:validateNumber(h,0,24),wage:isNaN(wp)?null:validateNumber(wp,0,100)});return'';})
     .replace(/\[ADD_TRIP:([^:]+):([^:]+):([^\]]+)\]/gi,(_,dest,date,budget)=>{actions.push({type:'add_trip',dest:dest.trim(),date:date.trim(),budget:Math.min(Math.max(parseFloat(budget)||0,0),99999)});return'';})
     .replace(/\[SET_FOCUS:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_focus',val:v.trim()});return'';})
-    .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{actions.push({type:'log_sleep',bed:`${bh.trim().padStart(2,'0')}:${bm.trim().padStart(2,'0')}`,wake:`${wh.trim().padStart(2,'0')}:${wm.trim().padStart(2,'0')}`});return'';})
+    .replace(/\[LOG_SLEEP:([^:]+):([^:]+):([^:]+):([^\]]+)\]/gi,(_,bh,bm,wh,wm)=>{
+      // unlike <input type="time">, this tag had no bound; garbage/out-of-range values corrupted sleepDuration() math
+      const bH=parseInt(bh,10),bM=parseInt(bm,10),wH=parseInt(wh,10),wM=parseInt(wm,10);
+      const validPart=(h,m)=>Number.isInteger(h)&&h>=0&&h<=23&&Number.isInteger(m)&&m>=0&&m<=59;
+      if(validPart(bH,bM)&&validPart(wH,wM)){
+        actions.push({type:'log_sleep',bed:`${bH.toString().padStart(2,'0')}:${bM.toString().padStart(2,'0')}`,wake:`${wH.toString().padStart(2,'0')}:${wM.toString().padStart(2,'0')}`});
+      }
+      return'';
+    })
     .replace(/\[COMPLETE_GOAL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'complete_goal',val:v.trim().toLowerCase()});return'';})
     .replace(/\[DELETE_TODO:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'delete_todo',val:v.trim().toLowerCase()});return'';})
     .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:parseFloat(amount)||0,day:Math.min(Math.max(parseInt(day)||1,1),31)});return'';})
