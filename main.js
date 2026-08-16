@@ -455,8 +455,13 @@ ipcMain.handle('settings:set', (_, key, value) => {
   if (!isNonEmptyString(key)) return
   if (key === 'day_rollover_hour' && !(Number.isInteger(value) && value >= 0 && value <= 23)) return
   // equip_* slots must go through the ownership-checked shop:equip handler —
-  // writing them directly here would bypass that check entirely.
-  if (key.startsWith('equip_')) return
+  // writing them directly here would bypass that check entirely. shop_owned
+  // itself must only ever be grown by purchaseItem()'s coin-deducting
+  // transaction (or importGameData()'s validated restore) — a direct write
+  // here would let anyone forge ownership of a paid cosmetic and then equip
+  // it for free through the legitimate shop:equip path, since equipItem()
+  // trusts shop_owned as its source of truth.
+  if (key.startsWith('equip_') || key === 'shop_owned') return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
 ipcMain.handle('data:export-game', () => {
