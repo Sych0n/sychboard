@@ -553,6 +553,27 @@ function uncompleteQuest(questId) {
   for (let L = newLevel.level + 1; L <= oldLevel.level; L++) coinsRemoved += L * 10
 
   _db.transaction(() => {
+    // freeze_used/milestone_token_granted are day-level streak-transition effects
+    // that completeQuest only ever sets on the FIRST completion of the day for a
+    // category (later same-day completions hit the lastDate===appDate no-op
+    // branch) — but in a multi-quest category, that flagged completion isn't
+    // necessarily the one being undone here. If a same-day sibling completion
+    // still exists (otherOnDate>0 below, so the streak revert below correctly
+    // no-ops — the day still counts), deleting the flagged row outright would
+    // permanently orphan the token grant: neither this deletion (skipped, day
+    // still active) nor a later deletion of the sibling (which never carried the
+    // flag) would ever claw it back, letting the already-fixed 2026-08-13
+    // milestone-token farm resurface via a different multi-quest completion
+    // order. Migrate the flags onto a remaining sibling first so whichever
+    // completion ends up being the LAST one deleted for that date correctly
+    // triggers the clawback.
+    if (completion.freeze_used || completion.milestone_token_granted) {
+      const sibling = _db.prepare(`SELECT qc.id FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND qc.app_date=? AND qc.id!=?`).get(quest.category_id, completionDate, completion.id)
+      if (sibling) {
+        _db.prepare('UPDATE quest_completions SET freeze_used=MAX(freeze_used,?), milestone_token_granted=MAX(milestone_token_granted,?) WHERE id=?')
+          .run(completion.freeze_used ? 1 : 0, completion.milestone_token_granted ? 1 : 0, sibling.id)
+      }
+    }
     _db.prepare('DELETE FROM quest_completions WHERE id=?').run(completion.id)
     _db.prepare('UPDATE profile SET total_xp=?, current_level=?, sychcoins=MAX(0,sychcoins-?) WHERE id=1').run(newTotal, newLevel.level, coinsRemoved)
     _db.prepare(`INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)`)
