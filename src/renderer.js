@@ -141,7 +141,7 @@ function setMobNav(id){document.querySelectorAll('.mnb-item').forEach(el=>el.cla
 function sanitizeText(str,maxLen=500){
   if(!str)return '';
   let s=String(str).slice(0,maxLen).trim();
-  s=s.replace(/[<>\"']/g,c=>({'<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));
+  s=s.replace(/&/g,'&amp;').replace(/[<>\"']/g,c=>({'<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));
   return s;
 }
 function sanitizeImportedValue(v,depth=0){
