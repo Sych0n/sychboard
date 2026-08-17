@@ -1971,7 +1971,7 @@ function saveUniNotes(){st.uniNotes=document.getElementById('uni-notes').value;s
 function rYT(){
   const ct=document.getElementById('yt-chan-title');if(ct)ct.textContent=st.yt.channelName||'Channel stats';
   document.getElementById('yt-m1').innerHTML=`<div class="metric"><div class="ml">Subscribers</div><div class="mv">${fmtK(st.yt.subs)}</div></div><div class="metric"><div class="ml">Total views</div><div class="mv blue">${fmtK(st.yt.views)}</div></div>`;
-  document.getElementById('yt-m2').innerHTML=`<div class="metric"><div class="ml">Watch hours</div><div class="mv">${fmtK(st.yt.hours)}</div></div><div class="metric"><div class="ml">Videos</div><div class="mv green">${st.yt.videoCount||satDays()+'d'}</div></div>`;
+  document.getElementById('yt-m2').innerHTML=`<div class="metric"><div class="ml">Watch hours</div><div class="mv">${fmtK(st.yt.hours)}</div></div><div class="metric"><div class="ml">Videos</div><div class="mv green">${st.yt.videoCount||0}</div></div>`;
   const sp=Math.min(100,Math.round(st.yt.subs/1000*100));
   const hp=Math.min(100,Math.round(st.yt.hours/4000*100));
   document.getElementById('yt-goals').innerHTML=`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Subscribers</span><span style="font-weight:700">${st.yt.subs}/1,000</span></div><div class="pb"><div class="pf" style="width:${sp}%"></div></div></div><div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2)">Watch hours</span><span style="font-weight:700">${st.yt.hours}/4,000</span></div><div class="pb"><div class="pf" style="width:${hp}%"></div></div></div>`;
