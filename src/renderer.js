@@ -1719,8 +1719,10 @@ function saveGroqKey(){
   toast('Groq API key saved');
 }
 function savePomSettings(){
-  st.pomodoro.focus = validateNumber(parseInt(document.getElementById('pom-f-in').value)||25, 1, 180);
-  st.pomodoro.break = validateNumber(parseInt(document.getElementById('pom-b-in').value)||5, 1, 60);
+  const fRaw=document.getElementById('pom-f-in').value.trim();
+  const bRaw=document.getElementById('pom-b-in').value.trim();
+  st.pomodoro.focus = validateNumber(fRaw===''?25:parseInt(fRaw), 1, 180);
+  st.pomodoro.break = validateNumber(bRaw===''?5:parseInt(bRaw), 1, 60);
   save();
   if(!pomR){ 
     pomL = pomM==='focus'?st.pomodoro.focus*60:st.pomodoro.break*60;
