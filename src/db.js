@@ -283,6 +283,19 @@ function migrate() {
       -- correctly reverting to 6. Track the grant explicitly so it can be
       -- reverted the same way freeze_used already is.
       ALTER TABLE quest_completions ADD COLUMN milestone_token_granted INTEGER NOT NULL DEFAULT 0;
+    `},
+    { version: 7, sql: `
+      -- uncompleteQuest's streak revert always did current_streak=MAX(0,current_streak-1),
+      -- an inverse that only holds for the plain +1 and freeze-bridge transitions.
+      -- completeQuest's "broken streak" branch instead sets current_streak to
+      -- floor(oldStreak*0.5)+1 (soft reset, the default) or 1 (hard reset) — a
+      -- non-linear transform that -1 doesn't undo. Completing a quest right after a
+      -- streak break, then unticking that same completion, permanently corrupted
+      -- current_streak to a value between the true pre-break streak and the reset
+      -- value, silently poisoning every future soft-reset for that category (which
+      -- reads current_streak as its baseline). Record the true pre-completion value
+      -- so it can be restored exactly instead of decremented.
+      ALTER TABLE quest_completions ADD COLUMN pre_streak INTEGER;
     `}
   ]
 
@@ -433,9 +446,14 @@ function completeQuest(questId) {
     if (streak && lastDate !== appDate) {
       _db.prepare(`UPDATE streaks SET current_streak=?,longest_streak=?,last_completion_date=?,freeze_tokens=? WHERE category_id=?`)
         .run(newStreak, longest, appDate, tokens, quest.category_id)
+      // Record the true pre-completion value so uncompleteQuest can restore it
+      // exactly (see migration v7) instead of assuming a plain -1 inverse, which
+      // is wrong for the soft/hard-reset branch above.
+      _db.prepare('UPDATE quest_completions SET pre_streak=? WHERE quest_id=? AND app_date=?').run(currentStreak, questId, appDate)
     } else if (!streak) {
       _db.prepare(`INSERT INTO streaks (category_id,current_streak,longest_streak,last_completion_date,freeze_tokens) VALUES (?,1,1,?,0)`)
         .run(quest.category_id, appDate)
+      _db.prepare('UPDATE quest_completions SET pre_streak=0 WHERE quest_id=? AND app_date=?').run(questId, appDate)
     }
 
     // Check streak badges now; level badges are checked below, after the sweep
@@ -567,11 +585,16 @@ function uncompleteQuest(questId) {
     // order. Migrate the flags onto a remaining sibling first so whichever
     // completion ends up being the LAST one deleted for that date correctly
     // triggers the clawback.
-    if (completion.freeze_used || completion.milestone_token_granted) {
+    // pre_streak (migration v7) is the same kind of day-level, first-completion-
+    // only marker as freeze_used/milestone_token_granted above — carry it along
+    // in the same sibling migration so whichever completion ends up being the
+    // LAST one deleted for that date is also the one uncompleteQuest's revert
+    // block (below) can restore the true pre-day streak value from.
+    if (completion.freeze_used || completion.milestone_token_granted || completion.pre_streak != null) {
       const sibling = _db.prepare(`SELECT qc.id FROM quest_completions qc JOIN quests q ON qc.quest_id=q.id WHERE q.category_id=? AND qc.app_date=? AND qc.id!=?`).get(quest.category_id, completionDate, completion.id)
       if (sibling) {
-        _db.prepare('UPDATE quest_completions SET freeze_used=MAX(freeze_used,?), milestone_token_granted=MAX(milestone_token_granted,?) WHERE id=?')
-          .run(completion.freeze_used ? 1 : 0, completion.milestone_token_granted ? 1 : 0, sibling.id)
+        _db.prepare('UPDATE quest_completions SET freeze_used=MAX(freeze_used,?), milestone_token_granted=MAX(milestone_token_granted,?), pre_streak=COALESCE(pre_streak,?) WHERE id=?')
+          .run(completion.freeze_used ? 1 : 0, completion.milestone_token_granted ? 1 : 0, completion.pre_streak, sibling.id)
       }
     }
     _db.prepare('DELETE FROM quest_completions WHERE id=?').run(completion.id)
@@ -606,8 +629,21 @@ function uncompleteQuest(questId) {
       const freezeRestored = !!completion.freeze_used
       const milestoneClawback = !!completion.milestone_token_granted
       const tokenDelta = (freezeRestored ? 1 : 0) - (milestoneClawback ? 1 : 0)
-      _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=?, freeze_tokens=MAX(0,MIN(3,freeze_tokens+?)) WHERE category_id=?`)
-        .run(prevCompletion, tokenDelta, quest.category_id)
+      // current_streak=current_streak-1 is only a correct inverse for the plain
+      // +1 and freeze-bridge completion branches. completeQuest's broken-streak
+      // branch instead sets current_streak to a soft/hard-reset value (a
+      // non-linear transform of the pre-completion streak), which -1 doesn't
+      // undo — restore the exact pre-completion value recorded at completion
+      // time instead, when available (migration v7; older rows predating it, or
+      // an imported backup without the column, fall back to the -1 approximation
+      // rather than fail).
+      if (completion.pre_streak != null) {
+        _db.prepare(`UPDATE streaks SET current_streak=?, last_completion_date=?, freeze_tokens=MAX(0,MIN(3,freeze_tokens+?)) WHERE category_id=?`)
+          .run(completion.pre_streak, prevCompletion, tokenDelta, quest.category_id)
+      } else {
+        _db.prepare(`UPDATE streaks SET current_streak=MAX(0,current_streak-1), last_completion_date=?, freeze_tokens=MAX(0,MIN(3,freeze_tokens+?)) WHERE category_id=?`)
+          .run(prevCompletion, tokenDelta, quest.category_id)
+      }
     }
   })()
 
@@ -811,7 +847,7 @@ function setSetting(key, value) {
 function exportGameData() {
   return {
     profile: _db.prepare('SELECT display_name, total_xp, current_level, sychcoins FROM profile WHERE id=1').get(),
-    quest_completions: _db.prepare('SELECT quest_id, app_date, completed_at, xp_awarded, streak_bonus_pct, notes, freeze_used, milestone_token_granted FROM quest_completions').all(),
+    quest_completions: _db.prepare('SELECT quest_id, app_date, completed_at, xp_awarded, streak_bonus_pct, notes, freeze_used, milestone_token_granted, pre_streak FROM quest_completions').all(),
     streaks: _db.prepare('SELECT category_id, current_streak, longest_streak, last_completion_date, freeze_tokens FROM streaks').all(),
     xp_log: _db.prepare('SELECT occurred_at, amount, source_type, source_id, running_total, reason FROM xp_log').all(),
     badge_unlocks: _db.prepare('SELECT badge_id, unlocked_at FROM badge_unlocks').all(),
@@ -877,11 +913,12 @@ function importGameData(data) {
         typeof s.last_completion_date === 'string' ? s.last_completion_date : null, Math.min(3, Math.max(0, Math.round(Number(s.freeze_tokens) || 0))))
     }
 
-    const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used,milestone_token_granted) VALUES (?,?,?,?,?,?,?,?)')
+    const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used,milestone_token_granted,pre_streak) VALUES (?,?,?,?,?,?,?,?,?)')
     for (const c of quest_completions) {
       if (!Number.isInteger(c?.quest_id) || typeof c?.app_date !== 'string') continue
       insCompletion.run(c.quest_id, c.app_date, typeof c.completed_at === 'string' ? c.completed_at : sqliteNow(),
-        Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0, c.milestone_token_granted ? 1 : 0)
+        Math.round(Number(c.xp_awarded) || 0), Number(c.streak_bonus_pct) || 0, typeof c.notes === 'string' ? c.notes : null, c.freeze_used ? 1 : 0, c.milestone_token_granted ? 1 : 0,
+        Number.isInteger(c.pre_streak) ? c.pre_streak : null)
     }
 
     const insXp = _db.prepare('INSERT INTO xp_log (occurred_at,amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?,?)')
