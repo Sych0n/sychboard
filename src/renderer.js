@@ -171,7 +171,10 @@ function validateDate(date){
 
 const fmt=n=>'£'+Number(n).toFixed(2);
 const fmtK=n=>n>=1000?(n/1000).toFixed(1)+'k':String(n);
-function satDays(){const d=new Date().getDay();return d===6?7:(6-d)||7;}
+// Days until Saturday stream, anchored to the rollover-hour-aware app-date (not the raw
+// wall-clock weekday) — same "today" concept appWeekdayIndex() gives Schedule/Home/AI-prompt,
+// so this doesn't disagree with them between local midnight and the rollover hour.
+function satDays(){const aw=appWeekdayIndex();const diff=(5-aw+7)%7;return diff||7;}
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.getElementById('mc-ok').onclick=()=>{if(confirmCb)confirmCb();closeModal('modal-confirm');confirmCb=null;};
