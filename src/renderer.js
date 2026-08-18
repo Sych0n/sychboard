@@ -2546,9 +2546,15 @@ function sendNotif(title,body){
 async function sendAINudge(){
   if(!(getGroqKey()))return;
   const today=new Date().toDateString();
-  st.notifLastSent.aiNudge=today;save();
+  // Mark "sent" only once callGroq() actually succeeds — not before the call, like the
+  // old code did. checkNotifications() re-checks nl.aiNudge!==today every 60s for the
+  // rest of the day; stamping today's date up front meant a single transient failure
+  // (invalid/expired key, network hiccup, Groq API error — callGroq() returns null in
+  // all of these) silently disabled every retry for the rest of the day, unlike the
+  // sibling bed/morning/habit reminders, which only stamp their flag after their
+  // (effectively infallible) sendNotif() call already ran.
   const r=await callGroq([{role:'user',content:'Give me one proactive personalised observation based on my data. Max 1 sentence.'}]);
-  if(r){const{clean}=parseActions(parseNav(r).clean);sendNotif('💡 SychBoard',clean.slice(0,140));}
+  if(r){st.notifLastSent.aiNudge=today;save();const{clean}=parseActions(parseNav(r).clean);sendNotif('💡 SychBoard',clean.slice(0,140));}
 }
 function checkNotifications(){
   const now=new Date();
