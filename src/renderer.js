@@ -1536,9 +1536,9 @@ function executeActions(actions){
     else if(a.type==='add_balance'&&!isNaN(a.amount)){st.balances[a.field]=Math.max(0,Math.min(9999999,(st.balances[a.field]||0)+a.amount));changed=true;console.log('[actions] add_balance',a.field,'+',a.amount);}
     else if(a.type==='update_yt'&&!isNaN(a.amount)&&a.amount>=0){st.yt[a.field]=a.amount;changed=true;console.log('[actions] update_yt',a.field,'=',a.amount);}
     else if(a.type==='set_exam_date'){st.examDate=sanitizeText(a.val,50);changed=true;console.log('[actions] set_exam_date',a.val);}
-    else if(a.type==='add_todo'){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
-    else if(a.type==='add_habit'){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
-    else if(a.type==='add_goal'){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
+    else if(a.type==='add_todo'&&a.val){st.genTodos.push({text:sanitizeText(a.val,200),done:false});changed=true;}
+    else if(a.type==='add_habit'&&a.val){st.habits.push({label:sanitizeText(a.val,100),done:false});changed=true;}
+    else if(a.type==='add_goal'&&a.val){st.goals.push({text:sanitizeText(a.val,150),category:sanitizeText(a.cat,20),done:false});changed=true;}
     else if(a.type==='complete_habit'&&a.val){
       const wasAllDone=st.habits.length>0&&st.habits.every(x=>x.done);
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
