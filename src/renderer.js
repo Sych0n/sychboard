@@ -1918,13 +1918,27 @@ function updateBal(){
   document.getElementById('bal-amt').value='';
   save();rFinance();toast('Balance updated');
 }
+// The "Date" field (src/index.html: id="sh-d") is free text suggested by its
+// placeholder ("18 Apr") to be day+month with no year, which rShifts()'s
+// "This month" filter used to handle by always appending the current year
+// before parsing. But a shift added a different way — the AI assistant's
+// [ADD_SHIFT:date:hours:wage] tag has no format hint and, like most LLM
+// output, tends to write a full date (e.g. "2026-08-14"), and a user can
+// just as easily type one themselves — already carries its own year, so
+// blindly appending another (`new Date("2026-08-14 2026")`) produces an
+// unparseable string. Date's own comparisons treat Invalid Date as neither
+// >= nor < anything, so the shift silently vanished from "This month" only
+// (it still shows correctly in the list and in the "All time" sum), quietly
+// undercounting the month's earnings with no error anywhere. Only append the
+// year when the string doesn't already carry a 4-digit one of its own.
+function parseShiftDate(s,year){return /\d{4}/.test(s)?new Date(s):new Date(s+' '+year);}
 function rShifts(){
   const el=document.getElementById('shift-list');if(!el)return;
   if(!st.shifts.length){el.innerHTML=emptyState('💼','No shifts logged yet','Add your first shift above');document.getElementById('shift-totals').innerHTML='';return;}
   el.innerHTML=st.shifts.map((s,i)=>`<div class="shi"><span style="font-weight:600">${s.date}</span><span style="color:var(--text2)">${s.hours}h @ ${fmt(s.wage)}/hr</span><span style="color:var(--green);font-weight:700">${fmt(s.hours*s.wage)}</span><button class="btn btn-sm" style="color:var(--red);border-color:var(--red);background:var(--red-light)" onclick="rmShift(${i})">✕</button></div>`).join('');
   const all=st.shifts.reduce((a,s)=>a+s.hours*s.wage,0);
   const now=new Date();const ms=new Date(now.getFullYear(),now.getMonth(),1);const me=new Date(now.getFullYear(),now.getMonth()+1,1);
-  const mon=st.shifts.filter(s=>{const sd=new Date(s.date+' '+now.getFullYear());return sd>=ms&&sd<me;}).reduce((a,s)=>a+s.hours*s.wage,0);
+  const mon=st.shifts.filter(s=>{const sd=parseShiftDate(s.date,now.getFullYear());return sd>=ms&&sd<me;}).reduce((a,s)=>a+s.hours*s.wage,0);
   document.getElementById('shift-totals').innerHTML=`<div class="metric"><div class="ml">All time</div><div class="mv">${fmt(all)}</div></div><div class="metric"><div class="ml">This month</div><div class="mv green">${fmt(mon)}</div></div>`;
 }
 function addShift(){
