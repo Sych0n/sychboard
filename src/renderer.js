@@ -106,6 +106,12 @@ function load(){
   if(!st.chatHistory)st.chatHistory=[];
   if(!st.holidays||st.holidays.length<2)st.holidays=[{name:'Holiday 1',date:'',target:500,saved:0},{name:'Holiday 2',date:'',target:1000,saved:0}];
   if(!st.yt)st.yt={};
+  // One-time migration: obFinish() only runs once at onboarding, so an existing
+  // user's saved st.sections permanently lacked 'sleep' until the fix below.
+  if(st.onboarded&&Array.isArray(st.sections)&&!st.sections.some(s=>s.id==='sleep')){
+    st.sections.push({id:'sleep',label:'Sleep',icon:'🌙',core:true,visible:true});
+    save();
+  }
   // One-time migration of legacy cyan/blue accents to the new soft-white default
   if(!S.get('accentMigratedV2')){
     if(st.accentColor==='#3d8ef0'||st.accentColor==='#22d3ee'||st.accentColor==='#8b5cf6'){st.accentColor='#e8eaf0';st.accentGlow='rgba(232,234,240,0.10)';}
@@ -296,13 +302,17 @@ function obFinish(){
     dev:{id:'dev',label:'Side Project',icon:'🤖',core:true,visible:true},
     schedule:{id:'schedule',label:'Schedule',icon:'📅',core:true,visible:true},
     habits:{id:'habits',label:'Habits',icon:'✅',core:true,visible:true},
+    sleep:{id:'sleep',label:'Sleep',icon:'🌙',core:true,visible:true},
     fitness:{id:'fitness',label:'Fitness',icon:'💪',core:true,visible:true},
     travel:{id:'travel',label:'Travel',icon:'✈️',core:true,visible:true},
     goals:{id:'goals',label:'Goals',icon:'🎯',core:true,visible:true},
     todos:{id:'todos',label:'All Todos',icon:'📋',core:true,visible:true},
     journal:{id:'journal',label:'Journal',icon:'📓',core:true,visible:true}
   };
-  const always=['schedule','habits','goals','todos','journal'];
+  // 'sleep' belongs here like schedule/habits/goals/todos/journal — CORE_SECTIONS and
+  // activateDanielMode() both always include it, but this list had drifted out of sync
+  // with them, leaving the Sleep tracker unreachable from any nav after normal onboarding.
+  const always=['schedule','habits','sleep','goals','todos','journal'];
   const areaToSection={youtube:'youtube',uni:'uni',fitness:'fitness',finance:'finance',work:'schedule',dev:'dev',travel:'travel'};
   const toShow=new Set(always);
   obSelections.forEach(a=>{if(areaToSection[a])toShow.add(areaToSection[a]);});
