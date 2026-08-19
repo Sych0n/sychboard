@@ -84,7 +84,8 @@ let st={
   subscriptions: [],
   pomodoro: { focus: 25, break: 5 },
   fxEnabled: true,
-  lastAppDate: ''
+  lastAppDate: '',
+  dayRolloverHour: 4
 };
 
 let confirmCb=null,renamingId=null,obSelections=[],obColor='#e8eaf0',obColorGlow='rgba(232,234,240,0.10)',bootOrbAnim=null,bootParticlesAnim=null,bootChatHistory=[],bootResizeHandler=null,bootMouseHandler=null;
@@ -94,7 +95,7 @@ function load(){
     console.error('[storage] localStorage unavailable');
     toast('Warning: Storage unavailable — changes may not persist');
   }
-  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate','dayRolloverHour'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
@@ -132,9 +133,10 @@ function load(){
   if(st.notifSettings.questReset==null)st.notifSettings.questReset=true;
   if(!st.notifLastSent)st.notifLastSent={bedReminder:'',morningBrief:'',habitReminder:'',aiNudge:''};
   if(st.lastAppDate==null)st.lastAppDate='';
+  if(!Number.isInteger(st.dayRolloverHour)||st.dayRolloverHour<0||st.dayRolloverHour>23)st.dayRolloverHour=4;
 }
 function save(){
-  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate'];
+  const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate','dayRolloverHour'];
   keys.forEach(k=>S.set(k,st[k]));
 }
 
@@ -486,12 +488,30 @@ function getBootMsg(){
 // with each other AND with the SQLite quest/streak system on what "today"
 // is — previously they used real local midnight, 4 hours ahead of the
 // quest system's own app-date boundary by default.
+//
+// enterApp() fires refreshRolloverHour() without awaiting it (to avoid
+// delaying the boot screen's fade-out), then calls maybeResetHabits()
+// synchronously on the next line — which always runs before this
+// function's IPC round trip resolves. A bare hardcoded default here would
+// make every boot's first reset check (and any habit checkbox clicked
+// before the round trip lands) ignore a real configured rollover hour,
+// which can wrongly reset habits and wipe an already-recorded completion.
+// INIT re-seeds this from persisted st.dayRolloverHour right after load(),
+// so only the very first-ever boot risks the stale default.
 let _rolloverHour=4;
 async function refreshRolloverHour(){
   if(!window.sychboard)return;
   try{
     const rawRh=parseInt(await window.sychboard.settings.get('day_rollover_hour'));
-    _rolloverHour=Number.isInteger(rawRh)&&rawRh>=0&&rawRh<=23?rawRh:4;
+    const newRh=Number.isInteger(rawRh)&&rawRh>=0&&rawRh<=23?rawRh:4;
+    const changed=newRh!==_rolloverHour;
+    _rolloverHour=newRh;
+    if(st.dayRolloverHour!==newRh){st.dayRolloverHour=newRh;save();}
+    // If the seeded/previous value turned out stale, re-run the same
+    // idempotent check+render checkHabitReset() already uses on its 60s poll
+    // so a mid-session change (or a still-wrong seed) self-corrects within
+    // one IPC round trip instead of waiting for the next poll.
+    if(changed)checkHabitReset();
   }catch(e){}
 }
 function maybeResetHabits(){
@@ -2688,6 +2708,9 @@ function fireConfetti(){
 
 // ═══ INIT ═══
 load();
+// Seed from the persisted value now that load() has run — see the comment
+// at _rolloverHour's declaration for why this matters.
+_rolloverHour=st.dayRolloverHour;
 pomL = st.pomodoro.focus * 60; // Initialize timer based on saved settings
 applyColor(st.accentColor||'#e8eaf0');
 (async()=>{
