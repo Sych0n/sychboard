@@ -364,7 +364,21 @@ async function gitCommit(repoKey, draftMessage) {
   if (!diff.trim()) {
     throw new Error(`Nothing staged to commit in "${repoKey}" — working tree is clean.`);
   }
-  const finalMessage = await confirmCommitMessage("git_commit", repoKey, diff, draftMessage);
+  // stageAndDiff() above already ran `git add -A` — if the user declines
+  // (or the approval step errors) below, undo that staging so a "no"
+  // actually leaves the working tree as it found it, instead of silently
+  // leaving everything staged despite the refusal.
+  let finalMessage;
+  try {
+    finalMessage = await confirmCommitMessage("git_commit", repoKey, diff, draftMessage);
+  } catch (err) {
+    try {
+      await execFileP("git", ["-C", dir, "reset"], { timeout: 10_000 });
+    } catch {
+      // best-effort unstage; surface the original decline/error either way
+    }
+    throw err;
+  }
   await execFileP("git", ["-C", dir, "commit", "-m", finalMessage], { timeout: 30_000 });
   const { stdout: sha } = await execFileP("git", ["-C", dir, "rev-parse", "--short", "HEAD"], { timeout: 10_000 });
   return { repo: repoKey, message: finalMessage, sha: sha.trim(), committed: true };
