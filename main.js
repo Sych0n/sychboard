@@ -6,6 +6,15 @@ const http = require('http')
 const db = require('./src/db')
 const mcp = require('./mcp-client')
 
+// Without this, launching the app while it's already running (easy to do with
+// "Launch on startup" + the tray icon keeping it alive with no taskbar window)
+// spawns a second process against the same SQLite file with no coordination —
+// duplicate notification timers/tray icons and SQLITE_BUSY errors on write races.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+}
+
 // An uncaught exception/rejection in the main process otherwise crashes the
 // whole app for the user with no dialog or log they can see; log and keep running.
 process.on('uncaughtException', (err) => {
@@ -375,14 +384,23 @@ ipcMain.on('restart-and-install', () => {
   } catch (e) {}
 })
 
-app.whenReady().then(() => {
-  try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
-  createWindow()
-  createTray()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+if (gotSingleInstanceLock) {
+  app.on('second-instance', () => {
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
   })
-})
+
+  app.whenReady().then(() => {
+    try { db.initDB(app) } catch (e) { console.error('[db] Init failed:', e.message) }
+    createWindow()
+    createTray()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+}
 
 // ── Gamification IPC ──
 // Input validation helpers — IPC args come from the renderer and must not
