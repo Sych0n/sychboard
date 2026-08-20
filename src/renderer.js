@@ -2036,7 +2036,10 @@ function rYT(){
     }
   }
   const YT_CHECKS=['Record Saturday stream','Clip moments for Shorts','Edit long form highlight','Upload long form','Post Shorts (aim 3)','Check analytics'];
-  const ytWeekStart=mondayOfWeek(new Date());
+  // Week-start anchored to the rollover-hour-aware app-date, not the raw wall
+  // clock, so this agrees with Habits/Journal/Sleep/Schedule on a Sun->Mon boundary.
+  const[ytApY,ytApM,ytApD]=computeLocalAppDate(_rolloverHour).split('-').map(Number);
+  const ytWeekStart=mondayOfWeek(new Date(ytApY,ytApM-1,ytApD));
   if(!st.yt.weekChecks||st.yt.weekChecks.length!==YT_CHECKS.length||st.yt.weekChecksWeekStart!==ytWeekStart){st.yt.weekChecks=YT_CHECKS.map(()=>false);st.yt.weekChecksWeekStart=ytWeekStart;save();}
   document.getElementById('yt-checklist').innerHTML=YT_CHECKS.map((item,i)=>`<div class="todo-item ${st.yt.weekChecks[i]?'checked':''}"><input type="checkbox" ${st.yt.weekChecks[i]?'checked':''} onchange="st.yt.weekChecks[${i}]=this.checked;save();this.closest('.todo-item').classList.toggle('checked',this.checked)"><span>${item}</span></div>`).join('');
   rSecTodos('youtube');
