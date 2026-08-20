@@ -1937,7 +1937,17 @@ function rFinance(){
 }
 function updHol(i){
   const rawName=document.getElementById('hn-'+i).value;
-  st.holidays[i]={name:rawName?sanitizeText(rawName,40).trim():st.holidays[i].name,date:sanitizeText(document.getElementById('hd-'+i).value,30).trim(),target:validateNumber(document.getElementById('ht-'+i).value,0,9999999),saved:validateNumber(document.getElementById('hs-'+i).value,0,9999999)};
+  const rawDate=document.getElementById('hd-'+i).value;
+  const rawTarget=document.getElementById('ht-'+i).value;
+  const rawSaved=document.getElementById('hs-'+i).value;
+  // Blank means "leave unchanged" (matches name below) — without this,
+  // clearing Target/Saved before clicking Update silently zeroed real progress.
+  st.holidays[i]={
+    name:rawName?sanitizeText(rawName,40).trim():st.holidays[i].name,
+    date:rawDate.trim()!==''?sanitizeText(rawDate,30).trim():st.holidays[i].date,
+    target:rawTarget.trim()!==''?validateNumber(rawTarget,0,9999999):st.holidays[i].target,
+    saved:rawSaved.trim()!==''?validateNumber(rawSaved,0,9999999):st.holidays[i].saved
+  };
   save();rFinance();
 }
 function updateBal(){
