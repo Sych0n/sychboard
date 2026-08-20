@@ -2079,7 +2079,7 @@ async function fetchYTData(){
   if(btn){btn.textContent='…';btn.disabled=true;}
   if(vidEl)vidEl.innerHTML='<div class="empty" style="font-size:12px;color:var(--text3)">Fetching…</div>';
   try{
-    const chanRes=await ytFetch(`/channels?part=statistics,contentDetails&id=${channelId}`);
+    const chanRes=await ytFetch(`/channels?part=snippet,statistics,contentDetails&id=${channelId}`);
     if(chanRes.error||chanRes.status===400){ytApiCache={error:chanRes.error||'Bad request — check YOUTUBE_CHANNEL_ID',fetchedAt:Date.now()};renderYTVideos(ytApiCache);if(btn){btn.textContent='↻ Live';btn.disabled=false;}return;}
     if(chanRes.status===403){ytApiCache={error:'API key invalid or quota exceeded — check YOUTUBE_API_KEY',fetchedAt:Date.now()};renderYTVideos(ytApiCache);if(btn){btn.textContent='↻ Live';btn.disabled=false;}return;}
     const chan=chanRes.data?.items?.[0];
