@@ -1961,7 +1961,19 @@ function updateBal(){
 // (it still shows correctly in the list and in the "All time" sum), quietly
 // undercounting the month's earnings with no error anywhere. Only append the
 // year when the string doesn't already carry a 4-digit one of its own.
-function parseShiftDate(s,year){return /\d{4}/.test(s)?new Date(s):new Date(s+' '+year);}
+//
+// A second, separate ambiguity hits dates that DO carry their own year but in
+// D/M/Y (or D-M-Y) form — plausible from either the free-text field or the
+// AI tag, which has no format hint. `new Date("14/08/2026")` assumes US
+// M/D/Y, so day>12 (e.g. 14/08) is unparseable (Invalid Date, same silent
+// drop as above) and day<=12 (e.g. 04/08, meant as 4 August) is silently
+// misread as April 8th — wrong month, no error. Parse D/M/Y explicitly
+// before falling back to the platform parser.
+function parseShiftDate(s,year){
+  const dmy=s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if(dmy)return new Date(+dmy[3],+dmy[2]-1,+dmy[1]);
+  return /\d{4}/.test(s)?new Date(s):new Date(s+' '+year);
+}
 function rShifts(){
   const el=document.getElementById('shift-list');if(!el)return;
   if(!st.shifts.length){el.innerHTML=emptyState('💼','No shifts logged yet','Add your first shift above');document.getElementById('shift-totals').innerHTML='';return;}
