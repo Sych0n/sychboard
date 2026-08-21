@@ -1564,13 +1564,13 @@ function executeActions(actions){
       const h=st.habits.find(x=>x.label.toLowerCase().includes(a.val));
       if(h){h.done=true;changed=true;if(!wasAllDone&&st.habits.every(x=>x.done))fireConfetti();}
     }
-    else if(a.type==='add_shift'&&a.hours>0){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:(a.wage!=null&&a.wage>=0)?a.wage:st.defaultWage});changed=true;}
+    else if(a.type==='add_shift'&&a.hours>0&&a.date){st.shifts.unshift({date:sanitizeText(a.date,50),hours:a.hours,wage:(a.wage!=null&&a.wage>=0)?a.wage:st.defaultWage});changed=true;}
     else if(a.type==='add_trip'&&a.dest){st.trips.push({dest:sanitizeText(a.dest,100),date:sanitizeText(a.date,20),budget:a.budget,done:false});changed=true;}
     else if(a.type==='set_focus'){st.todayFocus=a.val;changed=true;}
     else if(a.type==='log_sleep'){const today=computeLocalAppDate(_rolloverHour);const existing=st.sleep?.logs?.findIndex(l=>l.date===today)??-1;const entry={date:today,bed:a.bed,wake:a.wake,note:'via AI'};if(existing>=0)st.sleep.logs[existing]=entry;else st.sleep.logs.push(entry);changed=true;}
     else if(a.type==='complete_goal'&&a.val){const g=st.goals.find(x=>!x.done&&x.text.toLowerCase().includes(a.val));if(g){g.done=true;changed=true;}}
     else if(a.type==='delete_todo'&&a.val){const before=st.genTodos.length;st.genTodos=st.genTodos.filter(t=>!t.text.toLowerCase().includes(a.val));if(st.genTodos.length!==before)changed=true;}
-    else if(a.type==='add_subscription'&&a.amount>0){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
+    else if(a.type==='add_subscription'&&a.amount>0&&a.name){if(!st.subscriptions)st.subscriptions=[];st.subscriptions.push({name:sanitizeText(a.name,50),amount:a.amount,date:a.day});changed=true;}
     else if(a.type==='remove_habit'&&a.val){const before=st.habits.length;st.habits=st.habits.filter(h=>!h.label.toLowerCase().includes(a.val));if(st.habits.length!==before)changed=true;}
     else if(a.type==='set_yt_channel'){st.yt.channelName=a.val;changed=true;}
     else if(a.type==='add_event'&&a.name){
