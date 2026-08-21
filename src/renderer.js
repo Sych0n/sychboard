@@ -1882,7 +1882,7 @@ function renderT212Holdings(){
       const col=(p.ppl||0)>=0?'var(--green)':'var(--red)';
       const qty=p.quantity%1===0?p.quantity:p.quantity.toFixed(4);
       return`<div class="t212-pos">
-        <div class="t212-sym">${sym}</div>
+        <div class="t212-sym">${escAttr(sym)}</div>
         <div class="t212-qty">${qty} shares<br>${fmt(p.averagePrice||0)} avg → ${fmt(p.currentPrice||0)}</div>
         <div class="t212-right">
           <div class="t212-val">${fmt(val)}</div>
