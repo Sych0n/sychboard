@@ -1989,8 +1989,18 @@ function rShifts(){
   if(!st.shifts.length){el.innerHTML=emptyState('💼','No shifts logged yet','Add your first shift above');document.getElementById('shift-totals').innerHTML='';return;}
   el.innerHTML=st.shifts.map((s,i)=>`<div class="shi"><span style="font-weight:600">${s.date}</span><span style="color:var(--text2)">${s.hours}h @ ${fmt(s.wage)}/hr</span><span style="color:var(--green);font-weight:700">${fmt(s.hours*s.wage)}</span><button class="btn btn-sm" style="color:var(--red);border-color:var(--red);background:var(--red-light)" onclick="rmShift(${i})">✕</button></div>`).join('');
   const all=st.shifts.reduce((a,s)=>a+s.hours*s.wage,0);
-  const now=new Date();const ms=new Date(now.getFullYear(),now.getMonth(),1);const me=new Date(now.getFullYear(),now.getMonth()+1,1);
-  const mon=st.shifts.filter(s=>{const sd=parseShiftDate(s.date,now.getFullYear());return sd>=ms&&sd<me;}).reduce((a,s)=>a+s.hours*s.wage,0);
+  // "This month" must agree with the app-date (rollover-hour-aware) the rest of the
+  // dashboard uses for "today", not the raw wall clock — otherwise a shift logged
+  // for a late-night/early-morning session between midnight and the rollover hour
+  // (default 4am), dated with the app-date the rest of the UI still calls "today"
+  // (e.g. "31 Aug" typed just after midnight on Sep 1st), silently drops out of
+  // "This month" the instant the wall clock ticks into the new calendar month,
+  // even though Habits/Quests/Journal/Sleep/Schedule all still agree it's the
+  // previous app-day. Same failure shape as every other app-date/real-date
+  // migration already fixed elsewhere (see computeLocalAppDate/appWeekdayIndex).
+  const[apY,apM]=computeLocalAppDate(_rolloverHour).split('-').map(Number);
+  const ms=new Date(apY,apM-1,1);const me=new Date(apY,apM,1);
+  const mon=st.shifts.filter(s=>{const sd=parseShiftDate(s.date,apY);return sd>=ms&&sd<me;}).reduce((a,s)=>a+s.hours*s.wage,0);
   document.getElementById('shift-totals').innerHTML=`<div class="metric"><div class="ml">All time</div><div class="mv">${fmt(all)}</div></div><div class="metric"><div class="ml">This month</div><div class="mv green">${fmt(mon)}</div></div>`;
 }
 function addShift(){
