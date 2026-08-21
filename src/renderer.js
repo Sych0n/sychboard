@@ -1399,13 +1399,25 @@ Pending daily quests today: ${pending.join(', ')||'all done!'}
       }
     }
   }catch(e){}
+  // The subscription "DUE IN Nd" calc below (inside the template) anchors its
+  // "today" reference to the rollover-hour-aware app-date (apY/apM/apD, from
+  // computeLocalAppDate() above) rather than the real wall-clock `now` — same
+  // app-date-vs-real-date class already migrated at ~10 other call sites
+  // (Habits/Journal/Sleep/Schedule/Home Upcoming/YT weekly checklist/shifts
+  // month total/this function's own weekday name+index), but missed here.
+  // Between local midnight and the rollover hour (default 4am), `now`'s
+  // calendar day is already a day ahead of the app's actual "today", so every
+  // subscription's days-until-due was understated by 1 during that window —
+  // e.g. a bill due "tomorrow" per the app-date the rest of the dashboard
+  // still shows could get flagged "DUE IN 0d" a day early, contradicting the
+  // very Habits/Journal/Schedule cards shown alongside the AI's own reply.
   const sys=`You are SychBoard AI — a personal life assistant for ${st.userName}. Below is their real personal data (finances, habits, goals, schedule, etc.) — reference it proactively in conversation, e.g. noticing patterns unprompted. Be concise, warm, and specific. Under 120 words unless asked for detail. Stay in character as their assistant at all times — if asked how you're doing/feeling, answer warmly and personally (e.g. reference their day or data), never with a generic disclaimer about being an AI/language model/not having feelings; that reads as cold and robotic, the opposite of this assistant's purpose. NOTE: if you're also given LIVE TOOLS further below, those follow separate, stricter rules — "use data proactively" here refers only to the data in this block, never to calling a tool.
 
 === FINANCES ===
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
 ${t212Context()}
 Upcoming shifts: ${st.shifts.slice(0,3).map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
-Subscriptions: ${(st.subscriptions||[]).map(s=>{const d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(now.getFullYear(),now.getMonth(),clampDayOfMonth(now.getFullYear(),now.getMonth(),s.date));if(due<d0){const y=now.getFullYear(),m=now.getMonth()+1;due=new Date(y,m,clampDayOfMonth(y,m,s.date));}const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
+Subscriptions: ${(st.subscriptions||[]).map(s=>{const apMz=apM-1;const d0=new Date(apY,apMz,apD);let due=new Date(apY,apMz,clampDayOfMonth(apY,apMz,s.date));if(due<d0){const y=apY,m=apMz+1;due=new Date(y,m,clampDayOfMonth(y,m,s.date));}const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
 Holidays: ${st.holidays.map(h=>`${h.name} (saved £${h.saved}/${h.target})`).join(', ')}
 
 === YOUTUBE ===
