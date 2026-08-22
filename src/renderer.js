@@ -1554,7 +1554,8 @@ function parseActions(text){
     .replace(/\[ADD_SUBSCRIPTION:([^:]+):([^:]+):([^\]]+)\]/gi,(_,name,amount,day)=>{actions.push({type:'add_subscription',name:name.trim(),amount:Math.min(Math.max(parseFloat(amount)||0,0),99999),day:Math.min(Math.max(parseInt(day)||1,1),31)});return'';})
     .replace(/\[REMOVE_HABIT:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'remove_habit',val:v.trim().toLowerCase()});return'';})
     .replace(/\[SET_YT_CHANNEL:([^\]]+)\]/gi,(_,v)=>{actions.push({type:'set_yt_channel',val:v.trim()});return'';})
-    .replace(/\[ADD_EVENT:([^:]+):([^:]+):?([^\]]*)\]/gi,(_,d,n,t)=>{actions.push({type:'add_event',day:d.trim(),name:n.trim(),etype:(t||'').trim().toLowerCase()});return'';})
+    // name captured lazily up to an optional recognized ":type" suffix, not the next colon — event names routinely contain one (e.g. "3:30pm"), and [^:]+ was truncating them into the type field
+    .replace(/\[ADD_EVENT:([^:]+):(.+?)(?::(uni|work|stream|other))?\]/gi,(_,d,n,t)=>{actions.push({type:'add_event',day:d.trim(),name:n.replace(/:$/,'').trim(),etype:(t||'').trim().toLowerCase()});return'';})
     .replace(/\[REMOVE_EVENT:([^:]+):([^\]]+)\]/gi,(_,d,n)=>{actions.push({type:'remove_event',day:d.trim(),name:n.trim().toLowerCase()});return'';})
     .replace(/\s{2,}/g,' ').trim();
   if(actions.length)console.log('[actions] parsed:',actions);
