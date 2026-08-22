@@ -1381,6 +1381,21 @@ async function callGroq(messages){
   const timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   const[apY,apM,apD]=computeLocalAppDate(_rolloverHour).split('-').map(Number);
   const weekdayLong=new Date(apY,apM-1,apD).toLocaleDateString('en-GB',{weekday:'long'});
+  // st.shifts is stored newest-added-first (unshift, see addShift/executeActions'
+  // add_shift branch) — a plain slice(0,3) here just grabs the 3 most RECENTLY
+  // LOGGED entries, which is not the same thing as the 3 soonest-by-date shifts
+  // this line claims to be ("Upcoming shifts"). A shift logged after the fact for
+  // a day that's already passed (e.g. catching up on payroll records) sits at
+  // index 0 and can push a genuinely upcoming shift entirely out of the top 3,
+  // or get described to the AI as "upcoming" when it's actually in the past.
+  // Filter to real future-or-today shifts (by the same app-date-aware parsing
+  // rShifts()'s month filter already uses) and sort by date so this line matches
+  // what it claims.
+  const todayMidnight=new Date(apY,apM-1,apD);
+  const upcomingShifts=st.shifts
+    .filter(s=>parseShiftDate(s.date,apY)>=todayMidnight)
+    .sort((a,b)=>parseShiftDate(a.date,apY)-parseShiftDate(b.date,apY))
+    .slice(0,3);
   const todayEvs=(evs[ai]||[]).map(e=>e.t).join(', ')||'nothing scheduled';
   const dayLabels=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const weekSched=evs.map((d,i)=>`${dayLabels[i]}${i===ai?' (TODAY)':''}: ${(d||[]).map(e=>e.t).join(', ')||'free'}`).join('\n');
@@ -1416,7 +1431,7 @@ Pending daily quests today: ${pending.join(', ')||'all done!'}
 === FINANCES ===
 Bank: £${st.balances.bank} | Savings: £${st.balances.savings} | Trading/Other: £${st.balances.trading} | Total wealth: £${wealth.toFixed(2)}
 ${t212Context()}
-Upcoming shifts: ${st.shifts.slice(0,3).map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
+Upcoming shifts: ${upcomingShifts.map(s=>`${s.date} ${s.hours}h @£${s.wage}`).join(', ')||'none logged'}
 Subscriptions: ${(st.subscriptions||[]).map(s=>{const apMz=apM-1;const d0=new Date(apY,apMz,apD);let due=new Date(apY,apMz,clampDayOfMonth(apY,apMz,s.date));if(due<d0){const y=apY,m=apMz+1;due=new Date(y,m,clampDayOfMonth(y,m,s.date));}const d=Math.round((due-d0)/864e5);return`${s.name} (£${s.amount}/mo, due day ${s.date}${d<=3?` — DUE IN ${d}d`:''})`;}).join(', ')||'none'}
 Holidays: ${st.holidays.map(h=>`${h.name} (saved £${h.saved}/${h.target})`).join(', ')}
 
