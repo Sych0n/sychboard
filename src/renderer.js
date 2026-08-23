@@ -662,12 +662,20 @@ function drawSparkline(canvasId,points,color='#e8eaf0'){
   ctx.fillStyle=grad;ctx.fill();
 }
 
-let _xpToastTimer=null;
+let _xpToastTimer=null;let _xpToastQueue=[];let _xpToastShowing=false;
 function showXpToast(text){
+  _xpToastQueue.push(text);
+  if(!_xpToastShowing)_showNextXpToast();
+}
+function _showNextXpToast(){
+  if(!_xpToastQueue.length){_xpToastShowing=false;return;}
+  _xpToastShowing=true;
+  const text=_xpToastQueue.shift();
   let el=document.getElementById('xp-toast');
   if(!el){el=document.createElement('div');el.id='xp-toast';el.className='xp-toast';document.body.appendChild(el);}
   el.textContent=text;el.classList.add('show');
-  clearTimeout(_xpToastTimer);_xpToastTimer=setTimeout(()=>el.classList.remove('show'),2200);
+  clearTimeout(_xpToastTimer);
+  _xpToastTimer=setTimeout(()=>{el.classList.remove('show');setTimeout(_showNextXpToast,150);},2200);
 }
 
 function showLevelToast(level,rank){
