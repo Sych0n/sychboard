@@ -678,13 +678,22 @@ function _showNextXpToast(){
   _xpToastTimer=setTimeout(()=>{el.classList.remove('show');setTimeout(_showNextXpToast,150);},2200);
 }
 
+let _levelToastTimer=null;let _levelToastQueue=[];let _levelToastShowing=false;
 function showLevelToast(level,rank){
+  _levelToastQueue.push({level,rank});
+  if(!_levelToastShowing)_showNextLevelToast();
+}
+function _showNextLevelToast(){
+  if(!_levelToastQueue.length){_levelToastShowing=false;return;}
+  _levelToastShowing=true;
+  const {level,rank}=_levelToastQueue.shift();
   let el=document.getElementById('level-toast');
   if(!el){el=document.createElement('div');el.id='level-toast';el.className='level-toast';el.innerHTML=`<div class="level-toast-icon">⚡</div><div class="level-toast-title" id="lt-title"></div><div class="level-toast-sub" id="lt-sub"></div>`;document.body.appendChild(el);}
   document.getElementById('lt-title').textContent=`Level ${level}!`;
   document.getElementById('lt-sub').textContent=`You've reached ${rank}`;
   el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'),3000);
+  clearTimeout(_levelToastTimer);
+  _levelToastTimer=setTimeout(()=>{el.classList.remove('show');setTimeout(_showNextLevelToast,150);},3000);
 }
 
 // Guards against a rapid re-click firing a second complete/uncomplete call for
