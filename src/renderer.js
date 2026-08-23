@@ -2407,7 +2407,8 @@ function rJournal(){
   const jx=document.getElementById('journal-text');if(jx)jx.value=st.journals[today]||'';
   const past=Object.entries(st.journals).filter(([k])=>k!==today).reverse().slice(0,7);
   const pj=document.getElementById('past-journals');
-  if(pj)pj.innerHTML=past.length?past.map(([date,text])=>`<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">${date}</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${parseMD(text)}</div></div>`).join(''):emptyState('📓','No past entries yet','Your reflections will appear here');
+  // date is an object key, not text parseMD() covers — imported backups skip key sanitization, so escape here
+  if(pj)pj.innerHTML=past.length?past.map(([date,text])=>`<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">${escAttr(date)}</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${parseMD(text)}</div></div>`).join(''):emptyState('📓','No past entries yet','Your reflections will appear here');
 }
 async function generateJournalPrompt(){
   if(!getGroqKey()){toast('Add your Groq API key in Settings first!');return;}
