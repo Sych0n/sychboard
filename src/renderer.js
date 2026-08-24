@@ -1717,22 +1717,27 @@ function rAI(){
     chips.innerHTML=prompts.map(s=>`<div class="prompt-item" data-prompt="${s.replace(/"/g,'&quot;')}" onclick="const i=document.getElementById('chat-in');i.value=this.dataset.prompt;i.focus()">${s}</div>`).join('');
   }
 }
+let _chatSending=false;
 async function sendChat(){
+  if(_chatSending)return;
   const inp=document.getElementById('chat-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
   if(!(getGroqKey())){addMsg('assistant','Please add your Groq API key in the Settings page to enable AI features.');return;}
-  addMsg('user',msg);
-  const msgs=document.getElementById('chat-msgs');
-  const t=document.createElement('div');t.className='ai-msg ai';t.id='chat-typing';
-  t.innerHTML='<div class="ai-bubble typing"><span></span><span></span><span></span></div>';
-  msgs.appendChild(t);msgs.scrollTop=99999;
-  const hist=st.chatHistory.slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',content:m.content}));
-  const r=await callGroq(hist);
-  document.getElementById('chat-typing')?.remove();
-  const{clean:r1,sectionId}=parseNav(r||'Sorry, could not get a response.');
-  const{clean:reply,actions}=parseActions(r1);
-  executeActions(actions);
-  addMsg('assistant',reply);
-  if(sectionId)setTimeout(()=>goPage(sectionId),400);
+  _chatSending=true;
+  try{
+    addMsg('user',msg);
+    const msgs=document.getElementById('chat-msgs');
+    const t=document.createElement('div');t.className='ai-msg ai';
+    t.innerHTML='<div class="ai-bubble typing"><span></span><span></span><span></span></div>';
+    msgs.appendChild(t);msgs.scrollTop=99999;
+    const hist=st.chatHistory.slice(-40).map(m=>({role:m.role==='user'?'user':'assistant',content:m.content}));
+    const r=await callGroq(hist);
+    t.remove();
+    const{clean:r1,sectionId}=parseNav(r||'Sorry, could not get a response.');
+    const{clean:reply,actions}=parseActions(r1);
+    executeActions(actions);
+    addMsg('assistant',reply);
+    if(sectionId)setTimeout(()=>goPage(sectionId),400);
+  }finally{_chatSending=false;}
 }
 function addMsg(role,content){
   st.chatHistory.push({role,content,ts:Date.now()});save();
