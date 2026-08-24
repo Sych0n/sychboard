@@ -2841,7 +2841,7 @@ if(window.electronAPI?.onUpdateAvailable){
   window.electronAPI.onUpdateAvailable(version=>{
     const b=document.getElementById('update-banner');
     if(!b)return;
-    b.innerHTML=`<div class="ub-text"><strong>Update available</strong>v${version} is downloading...</div><div class="ub-actions"><button class="btn btn-sm" onclick="document.getElementById('update-banner').classList.remove('show')">✕</button></div>`;
+    b.innerHTML=`<div class="ub-text"><strong>Update available</strong>v${sanitizeText(String(version),40)} is downloading...</div><div class="ub-actions"><button class="btn btn-sm" onclick="document.getElementById('update-banner').classList.remove('show')">✕</button></div>`;
     b.classList.add('show');
   });
 }
