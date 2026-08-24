@@ -152,9 +152,17 @@ function sanitizeText(str,maxLen=500){
   s=s.replace(/&/g,'&amp;').replace(/[<>\"']/g,c=>({'<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]||c));
   return s;
 }
+const SANITIZE_ENTITY_DECODE={'&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"',"&#39;":"'"};
+function decodeSanitizedEntities(s){
+  // Backup values are already sanitizeText()-escaped at their write site; decode that one
+  // layer before re-escaping so restore doesn't compound entities (&amp; -> &amp;amp; -> ...)
+  // on every export/restore cycle. sanitizeText() re-escapes whatever this produces, so a
+  // malicious payload smuggled in as pre-escaped text still ends up neutralized.
+  return s.replace(/&amp;|&lt;|&gt;|&quot;|&#39;/g,e=>SANITIZE_ENTITY_DECODE[e]);
+}
 function sanitizeImportedValue(v,depth=0){
   if(depth>10)return null;
-  if(typeof v==='string')return sanitizeText(v,10000);
+  if(typeof v==='string')return sanitizeText(decodeSanitizedEntities(v),10000);
   if(Array.isArray(v))return v.map(x=>sanitizeImportedValue(x,depth+1));
   if(v&&typeof v==='object'){
     const out={};
