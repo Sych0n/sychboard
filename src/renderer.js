@@ -1671,18 +1671,23 @@ async function loadAISug(){
   const cleaned = parseActions(parseNav(r).clean).clean;
   if(el)el.textContent=cleaned;
 }
+let _homeAISending=false;
 async function homeAI(){
+  if(_homeAISending)return;
   const inp=document.getElementById('ai-in');const msg=inp.value.trim();if(!msg)return;inp.value='';
   const el=document.getElementById('ai-sug');if(!el)return;
   if(!(getGroqKey())){el.textContent='AI features require a Groq API key (add it in Settings).';return;}
-  el.textContent='Thinking...';
-  const r=await callGroq([{role:'user',content:msg}]);
-  if(!r){if(el)el.textContent='Could not get a response.';return;}
-  const {clean: r1, sectionId} = parseNav(r);
-  const {clean, actions} = parseActions(r1);
-  executeActions(actions);
-  if(el){el.textContent=clean;el.style.display=clean?'':'none';}
-  if(sectionId&&actions.length===0)setTimeout(()=>goPage(sectionId),400);
+  _homeAISending=true;
+  try{
+    el.textContent='Thinking...';
+    const r=await callGroq([{role:'user',content:msg}]);
+    if(!r){if(el)el.textContent='Could not get a response.';return;}
+    const {clean: r1, sectionId} = parseNav(r);
+    const {clean, actions} = parseActions(r1);
+    executeActions(actions);
+    if(el){el.textContent=clean;el.style.display=clean?'':'none';}
+    if(sectionId&&actions.length===0)setTimeout(()=>goPage(sectionId),400);
+  }finally{_homeAISending=false;}
 }
 function fmtTs(ts){
   if(!ts)return'';
