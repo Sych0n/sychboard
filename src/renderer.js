@@ -427,44 +427,49 @@ function addBootMsg(role,text){
   return null;
 }
 
+let _bootSending=false;
 async function bootSend(){
+  if(_bootSending)return;
   const inp=document.getElementById('boot-chat-in');if(!inp)return;
   const msg=inp.value.trim();if(!msg)return;inp.value='';
-  bootChatHistory.push({role:'user',content:msg});
+  _bootSending=true;
+  try{
+    bootChatHistory.push({role:'user',content:msg});
 
-  // Show user message dimmed while waiting. Built via textContent (not
-  // innerHTML with the raw string interpolated) — same escaping guarantee
-  // showBootResponse() already uses for the AI's reply, since this is the
-  // user's own typed text and the boot chat is the very first input surface
-  // in the app.
-  const respEl=document.getElementById('boot-response');
-  if(respEl){
-    respEl.innerHTML='';
-    const span=document.createElement('span');
-    span.className='boot-word';
-    span.style.opacity='0.45';
-    span.style.fontStyle='italic';
-    span.textContent=msg;
-    respEl.appendChild(span);
-  }
+    // Show user message dimmed while waiting. Built via textContent (not
+    // innerHTML with the raw string interpolated) — same escaping guarantee
+    // showBootResponse() already uses for the AI's reply, since this is the
+    // user's own typed text and the boot chat is the very first input surface
+    // in the app.
+    const respEl=document.getElementById('boot-response');
+    if(respEl){
+      respEl.innerHTML='';
+      const span=document.createElement('span');
+      span.className='boot-word';
+      span.style.opacity='0.45';
+      span.style.fontStyle='italic';
+      span.textContent=msg;
+      respEl.appendChild(span);
+    }
 
-  if(window._bootOrb){window._bootOrb.mode='thinking';window._bootOrb.pulseSpeed=0.05;}
+    if(window._bootOrb){window._bootOrb.mode='thinking';window._bootOrb.pulseSpeed=0.05;}
 
-  const key=getGroqKey();
-  if(!key){
+    const key=getGroqKey();
+    if(!key){
+      if(window._bootOrb){window._bootOrb.mode='idle';window._bootOrb.pulseSpeed=0.011;}
+      showBootResponse('No AI key configured — add one in Settings.',null);
+      return;
+    }
+
+    const r=await callGroq(bootChatHistory);
     if(window._bootOrb){window._bootOrb.mode='idle';window._bootOrb.pulseSpeed=0.011;}
-    showBootResponse('No AI key configured — add one in Settings.',null);
-    return;
-  }
 
-  const r=await callGroq(bootChatHistory);
-  if(window._bootOrb){window._bootOrb.mode='idle';window._bootOrb.pulseSpeed=0.011;}
-
-  const{clean:r1,sectionId}=parseNav(r||'Ready when you are.');
-  const{clean,actions}=parseActions(r1);
-  executeActions(actions);
-  bootChatHistory.push({role:'assistant',content:clean});
-  showBootResponse(clean,sectionId?()=>setTimeout(()=>enterAppAndGo(sectionId),600):null);
+    const{clean:r1,sectionId}=parseNav(r||'Ready when you are.');
+    const{clean,actions}=parseActions(r1);
+    executeActions(actions);
+    bootChatHistory.push({role:'assistant',content:clean});
+    showBootResponse(clean,sectionId?()=>setTimeout(()=>enterAppAndGo(sectionId),600):null);
+  }finally{_bootSending=false;}
 }
 
 function enterAppAndGo(sectionId){enterApp();setTimeout(()=>goPage(sectionId),150);}
