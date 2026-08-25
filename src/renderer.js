@@ -97,6 +97,31 @@ function load(){
   }
   const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate','dayRolloverHour'];
   keys.forEach(k=>{const v=S.get(k);if(v!=null)st[k]=v});
+  // Section ids are embedded raw into inline onclick JS-string attributes (goPage(),
+  // openRename(), togVis(), dragStart()/dropSec(), promptDelSec(), and rCustom()'s
+  // cs-todo/tracker handlers) — sanitizeText()/sanitizeImportedValue() HTML-escape
+  // string values on backup restore, which stops an HTML-attribute breakout but not
+  // a JS-string breakout after the browser decodes the entities back to raw quotes.
+  // A restored backup with a crafted sb4_sections[].id could otherwise inject script
+  // that runs the moment the sidebar/Home tile/Manage list renders. Reject anything
+  // that isn't a plain alnum/underscore token (every id this app itself ever
+  // generates already is) and regenerate a safe one, carrying customSecs along.
+  if(Array.isArray(st.sections)){
+    const safeId=id=>typeof id==='string'&&/^[a-zA-Z0-9_]+$/.test(id);
+    let sectionIdsFixed=false;
+    st.sections.forEach((s,i)=>{
+      if(!safeId(s.id)){
+        const newId='cs_'+Date.now()+'_'+i;
+        if(st.customSecs&&Object.prototype.hasOwnProperty.call(st.customSecs,s.id)){
+          st.customSecs[newId]=st.customSecs[s.id];
+          delete st.customSecs[s.id];
+        }
+        s.id=newId;
+        sectionIdsFixed=true;
+      }
+    });
+    if(sectionIdsFixed)save();
+  }
   if(!st.apiKeys)st.apiKeys={groq:st.groqKey||'',t212:'',ytApi:'',ytClientId:'',ytClientSecret:'',ytRefreshToken:'',ytChannelId:''};
   if(!st.habitHistory)st.habitHistory={};
   if(!st.subscriptions)st.subscriptions=[];
