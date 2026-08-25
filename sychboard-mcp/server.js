@@ -38,9 +38,22 @@ const COMMIT_DIALOG_PS1 = path.join(
   "commit-dialog.ps1",
 );
 
-const permissions = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "permissions.json"), "utf8"),
-);
+// permissions.json is documented (README) as a file a user may hand-edit to
+// change tool gating; a syntax mistake there previously crashed this whole
+// process with a raw JSON.parse stack trace on stderr — indistinguishable
+// from an internal bug — instead of pointing at the actual cause. The parent
+// process (mcp-client.js) already handles a failed/missing server the same
+// way either way (child exits, teardown() rejects pending calls), so this
+// only improves the diagnosis, not the failure mode itself.
+let permissions;
+try {
+  permissions = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "permissions.json"), "utf8"),
+  );
+} catch (err) {
+  console.error(`[mcp-server] failed to load permissions.json: ${err.message}`);
+  process.exit(1);
+}
 
 const CHUCKBIRD_SSH_HOST = process.env.CHUCKBIRD_SSH_HOST || "opc@152.67.159.196";
 const CHUCKBIRD_SERVICE = "chuckbird.service";
