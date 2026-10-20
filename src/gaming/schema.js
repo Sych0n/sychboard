@@ -59,6 +59,26 @@ const migrations = [
       spike_threshold_ms REAL NOT NULL,
       frametimes TEXT NOT NULL      -- JSON array of ms, 2 dp
     );
+  `},
+  { version: 11, sql: `
+    -- "Gaming" quest category. Kept to 2 dailies on purpose: a category's sweep bonus
+    -- needs ALL its dailies done, and gaming isn't a daily thing for everyone.
+    INSERT OR IGNORE INTO categories VALUES (5,'gaming','Gaming','#22d3ee','🎯');
+    INSERT OR IGNORE INTO streaks (category_id) VALUES (5);
+    INSERT OR IGNORE INTO quests (category_id,key,name,tier,base_xp,frequency,repeatable,sort_order) VALUES
+      (5,'g_aim_warmup','Aim trainer warm-up (10+ min)','easy',10,'daily',1,1),
+      (5,'g_review','Review your last session (notes, one thing to fix)','easy',10,'daily',1,2),
+      (5,'g_sessions_4x','Log 4+ gaming sessions this week','medium',25,'weekly',1,3),
+      (5,'g_capture_test','Test one setting change with a PresentMon capture','medium',25,'weekly',1,4),
+      (5,'g_aim_pb','Beat an aim-trainer personal best','hard',50,'weekly',1,5),
+      (5,'g_peak_rank','Reach a new peak rank','epic',150,'epic',0,6),
+      (5,'g_stutter_checklist','Work through the whole stutter checklist','epic',100,'epic',0,7);
+    INSERT OR IGNORE INTO badges (key,name,description,icon,category_id) VALUES
+      ('spark_gaming','3-Day Spark','3-day Gaming streak','🌟',5),
+      ('week_gaming','Week Warrior','7-day Gaming streak','🔥',5),
+      ('fortnight_gaming','Fortnight Flame','14-day Gaming streak','⚡',5),
+      ('monthly_gaming','Monthly Master','30-day Gaming streak','🏆',5),
+      ('centurion_gaming','Centurion','100-day Gaming streak','👑',5);
   `}
 ]
 

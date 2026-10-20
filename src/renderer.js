@@ -43,7 +43,7 @@ const DEFAULT_SCHED_EVENTS=[
 ];
 function evClass(c){return{uni:'eu',work:'ew',stream:'es'}[c]||'';}
 
-const QCAT_COLORS={health:'var(--cat-health)',productivity:'var(--cat-productivity)',creativity:'var(--cat-creativity)',finance:'var(--cat-finance)'};
+const QCAT_COLORS={health:'var(--cat-health)',productivity:'var(--cat-productivity)',creativity:'var(--cat-creativity)',finance:'var(--cat-finance)',gaming:'var(--cat-gaming)'};
 
 const CORE_SECTIONS=[
   {id:'finance',label:'Finance',icon:'💰',core:true,visible:true},
@@ -959,7 +959,7 @@ function renderHomeGamification(){
     (quests||[]).filter(q=>q.frequency!=='epic').forEach(q=>{
       (byCat[q.category_key]=byCat[q.category_key]||{name:q.category_name,qs:[]}).qs.push(q);
     });
-    const catOrder=['health','productivity','creativity','finance'];
+    const catOrder=['health','productivity','creativity','finance','gaming'];
     Object.values(byCat).forEach(c=>c.qs.sort((a,b)=>(a.frequency==='daily'?0:1)-(b.frequency==='daily'?0:1)));
     const orderedKeys=[...catOrder.filter(k=>byCat[k]),...Object.keys(byCat).filter(k=>!catOrder.includes(k))];
     let questHtml=orderedKeys.map(k=>catGroup(k,byCat[k].name,byCat[k].qs)).join('');

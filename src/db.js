@@ -305,6 +305,8 @@ function migrate() {
   ]
 
   migrations.push(...require('./gaming/schema').migrations)
+  // Two lists feed this array; a clashing version would silently skip one migration.
+  if (new Set(migrations.map(m => m.version)).size !== migrations.length) throw new Error('Duplicate migration version (db.js vs gaming/schema.js)')
 
   const newlyApplied = []
   for (const m of migrations) {
@@ -394,7 +396,7 @@ function completeQuest(questId) {
   const profile = _db.prepare('SELECT * FROM profile WHERE id = 1').get()
   const oldXp = profile?.total_xp ?? 0
 
-  const catKey = { 1:'health', 2:'productivity', 3:'creativity', 4:'finance' }[quest.category_id] ?? 'health'
+  const catKey = _db.prepare('SELECT key FROM categories WHERE id=?').get(quest.category_id)?.key ?? 'health'
 
   const doComplete = _db.transaction(() => {
     _db.prepare(`INSERT INTO quest_completions (quest_id,app_date,xp_awarded,streak_bonus_pct) VALUES (?,?,?,?)`)
@@ -924,6 +926,10 @@ function importGameData(data) {
       insStreak.run(s.category_id, Math.max(0, Math.round(Number(s.current_streak) || 0)), Math.max(0, Math.round(Number(s.longest_streak) || 0)),
         typeof s.last_completion_date === 'string' ? s.last_completion_date : null, Math.min(3, Math.max(0, Math.round(Number(s.freeze_tokens) || 0))))
     }
+
+    // A backup made before a category existed has no streak row for it; every
+    // category needs one for getStreaks() (which JOINs on it) to list it.
+    _db.prepare('INSERT OR IGNORE INTO streaks (category_id) SELECT id FROM categories').run()
 
     const insCompletion = _db.prepare('INSERT OR IGNORE INTO quest_completions (quest_id,app_date,completed_at,xp_awarded,streak_bonus_pct,notes,freeze_used,milestone_token_granted,pre_streak) VALUES (?,?,?,?,?,?,?,?,?)')
     for (const c of quest_completions) {
