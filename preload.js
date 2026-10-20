@@ -31,6 +31,13 @@ contextBridge.exposeInMainWorld('sychboard', {
     listTools: () => ipcRenderer.invoke('mcp:list-tools'),
     callTool: (name, args, approved) => ipcRenderer.invoke('mcp:call-tool', name, args, approved)
   },
+  gaming: {
+    sens: {
+      list: () => ipcRenderer.invoke('gaming:sens:list'),
+      save: (profile) => ipcRenderer.invoke('gaming:sens:save', profile),
+      remove: (id) => ipcRenderer.invoke('gaming:sens:delete', id)
+    }
+  },
   data: {
     exportGame: () => ipcRenderer.invoke('data:export-game'),
     importGame: (data) => ipcRenderer.invoke('data:import-game', data),

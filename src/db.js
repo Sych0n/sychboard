@@ -299,6 +299,8 @@ function migrate() {
     `}
   ]
 
+  migrations.push(...require('./gaming/schema').migrations)
+
   const newlyApplied = []
   for (const m of migrations) {
     if (!applied.has(m.version)) {
@@ -968,4 +970,6 @@ function clearGameData() {
   }
 }
 
-module.exports = { initDB, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, equipItem, getXpHistory, exportGameData, importGameData, clearGameData }
+function getDb() { return _db }
+
+module.exports = { initDB, getDb, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, equipItem, getXpHistory, exportGameData, importGameData, clearGameData }

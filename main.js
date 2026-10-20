@@ -404,6 +404,8 @@ if (gotSingleInstanceLock) {
   })
 }
 
+require('./src/gaming/ipc').registerGamingIpc(ipcMain, () => db.getDb())
+
 // ── Gamification IPC ──
 // Input validation helpers — IPC args come from the renderer and must not
 // reach better-sqlite3 with the wrong type (it throws on undefined/NaN/objects
