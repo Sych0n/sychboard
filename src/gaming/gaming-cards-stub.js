@@ -1,0 +1,10 @@
+// Phase 1a placeholders. Each card is replaced by its real implementation in its
+// own file as the sub-phases land; a later registerCard() with the same id wins.
+(function () {
+  'use strict'
+  const G = window.Gaming
+  G.registerCard({ id: 'sens', title: 'Sens Converter', order: 10, render: b => G.placeholder(b, 'Sensitivity converter') })
+  G.registerCard({ id: 'health', title: 'Health Check', order: 20, render: b => G.placeholder(b, 'System health check') })
+  G.registerCard({ id: 'mouse', title: 'Mouse', order: 30, render: b => G.placeholder(b, 'Mouse tools (DPI / polling rate)') })
+  G.registerCard({ id: 'sessions', title: 'Session Tracker', order: 40, render: b => G.placeholder(b, 'Session tracker') })
+})()

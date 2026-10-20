@@ -1,5 +1,6 @@
 const CACHE = 'sychboard-v3';
-const SHELL = ['./', './manifest.json', './styles.css', './renderer.js',
+const SHELL = ['./', './manifest.json', './styles.css', './renderer.js', './gaming/gaming.css', './gaming/gaming-ui.js',
+  './gaming/gaming-cards-stub.js',
   './icons/icon-72.png', './icons/icon-96.png', './icons/icon-128.png',
   './icons/icon-144.png', './icons/icon-180.png', './icons/icon-192.png',
   './icons/icon-512.png', './icons/icon-maskable-512.png'];

@@ -624,11 +624,11 @@ function goPage(id){
   }
   setSidebarActive(id);
   setMobNav(id);
-  const titles={finance:'Finance',uni:'University',youtube:'YouTube',dev:'Dev / Side Project',schedule:'Schedule',habits:'Habits',sleep:'Sleep Tracker',fitness:'Fitness',travel:'Travel',goals:'Goals',todos:'All Todos',journal:'Journal',game:'Game',shop:'Shop',ai:'AI Assistant',manage:'Manage Sections',settings:'Settings'};
+  const titles={finance:'Finance',uni:'University',youtube:'YouTube',dev:'Dev / Side Project',schedule:'Schedule',habits:'Habits',sleep:'Sleep Tracker',fitness:'Fitness',travel:'Travel',goals:'Goals',todos:'All Todos',journal:'Journal',game:'Game',gaming:'Gaming',shop:'Shop',ai:'AI Assistant',manage:'Manage Sections',settings:'Settings'};
   const sec=st.sections.find(s=>s.id===id);
   setMainTitle(titles[id]||(sec?.label)||id);
   const s=document.getElementById('main-scroll');if(s)s.scrollTop=0;
-  const renders={finance:rFinance,uni:rUni,youtube:rYT,dev:rDev,schedule:rSchedule,habits:rHabits,sleep:rSleep,fitness:rFitness,travel:rTravel,goals:rGoals,todos:rMasterTodos,journal:rJournal,game:rGame,shop:rShop,ai:rAI,manage:rManage,settings:rSettings};
+  const renders={finance:rFinance,uni:rUni,youtube:rYT,dev:rDev,schedule:rSchedule,habits:rHabits,sleep:rSleep,fitness:rFitness,travel:rTravel,goals:rGoals,todos:rMasterTodos,journal:rJournal,game:rGame,gaming:rGaming,shop:rShop,ai:rAI,manage:rManage,settings:rSettings};
   if(renders[id])renders[id]();
   else rCustom(id);
 }
@@ -674,6 +674,7 @@ function renderSidebar(){
     secs.map(s=>`<div class="sb-item${activePage===s.id?' active':''}" id="sbi-${s.id}" onclick="goPage('${s.id}')"><span class="sb-icon">${s.icon||'📁'}</span><span>${s.label}</span></div>`).join('')+
     `<div class="sb-divider"></div>`+
     `<div class="sb-item${activePage==='game'?' active':''}" id="sbi-game" onclick="goPage('game')"><span class="sb-icon">🎮</span><span>Game</span></div>`+
+    `<div class="sb-item${activePage==='gaming'?' active':''}" id="sbi-gaming" onclick="goPage('gaming')"><span class="sb-icon">🎯</span><span>Gaming</span></div>`+
     `<div class="sb-item${activePage==='shop'?' active':''}" id="sbi-shop" onclick="goPage('shop')"><span class="sb-icon">🛍️</span><span>Shop</span></div>`+
     `<div class="sb-item${activePage==='ai'?' active':''}" id="sbi-ai" onclick="goPage('ai')"><span class="sb-icon">💬</span><span>AI Assistant</span></div>`+
     `<div class="sb-item${activePage==='settings'?' active':''}" id="sbi-settings" onclick="goPage('settings')"><span class="sb-icon">⚙</span><span>Settings</span></div>`;
