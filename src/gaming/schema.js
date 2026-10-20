@@ -13,6 +13,33 @@ const migrations = [
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+  `},
+  { version: 9, sql: `
+    CREATE TABLE IF NOT EXISTS gaming_sessions (
+      id INTEGER PRIMARY KEY,
+      date TEXT NOT NULL,            -- YYYY-MM-DD, local
+      start_time TEXT,               -- HH:MM, local
+      end_time TEXT,                 -- HH:MM, local (may be earlier than start_time: crossed midnight)
+      game TEXT NOT NULL,
+      mode TEXT,
+      result TEXT CHECK (result IN ('win','loss','draw')),
+      score REAL,
+      rank_change INTEGER,           -- e.g. RR gained/lost
+      notes TEXT,
+      smoothness INTEGER CHECK (smoothness BETWEEN 1 AND 5),
+      sens_profile_id INTEGER REFERENCES gaming_sens_profiles(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_gaming_sessions_date ON gaming_sessions(date);
+    CREATE TABLE IF NOT EXISTS gaming_aim_scores (
+      id INTEGER PRIMARY KEY,
+      date TEXT NOT NULL,
+      scenario TEXT NOT NULL,
+      score REAL NOT NULL,
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_gaming_aim_scores_date ON gaming_aim_scores(date);
   `}
 ]
 

@@ -970,6 +970,46 @@ function clearGameData() {
   }
 }
 
+// Award XP from a non-quest source (e.g. the Gaming tab). Same level / SychCoin /
+// level-badge rules as completeQuest. `dailyCap` limits how many awards of this
+// sourceType can be paid out per app-day; it counts xp_log rows, so deleting the
+// underlying record and re-logging it cannot farm XP.
+function awardXp({ amount, sourceType, sourceId = null, reason = '', dailyCap = null }) {
+  if (!Number.isInteger(amount) || amount <= 0) throw new RangeError('amount must be a positive integer')
+  const appDate = getAppDate()
+  const run = _db.transaction(() => {
+    if (dailyCap != null) {
+      const done = _db.prepare(
+        `SELECT COUNT(*) AS n FROM xp_log WHERE source_type=? AND date(occurred_at, 'localtime', ?)=?`
+      ).get(sourceType, `-${getRolloverHour()} hours`, appDate).n
+      if (done >= dailyCap) return { awarded: 0, capped: true }
+    }
+    const oldXp = _db.prepare('SELECT total_xp FROM profile WHERE id=1').get()?.total_xp ?? 0
+    const newXp = oldXp + amount
+    _db.prepare('INSERT INTO xp_log (amount,source_type,source_id,running_total,reason) VALUES (?,?,?,?,?)')
+      .run(amount, sourceType, sourceId, newXp, reason)
+    const oldLevel = levelForTotalXp(oldXp).level
+    const newLevel = levelForTotalXp(newXp).level
+    let coins = Math.max(1, Math.round(amount * 0.2))
+    for (let L = oldLevel + 1; L <= newLevel; L++) coins += L * 10
+    _db.prepare('UPDATE profile SET total_xp=?, current_level=?, sychcoins=sychcoins+? WHERE id=1').run(newXp, newLevel, coins)
+    const badgesUnlocked = []
+    if (newLevel > oldLevel) {
+      for (const [lvl, key] of [[5, 'level_5'], [10, 'level_10'], [20, 'level_20']]) {
+        if (newLevel >= lvl) {
+          const badge = _db.prepare('SELECT * FROM badges WHERE key=?').get(key)
+          if (badge && !_db.prepare('SELECT id FROM badge_unlocks WHERE badge_id=?').get(badge.id)) {
+            _db.prepare('INSERT OR IGNORE INTO badge_unlocks (badge_id) VALUES (?)').run(badge.id)
+            badgesUnlocked.push(badge)
+          }
+        }
+      }
+    }
+    return { awarded: amount, capped: false, leveledUp: newLevel > oldLevel, newLevel, newRank: rankForLevel(newLevel), coinsAwarded: coins, badgesUnlocked }
+  })
+  return run()
+}
+
 function getDb() { return _db }
 
-module.exports = { initDB, getDb, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, equipItem, getXpHistory, exportGameData, importGameData, clearGameData }
+module.exports = { initDB, getDb, awardXp, listQuests, completeQuest, uncompleteQuest, getProfile, getStreaks, listBadges, getRecentActivity, getSetting, setSetting, getCoins, purchaseItem, purchaseFreeze, equipItem, getXpHistory, exportGameData, importGameData, clearGameData }

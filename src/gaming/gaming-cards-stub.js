@@ -5,5 +5,4 @@
   const G = window.Gaming
   G.registerCard({ id: 'health', title: 'Health Check', order: 20, render: b => G.placeholder(b, 'System health check') })
   G.registerCard({ id: 'mouse', title: 'Mouse', order: 30, render: b => G.placeholder(b, 'Mouse tools (DPI / polling rate)') })
-  G.registerCard({ id: 'sessions', title: 'Session Tracker', order: 40, render: b => G.placeholder(b, 'Session tracker') })
 })()

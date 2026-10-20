@@ -51,3 +51,96 @@ test('rejects invalid profiles', () => {
   assert.throws(() => store.deleteSensProfile('1'), RangeError)
   assert.equal(store.listSensProfiles().length, 0)
 })
+
+// ── Sessions & aim scores ────────────────────────────────────────────────────
+function storeWithXp() {
+  const db = new DatabaseSync(':memory:')
+  for (const m of migrations) db.exec(m.sql)
+  const calls = []
+  const store = createStore(() => db, a => { calls.push(a); return { awarded: a.amount } })
+  return { db, store, calls }
+}
+const sess = (over = {}) => ({ date: '2026-10-20', start_time: '21:30', end_time: '23:00', game: 'Valorant', mode: 'Competitive', result: 'win', score: 18, rank_change: 21, smoothness: 4, notes: 'ok', ...over })
+
+test('add + list session, newest first, joined with sens profile name', () => {
+  const { store } = storeWithXp()
+  const p = store.saveSensProfile({ name: 'main', game: 'valorant', sens: 0.4, dpi: 800 })
+  store.addSession(sess({ date: '2026-10-19', sens_profile_id: p.id }))
+  store.addSession(sess({ date: '2026-10-20' }))
+  const list = store.listSessions()
+  assert.deepEqual(list.map(s => s.date), ['2026-10-20', '2026-10-19'])
+  assert.equal(list[1].sens_profile_name, 'main')
+  assert.equal(list[0].rank_change, 21)
+})
+
+test('optional session fields may be blank', () => {
+  const { store } = storeWithXp()
+  store.addSession({ date: '2026-10-20', game: 'CS2', start_time: '', score: '', result: '', smoothness: '' })
+  const s = store.listSessions()[0]
+  assert.equal(s.start_time, null)
+  assert.equal(s.score, null)
+  assert.equal(s.result, null)
+  assert.equal(s.smoothness, null)
+})
+
+test('session validation', () => {
+  const { store } = storeWithXp()
+  assert.throws(() => store.addSession(sess({ game: ' ' })), RangeError)
+  assert.throws(() => store.addSession(sess({ date: '20/10/2026' })), RangeError)
+  assert.throws(() => store.addSession(sess({ date: '2026-13-45' })), RangeError)
+  assert.throws(() => store.addSession(sess({ start_time: '25:00' })), RangeError)
+  assert.throws(() => store.addSession(sess({ result: 'won' })), RangeError)
+  assert.throws(() => store.addSession(sess({ smoothness: 6 })), RangeError)
+  assert.throws(() => store.addSession(sess({ smoothness: 3.5 })), RangeError)
+  assert.throws(() => store.addSession(sess({ score: 'abc' })), RangeError)
+  assert.throws(() => store.addSession(sess({ rank_change: 1.5 })), RangeError)
+  assert.throws(() => store.addSession(sess({ sens_profile_id: 999 })), RangeError)
+  assert.equal(store.listSessions().length, 0)
+})
+
+test('deleting a sens profile keeps sessions that used it', () => {
+  const { store, db } = storeWithXp()
+  db.exec('PRAGMA foreign_keys = ON')
+  const p = store.saveSensProfile({ name: 'main', game: 'valorant', sens: 0.4, dpi: 800 })
+  store.addSession(sess({ sens_profile_id: p.id }))
+  store.deleteSensProfile(p.id)
+  const s = store.listSessions()
+  assert.equal(s.length, 1)
+  assert.equal(s[0].sens_profile_id, null)
+})
+
+test('delete session', () => {
+  const { store } = storeWithXp()
+  const { id } = store.addSession(sess())
+  assert.equal(store.deleteSession(id).deleted, true)
+  assert.equal(store.listSessions().length, 0)
+})
+
+test('aim scores: add, validate, list, delete', () => {
+  const { store } = storeWithXp()
+  const { id } = store.addAimScore({ date: '2026-10-20', scenario: 'Gridshot', score: '81234.5' })
+  store.addAimScore({ date: '2026-10-21', scenario: 'Tracking', score: 77 })
+  assert.deepEqual(store.listAimScores().map(a => a.scenario), ['Tracking', 'Gridshot'])
+  assert.equal(store.listAimScores()[1].score, 81234.5)
+  assert.throws(() => store.addAimScore({ date: '2026-10-20', scenario: '', score: 1 }), RangeError)
+  assert.throws(() => store.addAimScore({ date: '2026-10-20', scenario: 'x' }), RangeError)
+  assert.throws(() => store.addAimScore({ date: 'bad', scenario: 'x', score: 1 }), RangeError)
+  assert.equal(store.deleteAimScore(id).deleted, true)
+})
+
+test('logging awards XP via the injected hook with the daily cap passed through', () => {
+  const { store, calls } = storeWithXp()
+  const s = store.addSession(sess())
+  assert.equal(s.xp.awarded, 20)
+  store.addAimScore({ date: '2026-10-20', scenario: 'Gridshot', score: 1 })
+  assert.deepEqual(calls.map(c => [c.sourceType, c.amount, c.dailyCap]), [['gaming_session', 20, 3], ['gaming_aim_score', 5, 3]])
+})
+
+test('an XP failure does not fail the save', () => {
+  const db = new DatabaseSync(':memory:')
+  for (const m of migrations) db.exec(m.sql)
+  const store = createStore(() => db, () => { throw new Error('boom') })
+  const r = store.addSession(sess())
+  assert.equal(r.xp, null)
+  assert.equal(store.listSessions().length, 1)
+})

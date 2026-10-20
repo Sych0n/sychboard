@@ -36,6 +36,16 @@ contextBridge.exposeInMainWorld('sychboard', {
       list: () => ipcRenderer.invoke('gaming:sens:list'),
       save: (profile) => ipcRenderer.invoke('gaming:sens:save', profile),
       remove: (id) => ipcRenderer.invoke('gaming:sens:delete', id)
+    },
+    sessions: {
+      add: (s) => ipcRenderer.invoke('gaming:session:add', s),
+      list: () => ipcRenderer.invoke('gaming:session:list'),
+      remove: (id) => ipcRenderer.invoke('gaming:session:delete', id)
+    },
+    aim: {
+      add: (s) => ipcRenderer.invoke('gaming:aim:add', s),
+      list: () => ipcRenderer.invoke('gaming:aim:list'),
+      remove: (id) => ipcRenderer.invoke('gaming:aim:delete', id)
     }
   },
   data: {
