@@ -48,6 +48,7 @@ Try-Get 'game' {
     gameBar           = RegVal 'HKCU:\Software\Microsoft\GameBar' 'UseNexusForGameBarEnabled'
     gameDvr           = RegVal 'HKCU:\System\GameConfigStore' 'GameDVR_Enabled'
     appCapture        = RegVal 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR' 'AppCaptureEnabled'
+    historical        = RegVal 'HKCU:\Software\Microsoft\Windows\CurrentVersion\GameDVR' 'HistoricalCaptureEnabled'
     policyDvr         = RegVal 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\GameDVR' 'AllowGameDVR'
   }
 }

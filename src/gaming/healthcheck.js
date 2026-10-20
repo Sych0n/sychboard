@@ -84,9 +84,13 @@ function evaluate(raw, { now = Date.now() } = {}) {
   if (bad(gm)) checks.push(unreadable('gamedvr', 'Xbox Game Bar / Game DVR', gm, dvrWhy))
   else {
     const policyOff = gm.policyDvr === 0
-    const recording = !policyOff && (gm.gameDvr === 1 || gm.appCapture === 1)
+    // HistoricalCaptureEnabled is the "Record what happened" switch — the thing that actually records
+    // in the background. AppCaptureEnabled / GameDVR_Enabled only mean capture is *allowed* (e.g. a
+    // manual hotkey clip), which costs nothing while idle, so they are shown but not flagged.
+    const recording = !policyOff && gm.historical === 1
+    const allowed = !policyOff && (gm.gameDvr === 1 || gm.appCapture === 1)
     const bar = gm.gameBar == null ? 'unknown' : gm.gameBar === 1 ? 'on' : 'off'
-    const value = `Game Bar: ${bar} · background recording: ${recording ? 'ON' : 'off'}${policyOff ? ' (disabled by policy)' : ''}`
+    const value = `Game Bar: ${bar} · background recording: ${recording ? 'ON' : 'off'} · manual capture: ${allowed ? 'allowed' : 'disabled'}${policyOff ? ' (disabled by policy)' : ''}`
     checks.push((recording ? warn : ok)('gamedvr', 'Xbox Game Bar / Game DVR', value, dvrWhy))
   }
 

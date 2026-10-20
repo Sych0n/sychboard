@@ -73,11 +73,16 @@ test('game mode: default (unset) is on, explicit 0 is off', () => {
   assert.equal(by(H.evaluate(r, { now: NOW }), 'gamemode').status, 'warn')
 })
 
-test('game DVR: recording on warns, policy off wins, game bar alone is fine', () => {
+test('game DVR: only background recording (HistoricalCaptureEnabled) warns; "capture allowed" alone is fine; policy off wins', () => {
   const r = GOOD(); r.game.gameBar = 1
   assert.equal(by(H.evaluate(r, { now: NOW }), 'gamedvr').status, 'ok')
-  r.game.appCapture = 1
-  const c = by(H.evaluate(r, { now: NOW }), 'gamedvr')
+  // The real-world state after turning "Record what happened" off: capture still allowed, not recording.
+  r.game.appCapture = 1; r.game.gameDvr = 1; r.game.historical = 0
+  let c = by(H.evaluate(r, { now: NOW }), 'gamedvr')
+  assert.equal(c.status, 'ok')
+  assert.match(c.value, /background recording: off · manual capture: allowed/)
+  r.game.historical = 1
+  c = by(H.evaluate(r, { now: NOW }), 'gamedvr')
   assert.equal(c.status, 'warn')
   assert.match(c.value, /recording: ON/)
   r.game.policyDvr = 0
