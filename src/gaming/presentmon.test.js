@@ -130,3 +130,10 @@ test('startCapture rejects a bad exe before spawning anything', () => {
   assert.throws(() => P.startCapture({ exe: 'C:\\Windows\\System32\\cmd.exe', seconds: 5, tempDir: tmp, spawn }), /PresentMon/)
   assert.equal(spawn.calls.length, 0)
 })
+
+test('auto-pick ignores <unknown> and dwm.exe unless nothing else presented (found on first live capture)', () => {
+  const rows = [...Array(50).fill(0).map(() => row('<unknown>', 17)), ...Array(40).fill(0).map(() => row('dwm.exe', 16)), ...Array(10).fill(0).map(() => row('game.exe', 3))]
+  assert.equal(P.parseCsv(csv(rows)).app, 'game.exe')
+  const onlyNoise = [...Array(5).fill(0).map(() => row('<unknown>', 17)), row('dwm.exe', 16)]
+  assert.equal(P.parseCsv(csv(onlyNoise)).app, '<unknown>')
+})

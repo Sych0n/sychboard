@@ -96,7 +96,13 @@ function parseCsv(text, processName) {
   const apps = [...byApp.entries()].map(([app, f]) => ({ app, frames: f.length })).sort((a, b) => b.frames - a.frames)
   let chosen = null
   if (processName) chosen = apps.find(a => a.app.toLowerCase() === processName.toLowerCase()) || null
-  else chosen = apps[0] || null
+  else {
+    // "<unknown>" is a catch-all for frames PresentMon couldn't attribute to a process
+    // and dwm.exe is the compositor — neither is what you want to measure, so only
+    // fall back to them when nothing else presented.
+    const NOISE = new Set(['<unknown>', 'dwm.exe'])
+    chosen = apps.find(a => !NOISE.has(a.app.toLowerCase())) || apps[0] || null
+  }
   return { app: chosen ? chosen.app : null, frametimes: chosen ? byApp.get(chosen.app) : [], apps }
 }
 
