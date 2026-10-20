@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test": "node --test \"src/gaming/*.test.js\"",
+    "test": "node --test \"src/gaming/*.test.js\" \"src/obsidian/*.test.js\"",
     "build": "electron-builder --win --x64",
     "build-portable": "electron-builder --win portable --x64",
     "publish": "electron-builder --win --x64 --publish always"
