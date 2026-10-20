@@ -1,5 +1,10 @@
 'use strict'
 const path = require('path')
+const gaming = require('./gaming/backup')
+
+// Machine-specific settings survive import / clear and are never exported (see gaming/backup.js).
+const MACHINE_SETTINGS = gaming.MACHINE_SETTINGS
+const DELETE_USER_SETTINGS = `DELETE FROM settings WHERE key NOT IN (${MACHINE_SETTINGS.map(() => '?').join(',')})`
 
 let _db = null
 let _app = null
@@ -853,7 +858,8 @@ function exportGameData() {
     streaks: _db.prepare('SELECT category_id, current_streak, longest_streak, last_completion_date, freeze_tokens FROM streaks').all(),
     xp_log: _db.prepare('SELECT occurred_at, amount, source_type, source_id, running_total, reason FROM xp_log').all(),
     badge_unlocks: _db.prepare('SELECT badge_id, unlocked_at FROM badge_unlocks').all(),
-    settings: _db.prepare('SELECT key, value FROM settings').all()
+    settings: _db.prepare(`SELECT key, value FROM settings WHERE key NOT IN (${MACHINE_SETTINGS.map(() => '?').join(',')})`).all(...MACHINE_SETTINGS),
+    gaming: gaming.exportGaming(_db)
   }
 }
 
@@ -864,19 +870,22 @@ function exportGameData() {
 // as every in-app write path (getProfile() never reads the stored column).
 function importGameData(data) {
   if (!data || typeof data !== 'object') return { ok: false, error: 'invalid_data' }
-  const { profile, quest_completions, streaks, xp_log, badge_unlocks, settings } = data
+  const { profile, quest_completions, streaks, xp_log, badge_unlocks, settings, gaming: gamingData } = data
   if (!profile || typeof profile !== 'object' || !Array.isArray(quest_completions) ||
       !Array.isArray(streaks) || !Array.isArray(xp_log) || !Array.isArray(badge_unlocks) ||
       !Array.isArray(settings)) {
     return { ok: false, error: 'malformed_data' }
   }
+  // Backups made before the Gaming tab have no `gaming` key: leave existing gaming
+  // data alone in that case. If the key is present it must be well-formed.
+  if (gamingData !== undefined && !gaming.isValidGaming(gamingData)) return { ok: false, error: 'malformed_data' }
 
   const doImport = _db.transaction(() => {
     _db.prepare('DELETE FROM quest_completions').run()
     _db.prepare('DELETE FROM xp_log').run()
     _db.prepare('DELETE FROM badge_unlocks').run()
     _db.prepare('DELETE FROM streaks').run()
-    _db.prepare('DELETE FROM settings').run()
+    _db.prepare(DELETE_USER_SETTINGS).run(...MACHINE_SETTINGS)
 
     const totalXp = Math.max(0, Math.round(Number(profile.total_xp) || 0))
     const { level } = levelForTotalXp(totalXp)
@@ -884,7 +893,8 @@ function importGameData(data) {
       .run(String(profile.display_name ?? 'Operator').slice(0, 40), totalXp, level, Math.max(0, Math.round(Number(profile.sychcoins) || 0)))
 
     const insSetting = _db.prepare('INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)')
-    for (const s of settings) if (s && typeof s.key === 'string') insSetting.run(s.key, String(s.value ?? ''))
+    for (const s of settings) if (s && typeof s.key === 'string' && !MACHINE_SETTINGS.includes(s.key)) insSetting.run(s.key, String(s.value ?? ''))
+    if (gamingData !== undefined) gaming.importGaming(_db, gamingData, sqliteNow())
     // These are relied on elsewhere (getAppDate, soft-reset, shop) — restore
     // defaults if the import predates them or omitted them.
     if (getSetting('day_rollover_hour') == null) insSetting.run('day_rollover_hour', '4')
@@ -954,7 +964,8 @@ function clearGameData() {
     _db.prepare('DELETE FROM xp_log').run()
     _db.prepare('DELETE FROM badge_unlocks').run()
     _db.prepare('DELETE FROM streaks').run()
-    _db.prepare('DELETE FROM settings').run()
+    _db.prepare(DELETE_USER_SETTINGS).run(...MACHINE_SETTINGS)
+    gaming.clearGaming(_db)
     _db.prepare("UPDATE profile SET display_name='Operator', total_xp=0, current_level=1, sychcoins=0 WHERE id=1").run()
     _db.prepare('INSERT INTO streaks (category_id) SELECT id FROM categories').run()
     _db.prepare("INSERT INTO settings VALUES ('day_rollover_hour','4')").run()
