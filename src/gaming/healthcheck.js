@@ -1,0 +1,169 @@
+'use strict'
+// Read-only system health check. healthcheck.ps1 gathers raw facts; evaluate()
+// (pure, tested) turns them into ✅ / ⚠️ rows with a one-line "why this matters".
+// Nothing here changes a setting — it only reports.
+const fs = require('fs')
+const path = require('path')
+const { execFile } = require('child_process')
+
+const DAY = 86400000
+const asArray = x => x == null ? [] : Array.isArray(x) ? x : [x]
+const ADMIN_RE = /elevat|administrator|access is denied|privilege|not authorized/i
+
+const ok = (id, title, value, why, needsAdmin = false) => ({ id, title, status: 'ok', value, why, needsAdmin })
+const warn = (id, title, value, why, needsAdmin = false) => ({ id, title, status: 'warn', value, why, needsAdmin })
+
+// A source that errored or returned nothing is reported, never silently skipped.
+function unreadable(id, title, src, why) {
+  const msg = src && src.error ? String(src.error) : 'no data returned'
+  return warn(id, title, 'Could not read: ' + msg, why, ADMIN_RE.test(msg))
+}
+const bad = src => src == null || (typeof src === 'object' && !Array.isArray(src) && src.error)
+
+function ageDays(dateStr, now) {
+  const t = Date.parse(dateStr + 'T00:00:00Z')
+  return Number.isNaN(t) ? null : Math.floor((now - t) / DAY)
+}
+
+function evaluate(raw, { now = Date.now() } = {}) {
+  const checks = []
+
+  // ── VBS / Memory Integrity ────────────────────────────────────────────────
+  const dg = raw.deviceGuard
+  const vbsWhy = 'Virtualization-based security runs Windows on top of a hypervisor, which can add overhead and frametime variance in games.'
+  const hvciWhy = 'Memory Integrity (HVCI) is the VBS feature with the biggest gaming cost; it adds checks to every driver code page.'
+  if (bad(dg)) {
+    checks.push(unreadable('vbs', 'Virtualization-based security (VBS)', dg, vbsWhy))
+    checks.push(unreadable('hvci', 'Memory Integrity (HVCI)', dg, hvciWhy))
+  } else {
+    const names = { 0: 'Off', 1: 'Enabled but not running', 2: 'Running' }
+    const vbsLabel = names[dg.vbsStatus] || 'Unknown (' + dg.vbsStatus + ')'
+    checks.push((dg.vbsStatus === 2 ? warn : ok)('vbs', 'Virtualization-based security (VBS)', vbsLabel, vbsWhy))
+    const running = asArray(dg.running), configured = asArray(dg.configured)
+    const hvciRunning = running.includes(2)
+    const hvciLabel = hvciRunning ? 'On (running)'
+      : (configured.includes(2) || dg.hvciPolicy === 1) ? 'Configured but not running (restart pending?)' : 'Off'
+    checks.push((hvciRunning ? warn : ok)('hvci', 'Memory Integrity (HVCI)', hvciLabel, hvciWhy))
+  }
+
+  // ── Hypervisor / Hyper-V ──────────────────────────────────────────────────
+  const hv = raw.hypervisor
+  const hvWhy = 'A running hypervisor (Hyper-V, VBS, WSL2 / Virtual Machine Platform) can come back after Windows updates and adds scheduling overhead.'
+  if (bad(hv)) checks.push(unreadable('hypervisor', 'Hypervisor / Hyper-V', hv, hvWhy))
+  else {
+    const feats = Object.entries(hv.features || {}).map(([k, v]) => `${k}: ${v}`)
+    let value = hv.present ? 'Hypervisor is running' : 'No hypervisor running'
+    if (feats.length) value += ' · ' + feats.join(', ')
+    if (hv.needsAdmin) value += ' · optional-feature states need admin to read'
+    const row = (hv.present ? warn : ok)('hypervisor', 'Hypervisor / Hyper-V', value, hvWhy, !!hv.needsAdmin)
+    checks.push(row)
+  }
+
+  // ── Power plan ────────────────────────────────────────────────────────────
+  const pw = raw.power
+  const pwWhy = 'The power plan controls how aggressively the CPU parks cores and drops clocks between frames; steadier clocks mean steadier frametimes.'
+  if (typeof pw !== 'string' || !pw.trim()) checks.push(unreadable('power', 'Active power plan', typeof pw === 'object' ? pw : null, pwWhy))
+  else {
+    const m = /\(([^)]+)\)\s*$/.exec(pw.trim())
+    const name = m ? m[1] : pw.trim()
+    const slow = /power saver/i.test(name) || /^balanced$/i.test(name)
+    checks.push((slow ? warn : ok)('power', 'Active power plan', name, pwWhy + (slow ? ' Consider a High / Ultimate Performance or AMD Ryzen plan (test one change at a time).' : '')))
+  }
+
+  // ── Game Mode ─────────────────────────────────────────────────────────────
+  const gm = raw.game
+  const gmWhy = 'Game Mode asks Windows to prioritise the foreground game and hold off background tasks such as driver and update installs.'
+  if (bad(gm)) checks.push(unreadable('gamemode', 'Game Mode', gm, gmWhy))
+  else {
+    const off = gm.autoGameMode === 0 || gm.allowAutoGameMode === 0
+    checks.push((off ? warn : ok)('gamemode', 'Game Mode', off ? 'Off' : (gm.autoGameMode == null ? 'On (default)' : 'On'), gmWhy))
+  }
+
+  // ── Xbox Game Bar / Game DVR ──────────────────────────────────────────────
+  const dvrWhy = 'Background recording (Game DVR) keeps the GPU encoder and disk busy while you play; Game Bar itself is harmless when recording is off.'
+  if (bad(gm)) checks.push(unreadable('gamedvr', 'Xbox Game Bar / Game DVR', gm, dvrWhy))
+  else {
+    const policyOff = gm.policyDvr === 0
+    const recording = !policyOff && (gm.gameDvr === 1 || gm.appCapture === 1)
+    const bar = gm.gameBar == null ? 'unknown' : gm.gameBar === 1 ? 'on' : 'off'
+    const value = `Game Bar: ${bar} · background recording: ${recording ? 'ON' : 'off'}${policyOff ? ' (disabled by policy)' : ''}`
+    checks.push((recording ? warn : ok)('gamedvr', 'Xbox Game Bar / Game DVR', value, dvrWhy))
+  }
+
+  // ── Monitors ──────────────────────────────────────────────────────────────
+  const mons = raw.monitors
+  const monWhy = 'Windows composes every monitor together: a display running below its maximum refresh rate, or mixed refresh rates, can cap smoothness or cause stutter.'
+  if (bad(mons) || !asArray(mons).length) checks.push(unreadable('monitors', 'Monitors & refresh rates', bad(mons) ? mons : null, monWhy))
+  else {
+    const list = asArray(mons)
+    const lines = list.map(m =>
+      `${String(m.device).replace('\\\\.\\', '')}${m.primary ? ' (main)' : ''} · ${m.name} · ${m.width}×${m.height} @ ${m.hz} Hz` + (m.maxHz > m.hz ? ` (supports up to ${m.maxHz} Hz)` : ''))
+    const below = list.some(m => m.maxHz > m.hz)
+    const mixed = new Set(list.map(m => m.hz)).size > 1
+    const notes = []
+    if (below) notes.push('a display is below its max refresh rate')
+    if (mixed) notes.push('refresh rates differ between monitors')
+    checks.push((below || mixed ? warn : ok)('monitors', 'Monitors & refresh rates', lines.join('\n'),
+      monWhy + (notes.length ? ' Found: ' + notes.join('; ') + '.' : '')))
+  }
+
+  // ── GPU driver ────────────────────────────────────────────────────────────
+  const gpu = raw.gpu
+  const gpuWhy = 'Driver releases routinely fix frametime and stutter bugs; a very old driver is worth checking against current release notes.'
+  const adapters = bad(gpu) ? [] : asArray(gpu.adapters).filter(a => !/basic render|remote display|virtual/i.test(a.name || ''))
+  if (bad(gpu) || !adapters.length) checks.push(unreadable('gpu', 'GPU driver', bad(gpu) ? gpu : null, gpuWhy))
+  else {
+    const lines = adapters.map(a => [a.name, gpu.radeonSoftware && /amd|radeon/i.test(a.name) ? 'Adrenalin ' + gpu.radeonSoftware : null,
+      a.driverVersion ? 'driver ' + a.driverVersion : null, a.driverDate].filter(Boolean).join(' · '))
+    const ages = adapters.map(a => a.driverDate ? ageDays(a.driverDate, now) : null).filter(d => d != null)
+    const old = ages.length && Math.max(...ages) > 180
+    checks.push((old ? warn : ok)('gpu', 'GPU driver', lines.join('\n'), gpuWhy + (old ? ' This one is over 6 months old.' : '')))
+  }
+
+  // ── Chipset driver ────────────────────────────────────────────────────────
+  const cs = raw.chipset
+  const csWhy = 'The AMD chipset driver carries the Ryzen power-management and core-scheduling support Windows relies on for boost and parking behaviour.'
+  if (bad(cs)) checks.push(unreadable('chipset', 'Chipset driver', cs, csWhy))
+  else if (cs.found) checks.push(ok('chipset', 'Chipset driver', `${cs.name} ${cs.version || ''}`.trim(), csWhy))
+  else checks.push(warn('chipset', 'Chipset driver', 'AMD chipset software not detected', csWhy + ' Windows may be using generic drivers.'))
+
+  // ── BIOS ──────────────────────────────────────────────────────────────────
+  const bios = raw.bios
+  const biosWhy = 'BIOS / AGESA updates change memory training, EXPO stability and boost behaviour; a year-old BIOS is worth checking for updates.'
+  if (bad(bios)) checks.push(unreadable('bios', 'BIOS', bios, biosWhy))
+  else {
+    const age = bios.date ? ageDays(bios.date, now) : null
+    const old = age != null && age > 365
+    const value = [bios.board, bios.vendor, bios.version, bios.date].filter(Boolean).join(' · ') + (age != null ? ` (${age} days old)` : '')
+    checks.push((old ? warn : ok)('bios', 'BIOS', value, biosWhy + (old ? ' Yours is over a year old.' : '')))
+  }
+
+  return { isAdmin: raw.admin === true, checks }
+}
+
+function readScript() {
+  return fs.readFileSync(path.join(__dirname, 'healthcheck.ps1'), 'utf8')
+}
+
+function encodeCommand(script) {
+  return Buffer.from(script, 'utf16le').toString('base64')
+}
+
+// Runs the PowerShell collector and evaluates it. Windows only.
+function runHealthCheck({ platform = process.platform, exec = execFile, now = Date.now() } = {}) {
+  if (platform !== 'win32') return Promise.reject(new Error('The health check is Windows-only'))
+  const encoded = encodeCommand(readScript())
+  return new Promise((resolve, reject) => {
+    exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+      { windowsHide: true, timeout: 60000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+        const s = String(stdout || '')
+        const a = s.indexOf('{'), b = s.lastIndexOf('}')
+        if (a < 0 || b < a) return reject(new Error(err ? 'PowerShell failed: ' + err.message : 'PowerShell returned no data'))
+        let raw
+        try { raw = JSON.parse(s.slice(a, b + 1)) } catch (e) { return reject(new Error('Could not parse health check output: ' + e.message)) }
+        resolve({ ...evaluate(raw, { now }), ranAt: new Date(now).toISOString() })
+      })
+  })
+}
+
+module.exports = { evaluate, runHealthCheck, encodeCommand, readScript }

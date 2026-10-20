@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron')
 const path = require('path')
 const { pathToFileURL } = require('url')
 const https = require('https')
@@ -404,7 +404,13 @@ if (gotSingleInstanceLock) {
   })
 }
 
-require('./src/gaming/ipc').registerGamingIpc(ipcMain, () => db.getDb(), db.awardXp)
+require('./src/gaming/ipc').registerGamingIpc(ipcMain, {
+  getDb: () => db.getDb(),
+  awardXp: db.awardXp,
+  dialog,
+  getWindow: () => mainWindow,
+  tempDir: () => app.getPath('temp')
+})
 
 // ── Gamification IPC ──
 // Input validation helpers — IPC args come from the renderer and must not

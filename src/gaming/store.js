@@ -131,9 +131,57 @@ function createStore(getDb, awardXp) {
     return { deleted: db().prepare('DELETE FROM gaming_aim_scores WHERE id=?').run(id).changes > 0 }
   }
 
+  // ── PresentMon path + saved frametime captures ─────────────────────────────
+  const PM_KEY = 'gaming_presentmon_path'
+
+  function getPresentMonPath() {
+    const r = db().prepare('SELECT value FROM settings WHERE key=?').get(PM_KEY)
+    return r && r.value ? r.value : null
+  }
+
+  // Only ever called with a path from the native file dialog (see ipc.js); the
+  // renderer cannot set an arbitrary executable to run.
+  function setPresentMonPath(p) {
+    const valid = require('./presentmon').validateExePath(p)
+    db().prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(PM_KEY, valid)
+    return valid
+  }
+
+  const CAPTURE_COLS = 'id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms'
+
+  // `capture` = the result of a PresentMon run ({app, seconds, frametimes, metrics}).
+  function saveCapture(label, capture) {
+    const l = typeof label === 'string' ? label.trim() : ''
+    if (!l || l.length > 80) throw new RangeError('Label must be 1-80 characters (e.g. "baseline", "polling 2000Hz")')
+    if (!capture || !capture.metrics || !Array.isArray(capture.frametimes) || !capture.frametimes.length) throw new Error('No capture to save — run one first')
+    const m = capture.metrics
+    const ft = JSON.stringify(capture.frametimes.map(v => Math.round(v * 100) / 100))
+    const info = db().prepare(`INSERT INTO gaming_captures
+      (label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(l, capture.app || null, m.durationSec, m.frames, m.avgFps, m.low1Fps, m.low01Fps, m.medianMs, m.p99Ms, m.maxMs, m.spikes, m.spikeThresholdMs, ft)
+    return db().prepare(`SELECT ${CAPTURE_COLS} FROM gaming_captures WHERE id=?`).get(Number(info.lastInsertRowid))
+  }
+
+  function listCaptures() {
+    return db().prepare(`SELECT ${CAPTURE_COLS} FROM gaming_captures ORDER BY id DESC LIMIT 200`).all()
+  }
+
+  function getCapture(id) {
+    if (!Number.isInteger(id) || id <= 0) throw new RangeError('Invalid capture id')
+    const r = db().prepare(`SELECT ${CAPTURE_COLS}, frametimes FROM gaming_captures WHERE id=?`).get(id)
+    if (!r) throw new Error('Capture not found')
+    return { ...r, frametimes: JSON.parse(r.frametimes) }
+  }
+
+  function deleteCapture(id) {
+    if (!Number.isInteger(id) || id <= 0) throw new RangeError('Invalid capture id')
+    return { deleted: db().prepare('DELETE FROM gaming_captures WHERE id=?').run(id).changes > 0 }
+  }
+
   return {
     listSensProfiles, saveSensProfile, deleteSensProfile,
-    addSession, listSessions, deleteSession, addAimScore, listAimScores, deleteAimScore
+    addSession, listSessions, deleteSession, addAimScore, listAimScores, deleteAimScore,
+    getPresentMonPath, setPresentMonPath, saveCapture, listCaptures, getCapture, deleteCapture
   }
 }
 

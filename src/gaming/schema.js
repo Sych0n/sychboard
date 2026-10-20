@@ -40,6 +40,25 @@ const migrations = [
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_gaming_aim_scores_date ON gaming_aim_scores(date);
+  `},
+  { version: 10, sql: `
+    CREATE TABLE IF NOT EXISTS gaming_captures (
+      id INTEGER PRIMARY KEY,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      label TEXT NOT NULL,
+      app TEXT,
+      duration_s REAL NOT NULL,
+      frames INTEGER NOT NULL,
+      avg_fps REAL NOT NULL,
+      low1_fps REAL NOT NULL,
+      low01_fps REAL NOT NULL,
+      median_ms REAL NOT NULL,
+      p99_ms REAL NOT NULL,
+      max_ms REAL NOT NULL,
+      spikes INTEGER NOT NULL,
+      spike_threshold_ms REAL NOT NULL,
+      frametimes TEXT NOT NULL      -- JSON array of ms, 2 dp
+    );
   `}
 ]
 

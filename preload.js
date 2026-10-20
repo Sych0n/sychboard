@@ -46,6 +46,19 @@ contextBridge.exposeInMainWorld('sychboard', {
       add: (s) => ipcRenderer.invoke('gaming:aim:add', s),
       list: () => ipcRenderer.invoke('gaming:aim:list'),
       remove: (id) => ipcRenderer.invoke('gaming:aim:delete', id)
+    },
+    health: { run: () => ipcRenderer.invoke('gaming:health:run') },
+    presentmon: {
+      status: () => ipcRenderer.invoke('gaming:pm:status'),
+      pick: () => ipcRenderer.invoke('gaming:pm:pick'),
+      capture: (opts) => ipcRenderer.invoke('gaming:pm:capture', opts),
+      cancel: () => ipcRenderer.invoke('gaming:pm:cancel')
+    },
+    captures: {
+      save: (label) => ipcRenderer.invoke('gaming:capture:save', label),
+      list: () => ipcRenderer.invoke('gaming:capture:list'),
+      get: (id) => ipcRenderer.invoke('gaming:capture:get', id),
+      remove: (id) => ipcRenderer.invoke('gaming:capture:delete', id)
     }
   },
   data: {

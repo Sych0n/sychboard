@@ -144,3 +144,58 @@ test('an XP failure does not fail the save', () => {
   assert.equal(r.xp, null)
   assert.equal(store.listSessions().length, 1)
 })
+
+// ── PresentMon path + captures ───────────────────────────────────────────────
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+const Frames = require('./framemetrics')
+
+function freshWithSettings() {
+  const db = new DatabaseSync(':memory:')
+  db.exec('CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT)') // db.js owns this table
+  for (const m of migrations) db.exec(m.sql)
+  return createStore(() => db)
+}
+const mkCapture = (fts, app = 'game.exe') => ({ app, seconds: 10, frametimes: fts, metrics: Frames.computeMetrics(fts) })
+
+test('presentmon path: only a real PresentMon exe is accepted and it persists', () => {
+  const store = freshWithSettings()
+  assert.equal(store.getPresentMonPath(), null)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pm-store-'))
+  const exe = path.join(dir, 'PresentMon-2.3.0-x64.exe'); fs.writeFileSync(exe, 'x')
+  const bad = path.join(dir, 'notepad.exe'); fs.writeFileSync(bad, 'x')
+  assert.throws(() => store.setPresentMonPath(bad), /PresentMon/)
+  assert.equal(store.getPresentMonPath(), null)
+  store.setPresentMonPath(exe)
+  assert.equal(store.getPresentMonPath(), path.normalize(exe))
+})
+
+test('captures: save, list without frametimes, get with frametimes, delete', () => {
+  const store = freshWithSettings()
+  const fts = [...Array(300).fill(4.123456), 30]
+  const saved = store.saveCapture('  baseline ', mkCapture(fts))
+  assert.equal(saved.label, 'baseline')
+  assert.equal(saved.frames, 301)
+  assert.equal(saved.spikes, 1)
+  store.saveCapture('polling 2000Hz', mkCapture(Array(100).fill(3)))
+  const list = store.listCaptures()
+  assert.deepEqual(list.map(c => c.label), ['polling 2000Hz', 'baseline'])
+  assert.equal(list[0].frametimes, undefined)
+  const full = store.getCapture(saved.id)
+  assert.equal(full.frametimes.length, 301)
+  assert.equal(full.frametimes[0], 4.12) // rounded to 2 dp
+  assert.equal(full.frametimes[300], 30)
+  assert.equal(store.deleteCapture(saved.id).deleted, true)
+  assert.throws(() => store.getCapture(saved.id), /not found/)
+})
+
+test('captures: validation', () => {
+  const store = freshWithSettings()
+  assert.throws(() => store.saveCapture('', mkCapture([5, 5])), RangeError)
+  assert.throws(() => store.saveCapture('x'.repeat(81), mkCapture([5, 5])), RangeError)
+  assert.throws(() => store.saveCapture('ok', null), /No capture/)
+  assert.throws(() => store.saveCapture('ok', { frametimes: [], metrics: null }), /No capture/)
+  assert.throws(() => store.getCapture('1'), RangeError)
+  assert.equal(store.listCaptures().length, 0)
+})

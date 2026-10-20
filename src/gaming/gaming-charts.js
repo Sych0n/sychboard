@@ -57,5 +57,33 @@
     return `<svg class="gm-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label || 'chart')}">${cols}</svg>`
   }
 
-  G.charts = { line, bars }
+  // Frametime-style plot: one or more series of raw values (index on x, no dots),
+  // sharing a 0-based y axis. series: [{label, color, values:[number]}].
+  // opts.hline = {y, label} draws a dashed reference line (e.g. the spike threshold).
+  function multi(series, opts = {}) {
+    const all = series.flatMap(s => s.values)
+    if (!all.length) return empty(opts.empty || 'No data yet')
+    const fmt = opts.fmt || (v => String(Math.round(v * 10) / 10))
+    const hi = Math.max(...all, opts.hline ? opts.hline.y : 0) * 1.05 || 1
+    const py = v => T + (1 - v / hi) * (H - T - B)
+    const paths = series.map(s => {
+      const n = s.values.length
+      const px = i => n === 1 ? L : L + i * (W - L - R) / (n - 1)
+      const d = s.values.map((v, i) => `${i ? 'L' : 'M'}${px(i).toFixed(1)},${py(v).toFixed(1)}`).join(' ')
+      return `<path d="${d}" fill="none" stroke="${s.color || 'var(--gm)'}" stroke-width="1.4" stroke-linejoin="round" opacity="0.9"/>`
+    }).join('')
+    const h = opts.hline ? `<line x1="${L}" y1="${py(opts.hline.y).toFixed(1)}" x2="${W - R}" y2="${py(opts.hline.y).toFixed(1)}" stroke="var(--amber)" stroke-dasharray="4 4" opacity="0.7"/>
+      <text x="${W - R}" y="${(py(opts.hline.y) - 4).toFixed(1)}" text-anchor="end" fill="var(--amber)" font-size="10">${esc(opts.hline.label)}</text>` : ''
+    const legend = series.length > 1 ? series.map((s, i) =>
+      `<text x="${L + 6 + i * 150}" y="${T + 8}" fill="${s.color}" font-size="10.5">● ${esc(s.label)}</text>`).join('') : ''
+    return `<svg class="gm-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.label || 'frametime graph')}">
+      <line x1="${L}" y1="${py(0)}" x2="${W - R}" y2="${py(0)}" stroke="rgba(255,255,255,0.06)"/>
+      <text x="${L - 6}" y="${py(0) + 4}" text-anchor="end" fill="var(--text3)" font-size="10">0</text>
+      <text x="${L - 6}" y="${py(hi) + 12}" text-anchor="end" fill="var(--text3)" font-size="10">${esc(fmt(hi))} ms</text>
+      <text x="${L}" y="${H - 6}" fill="var(--text3)" font-size="10">start</text>
+      <text x="${W - R}" y="${H - 6}" text-anchor="end" fill="var(--text3)" font-size="10">end</text>
+      ${h}${paths}${legend}</svg>`
+  }
+
+  G.charts = { line, bars, multi }
 })()
