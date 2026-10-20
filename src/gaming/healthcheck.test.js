@@ -174,3 +174,9 @@ test('runHealthCheck: Windows only; parses output despite stderr noise; reports 
   await assert.rejects(H.runHealthCheck({ platform: 'win32', exec: (c, a, o, cb) => cb(new Error('spawn fail'), '') }), /PowerShell failed/)
   await assert.rejects(H.runHealthCheck({ platform: 'win32', exec: (c, a, o, cb) => cb(null, '{not json}') }), /parse/)
 })
+
+test('regression: display enumeration passes a real NULL (found on first live run — $null becomes "" in PowerShell)', () => {
+  const s = H.readScript()
+  assert.ok(/EnumDisplayDevices\(\[NullString\]::Value/.test(s))
+  assert.ok(!/EnumDisplayDevices\(\$null/.test(s))
+})

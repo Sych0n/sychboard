@@ -88,7 +88,9 @@ public class SbDisp {
   while ($true) {
     $dd = New-Object 'SbDisp+DISPLAY_DEVICE'
     $dd.cb = [Runtime.InteropServices.Marshal]::SizeOf($dd)
-    if (-not [SbDisp]::EnumDisplayDevices($null, [uint32]$i, [ref]$dd, 0)) { break }
+    # [NullString]::Value, not $null: PowerShell turns $null into "" for string params,
+    # and the API needs a real NULL here to enumerate adapters.
+    if (-not [SbDisp]::EnumDisplayDevices([NullString]::Value, [uint32]$i, [ref]$dd, 0)) { break }
     $i++
     if (($dd.StateFlags -band 1) -eq 0) { continue }   # not attached to the desktop
     $dm = New-Object 'SbDisp+DEVMODE'
