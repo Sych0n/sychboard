@@ -2,7 +2,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const { DatabaseSync } = require('node:sqlite')
-const { migrations } = require('./schema')
+const { standaloneMigrations: migrations } = require('./schema')
 const { createStore } = require('./store')
 const B = require('./backup')
 const Frames = require('./framemetrics')

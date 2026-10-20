@@ -2,7 +2,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const { DatabaseSync } = require('node:sqlite') // better-sqlite3 is built for Electron's ABI, so tests use Node's built-in
-const { migrations } = require('./schema')
+const { standaloneMigrations: migrations } = require('./schema')
 const { createStore } = require('./store')
 
 function freshStore() {

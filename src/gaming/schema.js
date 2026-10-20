@@ -60,7 +60,7 @@ const migrations = [
       frametimes TEXT NOT NULL      -- JSON array of ms, 2 dp
     );
   `},
-  { version: 11, sql: `
+  { version: 11, core: true, sql: `
     -- "Gaming" quest category. Kept to 2 dailies on purpose: a category's sweep bonus
     -- needs ALL its dailies done, and gaming isn't a daily thing for everyone.
     INSERT OR IGNORE INTO categories VALUES (5,'gaming','Gaming','#22d3ee','🎯');
@@ -82,4 +82,9 @@ const migrations = [
   `}
 ]
 
-module.exports = { migrations }
+// Migrations that only touch gaming_* tables. Ones flagged `core: true` also write to
+// db.js-owned tables (categories, quests, ...), so unit tests with a bare in-memory
+// DB use this subset; the full list is exercised against the real DB under Electron.
+const standaloneMigrations = migrations.filter(m => !m.core)
+
+module.exports = { migrations, standaloneMigrations }
