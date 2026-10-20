@@ -7,8 +7,8 @@ const NOW = Date.parse('2026-10-20T12:00:00Z')
 
 const GOOD = () => ({
   admin: true,
-  deviceGuard: { vbsStatus: 0, running: [], configured: [], hvciPolicy: null },
-  hypervisor: { present: false, features: { 'Microsoft-Hyper-V-All': 'Disabled' }, needsAdmin: false },
+  deviceGuard: { vbsStatus: 2, running: [1, 2], configured: [1, 2], hvciPolicy: 1 },
+  hypervisor: { present: true, features: { 'Microsoft-Hyper-V-All': 'Disabled' }, needsAdmin: false },
   power: 'Power Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (High performance)',
   game: { autoGameMode: 1, allowAutoGameMode: 1, gameBar: 0, gameDvr: 0, appCapture: 0, policyDvr: null },
   monitors: [
@@ -29,30 +29,42 @@ test('a healthy system is all ✅', () => {
   for (const c of r.checks) { assert.equal(c.status, 'ok', c.id + ' ' + c.value); assert.ok(c.why.length > 20, c.id + ' has a why') }
 })
 
-test('VBS running + Memory Integrity + hypervisor are flagged', () => {
-  const raw = GOOD()
-  raw.deviceGuard = { vbsStatus: 2, running: [1, 2], configured: [1, 2], hvciPolicy: 1 }
-  raw.hypervisor = { present: true, features: { 'Microsoft-Hyper-V-All': 'Enabled', VirtualMachinePlatform: 'Enabled' }, needsAdmin: false }
-  const r = H.evaluate(raw, { now: NOW })
-  assert.equal(by(r, 'vbs').status, 'warn')
-  assert.equal(by(r, 'vbs').value, 'Running')
-  assert.equal(by(r, 'hvci').status, 'warn')
-  assert.equal(by(r, 'hypervisor').status, 'warn')
-  assert.match(by(r, 'hypervisor').value, /Microsoft-Hyper-V-All: Enabled/)
+test('Valorant needs Memory Integrity: running VBS / HVCI / hypervisor is expected (ok), off is the warning', () => {
+  const r = H.evaluate(GOOD(), { now: NOW })
+  assert.equal(by(r, 'vbs').status, 'ok')
+  assert.match(by(r, 'vbs').value, /Running.*needed for Valorant/)
+  assert.equal(by(r, 'hvci').status, 'ok')
+  assert.match(by(r, 'hvci').value, /required by Valorant/)
+  assert.equal(by(r, 'hypervisor').status, 'ok')
+  assert.match(by(r, 'hvci').why, /VAN:RESTRICTION 5/)
+  const off = GOOD(); off.deviceGuard = { vbsStatus: 0, running: [], configured: [], hvciPolicy: null }
+  const r2 = H.evaluate(off, { now: NOW })
+  assert.equal(by(r2, 'vbs').status, 'warn')
+  assert.equal(by(r2, 'hvci').status, 'warn')
+  assert.match(by(r2, 'hvci').value, /Valorant will not launch/)
 })
 
-test('HVCI configured but not running is not flagged (restart pending)', () => {
+test('the Hyper-V role (not the hypervisor itself) is what gets flagged', () => {
+  const raw = GOOD()
+  raw.hypervisor = { present: true, features: { 'Microsoft-Hyper-V-All': 'Enabled', VirtualMachinePlatform: 'Enabled' }, needsAdmin: false }
+  const c = by(H.evaluate(raw, { now: NOW }), 'hypervisor')
+  assert.equal(c.status, 'warn')
+  assert.match(c.value, /Microsoft-Hyper-V-All: Enabled/)
+  assert.match(c.why, /Hyper-V role is enabled/)
+})
+
+test('HVCI configured but not running warns (Valorant would refuse to launch until a restart)', () => {
   const raw = GOOD()
   raw.deviceGuard = { vbsStatus: 1, running: [], configured: [2], hvciPolicy: 1 }
   const c = by(H.evaluate(raw, { now: NOW }), 'hvci')
-  assert.equal(c.status, 'ok')
+  assert.equal(c.status, 'warn')
   assert.match(c.value, /not running/)
 })
 
 test('single-element arrays from PowerShell JSON (a bare number) are handled', () => {
   const raw = GOOD()
   raw.deviceGuard = { vbsStatus: 2, running: 2, configured: 2, hvciPolicy: null }
-  assert.equal(by(H.evaluate(raw, { now: NOW }), 'hvci').status, 'warn')
+  assert.equal(by(H.evaluate(raw, { now: NOW }), 'hvci').status, 'ok') // a bare 2 still means HVCI is running
   raw.monitors = raw.monitors[0] // single object instead of [object]
   assert.equal(by(H.evaluate(raw, { now: NOW }), 'monitors').status, 'ok')
 })

@@ -29,34 +29,41 @@ function evaluate(raw, { now = Date.now() } = {}) {
   const checks = []
 
   // ── VBS / Memory Integrity ────────────────────────────────────────────────
+  // Valorant's Vanguard REQUIRES Memory Integrity (HVCI): without it the game refuses to
+  // launch (Riot error VAN:RESTRICTION 5). HVCI in turn needs VBS and a running hypervisor.
+  // So "running" is the expected state for a Valorant player, and "off" is the problem.
   const dg = raw.deviceGuard
-  const vbsWhy = 'Virtualization-based security runs Windows on top of a hypervisor, which can add overhead and frametime variance in games.'
-  const hvciWhy = 'Memory Integrity (HVCI) is the VBS feature with the biggest gaming cost; it adds checks to every driver code page.'
+  const vbsWhy = 'Virtualization-based security runs Windows on a hypervisor and costs a little performance, but Valorant\'s Vanguard requires it (via Memory Integrity), so it should stay on.'
+  const hvciWhy = 'Valorant\'s Vanguard requires Memory Integrity (HVCI) and refuses to launch without it (error VAN:RESTRICTION 5).'
   if (bad(dg)) {
     checks.push(unreadable('vbs', 'Virtualization-based security (VBS)', dg, vbsWhy))
     checks.push(unreadable('hvci', 'Memory Integrity (HVCI)', dg, hvciWhy))
   } else {
     const names = { 0: 'Off', 1: 'Enabled but not running', 2: 'Running' }
     const vbsLabel = names[dg.vbsStatus] || 'Unknown (' + dg.vbsStatus + ')'
-    checks.push((dg.vbsStatus === 2 ? warn : ok)('vbs', 'Virtualization-based security (VBS)', vbsLabel, vbsWhy))
+    checks.push((dg.vbsStatus === 2 ? ok : warn)('vbs', 'Virtualization-based security (VBS)',
+      dg.vbsStatus === 2 ? vbsLabel + ' (needed for Valorant)' : vbsLabel, vbsWhy))
     const running = asArray(dg.running), configured = asArray(dg.configured)
     const hvciRunning = running.includes(2)
-    const hvciLabel = hvciRunning ? 'On (running)'
-      : (configured.includes(2) || dg.hvciPolicy === 1) ? 'Configured but not running (restart pending?)' : 'Off'
-    checks.push((hvciRunning ? warn : ok)('hvci', 'Memory Integrity (HVCI)', hvciLabel, hvciWhy))
+    const hvciLabel = hvciRunning ? 'On (running) — required by Valorant'
+      : (configured.includes(2) || dg.hvciPolicy === 1) ? 'Configured but not running (restart pending?)' : 'Off — Valorant will not launch'
+    checks.push((hvciRunning ? ok : warn)('hvci', 'Memory Integrity (HVCI)', hvciLabel, hvciWhy))
   }
 
   // ── Hypervisor / Hyper-V ──────────────────────────────────────────────────
+  // The hypervisor itself is required (see above). What isn't needed is the separate Hyper-V
+  // role / virtual machines, which add extra overhead — that is what gets flagged here.
   const hv = raw.hypervisor
-  const hvWhy = 'A running hypervisor (Hyper-V, VBS, WSL2 / Virtual Machine Platform) can come back after Windows updates and adds scheduling overhead.'
+  const hvWhy = 'A hypervisor must be running for Memory Integrity (needed by Valorant). The optional Hyper-V role and virtual-machine features are not needed and add extra overhead.'
   if (bad(hv)) checks.push(unreadable('hypervisor', 'Hypervisor / Hyper-V', hv, hvWhy))
   else {
     const feats = Object.entries(hv.features || {}).map(([k, v]) => `${k}: ${v}`)
-    let value = hv.present ? 'Hypervisor is running' : 'No hypervisor running'
+    const hyperVRole = (hv.features || {})['Microsoft-Hyper-V-All'] === 'Enabled'
+    let value = hv.present ? 'Hypervisor is running (expected: needed for Valorant)' : 'No hypervisor running'
     if (feats.length) value += ' · ' + feats.join(', ')
     if (hv.needsAdmin) value += ' · optional-feature states need admin to read'
-    const row = (hv.present ? warn : ok)('hypervisor', 'Hypervisor / Hyper-V', value, hvWhy, !!hv.needsAdmin)
-    checks.push(row)
+    checks.push((hyperVRole ? warn : ok)('hypervisor', 'Hypervisor / Hyper-V', value,
+      hvWhy + (hyperVRole ? ' The Hyper-V role is enabled on this PC.' : ''), !!hv.needsAdmin))
   }
 
   // ── Power plan ────────────────────────────────────────────────────────────
