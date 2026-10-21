@@ -151,4 +151,39 @@ Try-Get 'bios' {
   @{ vendor = [string]$b.Manufacturer; version = [string]$b.SMBIOSBIOSVersion; date = $d; board = ("$($bb.Manufacturer) $($bb.Product)").Trim() }
 }
 
+# Unexpected shutdowns / hardware errors / GPU-driver resets over the last 60 days. All reads of the
+# System event log, which a standard user may read. Kernel-Power 41 = "restarted without a clean
+# shutdown"; its BugcheckCode is 0 for a power loss / hard reset and non-zero for a blue screen.
+Try-Get 'stability' {
+  $since = (Get-Date).AddDays(-60)
+  $events = New-Object System.Collections.ArrayList
+  foreach ($e in @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = 41; StartTime = $since } -ErrorAction SilentlyContinue)) {
+    $bug = 0
+    try {
+      $d = ([xml]$e.ToXml()).Event.EventData.Data | Where-Object { $_.Name -eq 'BugcheckCode' }
+      if ($d) { $bug = [int]$d.'#text' }
+    } catch { }
+    [void]$events.Add(@{ time = $e.TimeCreated.ToString('yyyy-MM-dd HH:mm'); bugcheck = $bug })
+  }
+  $whea = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WHEA-Logger'; StartTime = $since } -ErrorAction SilentlyContinue).Count
+  $resets = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Display'; Id = 4101; StartTime = $since } -ErrorAction SilentlyContinue).Count
+  @{ days = 60; unexpected = @($events); whea = $whea; displayResets = $resets }
+}
+
+# Installed RAM: size, rated speed and the speed it is actually running at.
+Try-Get 'memory' {
+  $mods = New-Object System.Collections.ArrayList
+  foreach ($d in @(Get-CimInstance Win32_PhysicalMemory)) {
+    [void]$mods.Add(@{ gb = [int][math]::Round($d.Capacity / 1GB); rated = [int]$d.Speed; configured = [int]$d.ConfiguredClockSpeed; part = ([string]$d.PartNumber).Trim() })
+  }
+  @{ modules = @($mods) }
+}
+
+# Capture / overlay programs that are running right now (process names only).
+Try-Get 'apps' {
+  $watch = 'Medal', 'MedalEncoder', 'obs64', 'obs32', 'Streamlabs OBS', 'Discord', 'CrosshairX', 'RTSS', 'MSIAfterburner', 'GameBarPresenceWriter', 'Overwolf'
+  $found = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $watch -contains $_.ProcessName } | ForEach-Object { $_.ProcessName } | Sort-Object -Unique)
+  ,@($found)
+}
+
 $out | ConvertTo-Json -Depth 6 -Compress

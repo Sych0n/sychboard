@@ -17,7 +17,10 @@ const GOOD = () => ({
   ],
   gpu: { adapters: [{ name: 'AMD Radeon RX 7800 XT', driverVersion: '32.0.1', driverDate: '2026-08-01' }], radeonSoftware: '26.6.4' },
   chipset: { found: true, name: 'AMD Chipset Software', version: '7.06.02.123' },
-  bios: { vendor: 'American Megatrends', version: 'F10', date: '2026-03-01', board: 'Gigabyte A620M GAMING X' }
+  bios: { vendor: 'American Megatrends', version: 'F10', date: '2026-03-01', board: 'Gigabyte A620M GAMING X' },
+  stability: { days: 60, unexpected: [], whea: 0, displayResets: 0 },
+  memory: { modules: [{ gb: 16, rated: 6000, configured: 6000 }, { gb: 16, rated: 6000, configured: 6000 }] },
+  apps: []
 })
 
 const by = (res, id) => res.checks.find(c => c.id === id)
@@ -25,7 +28,7 @@ const by = (res, id) => res.checks.find(c => c.id === id)
 test('a healthy system is all ✅', () => {
   const r = H.evaluate(GOOD(), { now: NOW })
   assert.equal(r.isAdmin, true)
-  assert.deepEqual(r.checks.map(c => c.id), ['vbs', 'hvci', 'hypervisor', 'power', 'gamemode', 'gamedvr', 'monitors', 'gpu', 'chipset', 'bios'])
+  assert.deepEqual(r.checks.map(c => c.id), ['vbs', 'hvci', 'hypervisor', 'power', 'gamemode', 'gamedvr', 'monitors', 'gpu', 'chipset', 'bios', 'stability', 'memory', 'apps'])
   for (const c of r.checks) { assert.equal(c.status, 'ok', c.id + ' ' + c.value); assert.ok(c.why.length > 20, c.id + ' has a why') }
 })
 
@@ -152,13 +155,62 @@ test('errored / missing sources become ⚠ rows (admin-flagged when relevant), n
   delete raw.bios
   raw.chipset = { error: 'boom' }
   const r = H.evaluate(raw, { now: NOW })
-  assert.equal(r.checks.length, 10)
+  assert.equal(r.checks.length, 13)
   assert.equal(by(r, 'vbs').status, 'warn')
   assert.equal(by(r, 'vbs').needsAdmin, true)
   assert.match(by(r, 'vbs').value, /Could not read: Access is denied/)
   assert.equal(by(r, 'hvci').status, 'warn')
   assert.equal(by(r, 'bios').status, 'warn')
   assert.equal(by(r, 'chipset').needsAdmin, false)
+})
+
+test('stability: clean log is ok; unexpected shutdowns, WHEA and display resets each warn and are itemised', () => {
+  const raw = GOOD()
+  raw.stability = { days: 60, unexpected: [{ time: '2026-10-11 21:47', bugcheck: 0 }], whea: 0, displayResets: 0 }
+  let c = by(H.evaluate(raw, { now: NOW }), 'stability')
+  assert.equal(c.status, 'warn')
+  assert.match(c.value, /1 unexpected shutdown \(2026-10-11\) · none with a crash code/)
+
+  const many = Array.from({ length: 7 }, (_, i) => ({ time: `2026-09-0${i + 1} 10:00`, bugcheck: i === 0 ? 278 : 0 }))
+  raw.stability = { days: 60, unexpected: many, whea: 3, displayResets: 1 }
+  c = by(H.evaluate(raw, { now: NOW }), 'stability')
+  assert.match(c.value, /7 unexpected shutdowns \(.*\+2 more\) · 1 blue screen/)
+  assert.match(c.value, /3 hardware error reports \(WHEA\)/)
+  assert.match(c.value, /1 display-driver reset\b/)
+
+  raw.stability = { days: 60, unexpected: [], whea: 0, displayResets: 0 }
+  assert.equal(by(H.evaluate(raw, { now: NOW }), 'stability').status, 'ok')
+  // a lone event object (PowerShell unwraps one-element arrays) still works
+  raw.stability = { days: 60, unexpected: { time: '2026-10-01 09:00', bugcheck: 0 }, whea: 0, displayResets: 0 }
+  assert.match(by(H.evaluate(raw, { now: NOW }), 'stability').value, /1 unexpected shutdown/)
+})
+
+test('memory: dual channel at rated speed is ok; single stick, below rated, mixed speeds warn', () => {
+  const raw = GOOD()
+  let c = by(H.evaluate(raw, { now: NOW }), 'memory')
+  assert.equal(c.status, 'ok')
+  assert.equal(c.value, '2 sticks (16 + 16 GB = 32 GB) · 6000 MT/s (rated 6000)')
+  raw.memory = { modules: [{ gb: 32, rated: 6000, configured: 6000 }] }
+  c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /single channel/)
+  raw.memory = { modules: [{ gb: 16, rated: 6000, configured: 4800 }, { gb: 16, rated: 6000, configured: 4800 }] }
+  c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /below its rated speed/)
+  raw.memory = { modules: [{ gb: 16, rated: 6000, configured: 6000 }, { gb: 16, rated: 5600, configured: 5600 }] }
+  c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /different speeds/)
+  raw.memory = { modules: [] }
+  assert.match(by(H.evaluate(raw, { now: NOW }), 'memory').value, /Could not read/)
+})
+
+test('capture / overlay programs: none is ok; running ones are named in plain words (a lone name from PowerShell works too)', () => {
+  const raw = GOOD()
+  assert.equal(by(H.evaluate(raw, { now: NOW }), 'apps').status, 'ok')
+  raw.apps = ['Discord', 'Medal', 'MedalEncoder']
+  let c = by(H.evaluate(raw, { now: NOW }), 'apps')
+  assert.equal(c.status, 'warn')
+  assert.equal(c.value, 'Running now: Discord (overlay), Medal (clip recorder)') // Medal + its encoder are one program
+  raw.apps = 'obs64'
+  assert.equal(by(H.evaluate(raw, { now: NOW }), 'apps').value, 'Running now: OBS')
+  delete raw.apps
+  assert.match(by(H.evaluate(raw, { now: NOW }), 'apps').value, /Could not read/)
 })
 
 test('the collector script is read-only', () => {
@@ -186,7 +238,7 @@ test('runHealthCheck: Windows only; parses output despite stderr noise; reports 
     cb(null, 'noise before\n' + raw + '\n')
   }
   const res = await H.runHealthCheck({ platform: 'win32', exec, now: NOW })
-  assert.equal(res.checks.length, 10)
+  assert.equal(res.checks.length, 13)
   assert.equal(res.ranAt, new Date(NOW).toISOString())
   await assert.rejects(H.runHealthCheck({ platform: 'win32', exec: (c, a, o, cb) => cb(new Error('spawn fail'), '') }), /PowerShell failed/)
   await assert.rejects(H.runHealthCheck({ platform: 'win32', exec: (c, a, o, cb) => cb(null, '{not json}') }), /parse/)

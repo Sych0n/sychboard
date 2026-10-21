@@ -149,6 +149,63 @@ function evaluate(raw, { now = Date.now() } = {}) {
     checks.push((old ? warn : ok)('bios', 'BIOS', value, biosWhy + (old ? ' Yours is over a year old.' : '')))
   }
 
+  // ── Stability (unexpected shutdowns, hardware errors, GPU driver resets) ──
+  const stab = raw.stability
+  const stabWhy = 'A shutdown with no crash code means power was lost or the PC froze and was reset with the power button. Repeats usually point at power delivery (PSU, cables, wall socket), heat, or unstable memory / overclock settings; hardware-error (WHEA) and display-driver resets point at the CPU, memory or GPU driver.'
+  if (bad(stab)) checks.push(unreadable('stability', 'Stability (last 60 days)', stab, stabWhy))
+  else {
+    const events = asArray(stab.unexpected)
+    const crashes = events.filter(e => e.bugcheck !== 0)
+    const whea = stab.whea || 0, resets = stab.displayResets || 0
+    const days = stab.days || 60
+    if (!events.length && !whea && !resets) {
+      checks.push(ok('stability', `Stability (last ${days} days)`, 'No unexpected shutdowns, hardware errors or display-driver resets', stabWhy))
+    } else {
+      const lines = []
+      if (events.length) {
+        const dates = events.slice(0, 5).map(e => e.time.slice(0, 10)).join(', ') + (events.length > 5 ? ` +${events.length - 5} more` : '')
+        lines.push(`${events.length} unexpected shutdown${events.length === 1 ? '' : 's'} (${dates})` +
+          (crashes.length ? ` · ${crashes.length} blue screen${crashes.length === 1 ? '' : 's'}` : ' · none with a crash code'))
+      }
+      if (whea) lines.push(`${whea} hardware error report${whea === 1 ? '' : 's'} (WHEA)`)
+      if (resets) lines.push(`${resets} display-driver reset${resets === 1 ? '' : 's'}`)
+      checks.push(warn('stability', `Stability (last ${days} days)`, lines.join('\n'), stabWhy))
+    }
+  }
+
+  // ── Memory ────────────────────────────────────────────────────────────────
+  const mem = raw.memory
+  const memWhy = 'On Ryzen, memory speed sets how fast the CPU\'s memory controller runs and two sticks run in dual channel. A kit running below its rated speed usually means the EXPO / XMP profile is off; an aggressive profile can also be unstable, so errors in a memory test matter.'
+  const mods = bad(mem) ? [] : asArray(mem.modules)
+  if (bad(mem) || !mods.length) checks.push(unreadable('memory', 'Memory', bad(mem) ? mem : null, memWhy))
+  else {
+    const total = mods.reduce((s, m) => s + (m.gb || 0), 0)
+    const speeds = [...new Set(mods.map(m => m.configured || m.rated))]
+    const below = mods.some(m => m.configured && m.rated && m.configured < m.rated)
+    const notes = []
+    if (mods.length === 1) notes.push('a single stick runs in single channel')
+    if (below) notes.push('running below its rated speed')
+    if (speeds.length > 1) notes.push('sticks run at different speeds')
+    const value = `${mods.length} stick${mods.length === 1 ? '' : 's'} (${mods.map(m => m.gb).join(' + ')} GB = ${total} GB) · ${speeds.join(' / ')} MT/s` +
+      (mods.every(m => m.rated === mods[0].rated) && mods[0].rated ? ` (rated ${mods[0].rated})` : '')
+    checks.push((notes.length ? warn : ok)('memory', 'Memory', value, memWhy + (notes.length ? ' Found: ' + notes.join('; ') + '.' : '')))
+  }
+
+  // ── Capture / overlay programs ────────────────────────────────────────────
+  const apps = raw.apps
+  const appsWhy = 'Recorders and overlays can make Windows composite the game instead of presenting it directly (more latency), and recorders use the GPU encoder. Fine day to day, but close them when testing smoothness — the Capture card shows which presentation path a game used.'
+  if (bad(apps)) checks.push(unreadable('apps', 'Capture / overlay programs', apps, appsWhy))
+  else {
+    const NICE = {
+      medal: 'Medal (clip recorder)', medalencoder: 'Medal (clip recorder)', obs64: 'OBS', obs32: 'OBS', 'streamlabs obs': 'Streamlabs',
+      discord: 'Discord (overlay)', crosshairx: 'Crosshair X (overlay)', rtss: 'RivaTuner (overlay)', msiafterburner: 'MSI Afterburner',
+      gamebarpresencewriter: 'Xbox Game Bar', overwolf: 'Overwolf (overlay)'
+    }
+    const names = [...new Set(asArray(apps).map(n => NICE[String(n).toLowerCase()] || String(n)))]
+    checks.push((names.length ? warn : ok)('apps', 'Capture / overlay programs',
+      names.length ? 'Running now: ' + names.join(', ') : 'None running', appsWhy))
+  }
+
   return { isAdmin: raw.admin === true, checks }
 }
 
