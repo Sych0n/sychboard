@@ -16,6 +16,7 @@ function exportGaming(db) {
     sens_profiles: db.prepare('SELECT id, name, game, sens, dpi, created_at, updated_at FROM gaming_sens_profiles').all(),
     sessions: db.prepare('SELECT id, date, start_time, end_time, game, mode, result, score, rank_change, notes, smoothness, sens_profile_id, created_at FROM gaming_sessions').all(),
     aim_scores: db.prepare('SELECT id, date, scenario, score, notes, created_at FROM gaming_aim_scores').all(),
+    changes: db.prepare('SELECT id, date, what, before_capture_id, after_capture_id, felt, verdict, notes, created_at FROM gaming_changes').all(),
     captures: db.prepare('SELECT id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, frametimes, present_json FROM gaming_captures').all()
       .map(c => {
         try {
@@ -30,8 +31,9 @@ function exportGaming(db) {
 
 // Shape check only (every table present as an array) — row-level problems are
 // skipped individually by importGaming. Call before touching anything.
+// `changes` (change journal, added later) is optional so older backups still restore.
 function isValidGaming(g) {
-  return !!g && typeof g === 'object' && TABLES.every(t => Array.isArray(g[t]))
+  return !!g && typeof g === 'object' && TABLES.every(t => Array.isArray(g[t])) && (g.changes === undefined || Array.isArray(g.changes))
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -50,6 +52,7 @@ const time = v => (typeof v === 'string' && TIME_RE.test(v) ? v : null)
 // Replaces all gaming data with `g` (already shape-checked). Invalid rows are skipped.
 // Row ids are preserved so sessions keep pointing at the right sens profile.
 function importGaming(db, g, nowStr) {
+  db.prepare('DELETE FROM gaming_changes').run() // before captures: it points at them
   db.prepare('DELETE FROM gaming_sessions').run()
   db.prepare('DELETE FROM gaming_aim_scores').run()
   db.prepare('DELETE FROM gaming_captures').run()
@@ -87,6 +90,7 @@ function importGaming(db, g, nowStr) {
 
   const insC = db.prepare(`INSERT OR IGNORE INTO gaming_captures
     (id,created_at,label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes,present_kind,present_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+  const captureIds = new Set()
   for (const c of g.captures) {
     if (!isObj(c) || !Array.isArray(c.frametimes)) continue
     const id = posInt(c.id), label = str(c.label, 80)
@@ -97,12 +101,26 @@ function importGaming(db, g, nowStr) {
     if (!id || !label || [dur, avg, low1, low01, median, p99, max, spikeThr].some(n => n === null) ||
         !frames || spikes === null || spikes < 0 || !ft.length) continue
     const present = Present.sanitize(c.present)
-    insC.run(id, ts(c.created_at) || nowStr, label, str(c.app, 120), dur, frames, avg, low1, low01, median, p99, max, spikes, spikeThr,
+    const info = insC.run(id, ts(c.created_at) || nowStr, label, str(c.app, 120), dur, frames, avg, low1, low01, median, p99, max, spikes, spikeThr,
       JSON.stringify(ft.map(v => Math.round(v * 100) / 100)), present ? present.kind : null, present ? JSON.stringify(present) : null)
+    if (info.changes) captureIds.add(id)
+  }
+
+  const insG = db.prepare(`INSERT OR IGNORE INTO gaming_changes
+    (id,date,what,before_capture_id,after_capture_id,felt,verdict,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?)`)
+  for (const ch of Array.isArray(g.changes) ? g.changes : []) {
+    if (!isObj(ch)) continue
+    const id = posInt(ch.id), d = date(ch.date), what = str(ch.what, 200)
+    if (!id || !d || !what) continue
+    const felt = int(ch.felt), bid = posInt(ch.before_capture_id), aid = posInt(ch.after_capture_id)
+    insG.run(id, d, what, bid && captureIds.has(bid) ? bid : null, aid && captureIds.has(aid) ? aid : null,
+      felt !== null && felt >= 1 && felt <= 5 ? felt : null, ['testing', 'keep', 'revert'].includes(ch.verdict) ? ch.verdict : 'testing',
+      str(ch.notes, 1000), ts(ch.created_at) || nowStr)
   }
 }
 
 function clearGaming(db) {
+  db.prepare('DELETE FROM gaming_changes').run()
   db.prepare('DELETE FROM gaming_sessions').run()
   db.prepare('DELETE FROM gaming_aim_scores').run()
   db.prepare('DELETE FROM gaming_captures').run()

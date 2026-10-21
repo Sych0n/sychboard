@@ -167,6 +167,7 @@
       const r = await a.captures.save(st.label)
       if (!r.ok) { st.error = r.error; return draw(el) }
       st.error = ''; st.msg = `Saved "${r.data.label}".`; st.label = ''
+      G.dataChanged()
       await load(); draw(el)
     })
 
@@ -179,7 +180,7 @@
 
     el.querySelectorAll('[data-cap-del]').forEach(b => b.addEventListener('click', async () => {
       const r = await a.captures.remove(Number(b.dataset.capDel))
-      if (!r.ok) st.error = r.error
+      if (!r.ok) st.error = r.error; else G.dataChanged()
       await load(); draw(el)
     }))
 

@@ -125,6 +125,7 @@
       if (!res.ok) return showMsg(res.error)
       notify(res, 'Session')
       Object.assign(form, { score: '', rank_change: '', result: '', smoothness: '', notes: '', start_time: '', end_time: '' })
+      G.dataChanged()
       G.refreshCard('sessions')
     })
     body.querySelector('[data-ga-log]').addEventListener('click', async () => {
@@ -132,13 +133,14 @@
       if (!res.ok) return showMsg(res.error)
       notify(res, 'Aim score')
       aim.score = ''
+      G.dataChanged()
       G.refreshCard('sessions')
     })
     body.querySelectorAll('[data-gs-del-session]').forEach(b => b.addEventListener('click', async () => {
-      const res = await a.sessions.remove(Number(b.dataset.gsDelSession)); if (!res.ok) return showMsg(res.error); G.refreshCard('sessions')
+      const res = await a.sessions.remove(Number(b.dataset.gsDelSession)); if (!res.ok) return showMsg(res.error); G.dataChanged(); G.refreshCard('sessions')
     }))
     body.querySelectorAll('[data-gs-del-aim]').forEach(b => b.addEventListener('click', async () => {
-      const res = await a.aim.remove(Number(b.dataset.gsDelAim)); if (!res.ok) return showMsg(res.error); G.refreshCard('sessions')
+      const res = await a.aim.remove(Number(b.dataset.gsDelAim)); if (!res.ok) return showMsg(res.error); G.dataChanged(); G.refreshCard('sessions')
     }))
   }
 

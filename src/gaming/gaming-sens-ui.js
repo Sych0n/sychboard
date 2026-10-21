@@ -80,6 +80,7 @@
       if (!a) return showMsg('Saved profiles need the desktop app.')
       const res = await a.save({ name: state.name, game: state.game, sens: Number(state.sens), dpi: Number(state.dpi) })
       if (!res.ok) return showMsg(res.error)
+      G.dataChanged()
       G.refreshCard('sens')
     })
 
@@ -94,6 +95,7 @@
     body.querySelectorAll('[data-gm-del]').forEach(btn => btn.addEventListener('click', async () => {
       const res = await api().remove(Number(btn.dataset.gmDel))
       if (!res.ok) return showMsg(res.error)
+      G.dataChanged()
       G.refreshCard('sens')
     }))
   }

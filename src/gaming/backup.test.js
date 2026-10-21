@@ -20,6 +20,8 @@ function seeded() {
   store.addAimScore({ date: '2026-10-20', scenario: 'Gridshot', score: 81234.5 })
   const fts = Array.from({ length: 300 }, (_, i) => i % 50 === 0 ? 20 : 3.2)
   store.saveCapture('baseline', { app: 'game.exe', frametimes: fts, metrics: Frames.computeMetrics(fts) })
+  store.addChange({ date: '2026-10-20', what: 'DP overclock off', notes: 'testing', felt: 3 })
+  store.addChange({ date: '2026-10-21', what: 'Max FPS 295', before_capture_id: 1, verdict: 'keep' })
   return { db, store }
 }
 
@@ -28,11 +30,13 @@ const inTx = (db, fn) => { db.exec('BEGIN'); try { fn(); db.exec('COMMIT') } cat
 test('export → clear → import round-trips everything, keeping session → profile links', () => {
   const { db, store } = seeded()
   const dump = JSON.parse(JSON.stringify(B.exportGaming(db))) // as it travels through a JSON file
-  const before = { s: store.listSessions(), a: store.listAimScores(), p: store.listSensProfiles(), c: store.getCapture(1) }
+  const before = { s: store.listSessions(), a: store.listAimScores(), p: store.listSensProfiles(), c: store.getCapture(1), g: store.listChanges() }
+  assert.equal(before.g.length, 2)
 
   inTx(db, () => B.clearGaming(db))
   assert.equal(store.listSessions().length, 0)
   assert.equal(store.listCaptures().length, 0)
+  assert.equal(store.listChanges().length, 0)
 
   assert.ok(B.isValidGaming(dump))
   inTx(db, () => B.importGaming(db, dump, NOW))
@@ -40,6 +44,7 @@ test('export → clear → import round-trips everything, keeping session → pr
   assert.deepEqual(store.listAimScores(), before.a)
   assert.deepEqual(store.listSensProfiles(), before.p)
   assert.deepEqual(store.getCapture(1), before.c)
+  assert.deepEqual(store.listChanges(), before.g)   // including the link to capture 1
   assert.equal(store.listSessions().find(s => s.notes === 'tired').sens_profile_name, 'main')
 })
 
@@ -69,6 +74,39 @@ test('import replaces existing gaming data rather than merging', () => {
   store.addAimScore({ date: '2026-10-21', scenario: 'Extra', score: 1 })
   inTx(db, () => B.importGaming(db, dump, NOW))
   assert.deepEqual(store.listAimScores().map(a => a.scenario), ['Gridshot'])
+})
+
+test('backups made before the change journal existed (no `changes`) still restore, and clear the journal', () => {
+  const { db, store } = seeded()
+  const old = JSON.parse(JSON.stringify(B.exportGaming(db)))
+  delete old.changes
+  assert.ok(B.isValidGaming(old))
+  assert.equal(B.isValidGaming({ ...old, changes: 'x' }), false)
+  inTx(db, () => B.importGaming(db, old, NOW))
+  assert.equal(store.listChanges().length, 0)
+  assert.equal(store.listCaptures().length, 1)
+})
+
+test('journal rows from a tampered backup are cleaned: bad fields dropped, links to missing captures cut', () => {
+  const { db, store } = seeded()
+  const dump = JSON.parse(JSON.stringify(B.exportGaming(db)))
+  dump.changes = [
+    null, 'junk',
+    { id: 1, date: '2026-10-21', what: 'good', before_capture_id: 1, after_capture_id: 404, felt: 9, verdict: 'hacked', notes: 'n' },
+    { id: 2, date: 'nope', what: 'bad date' },
+    { id: 3, date: '2026-10-21', what: '   ' },
+    { id: 'x', date: '2026-10-21', what: 'bad id' },
+    { id: 4, date: '2026-10-21', what: 'W'.repeat(500) }
+  ]
+  inTx(db, () => B.importGaming(db, dump, NOW))
+  const list = store.listChanges()
+  assert.deepEqual(list.map(c => c.id).sort(), [1, 4])
+  const g = list.find(c => c.id === 1)
+  assert.equal(g.before_capture_id, 1)
+  assert.equal(g.after_capture_id, null)   // capture 404 does not exist
+  assert.equal(g.felt, null)               // 9 is out of range
+  assert.equal(g.verdict, 'testing')       // not one of testing / keep / revert
+  assert.equal(list.find(c => c.id === 4).what.length, 200)
 })
 
 test('shape validation', () => {

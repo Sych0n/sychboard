@@ -53,6 +53,12 @@
     body.innerHTML = `<div class="empty"><span class="empty-icon">🛠</span>${esc(text)}<span class="empty-sub">Coming in a later phase</span></div>`
   }
 
-  window.Gaming = { registerCard, refreshCard, esc, placeholder }
+  // Gaming data lives in SQLite (main process), so renderer.js's save() never sees it change.
+  // Cards call this after a write so the Obsidian export picks it up.
+  function dataChanged() {
+    try { if (window.ObsidianSync && typeof window.ObsidianSync.schedule === 'function') window.ObsidianSync.schedule() } catch (_) { /* optional */ }
+  }
+
+  window.Gaming = { registerCard, refreshCard, esc, placeholder, dataChanged }
   window.rGaming = rGaming
 })()

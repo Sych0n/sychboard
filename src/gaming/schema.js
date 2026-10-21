@@ -86,6 +86,22 @@ const migrations = [
     -- saved before this version.
     ALTER TABLE gaming_captures ADD COLUMN present_kind TEXT;
     ALTER TABLE gaming_captures ADD COLUMN present_json TEXT;
+  `},
+  { version: 13, sql: `
+    -- Change journal: one row per setting changed while chasing smoothness, optionally linked to
+    -- the PresentMon captures taken before and after, with how it felt and the keep / revert call.
+    CREATE TABLE IF NOT EXISTS gaming_changes (
+      id INTEGER PRIMARY KEY,
+      date TEXT NOT NULL,            -- YYYY-MM-DD, local
+      what TEXT NOT NULL,
+      before_capture_id INTEGER REFERENCES gaming_captures(id) ON DELETE SET NULL,
+      after_capture_id INTEGER REFERENCES gaming_captures(id) ON DELETE SET NULL,
+      felt INTEGER CHECK (felt BETWEEN 1 AND 5),
+      verdict TEXT NOT NULL DEFAULT 'testing' CHECK (verdict IN ('testing','keep','revert')),
+      notes TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_gaming_changes_date ON gaming_changes(date);
   `}
 ]
 

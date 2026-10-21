@@ -53,6 +53,12 @@ contextBridge.exposeInMainWorld('sychboard', {
       list: () => ipcRenderer.invoke('gaming:aim:list'),
       remove: (id) => ipcRenderer.invoke('gaming:aim:delete', id)
     },
+    changes: {
+      add: (c) => ipcRenderer.invoke('gaming:change:add', c),
+      list: () => ipcRenderer.invoke('gaming:change:list'),
+      update: (id, patch) => ipcRenderer.invoke('gaming:change:update', id, patch),
+      remove: (id) => ipcRenderer.invoke('gaming:change:delete', id)
+    },
     health: { run: () => ipcRenderer.invoke('gaming:health:run') },
     presentmon: {
       status: () => ipcRenderer.invoke('gaming:pm:status'),

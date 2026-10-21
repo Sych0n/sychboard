@@ -82,11 +82,76 @@ function notesFile(s) {
   return { relPath: 'SychBoard/Notes.md', content: parts.join('\n') }
 }
 
+// ── Gaming tab (summary rows read by the main process; never taken from the renderer) ──
+const cell = v => oneLine(v).replace(/\|/g, '\\|').replace(/\[\[/g, '[ [') || ' '
+const fnum = (v, digits = 1) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(digits) : '–')
+const dayOf = v => (typeof v === 'string' ? v.slice(0, 10) : '')
+const PATH_LABEL = { direct: 'Direct flip', 'composed-flip': 'Composed flip', 'composed-copy': 'Composed copy', copy: 'Legacy copy', unknown: 'Unknown' }
+const pathLabel = k => PATH_LABEL[k] || ''
+const table = (head, rows) => [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map(r => `| ${r.join(' | ')} |`)]
+const rowsOf = v => (Array.isArray(v) ? v.filter(isObj) : [])
+
+function captureSummary(c, pre) {
+  if (c[pre + '_label'] == null) return '–'
+  const bits = [`${fnum(c[pre + '_avg_fps'])} fps`, `1% low ${fnum(c[pre + '_low1_fps'])}`]
+  if (pathLabel(c[pre + '_present_kind'])) bits.push(pathLabel(c[pre + '_present_kind']))
+  return cell(`${c[pre + '_label']} (${bits.join(', ')})`)
+}
+
+function gamingFiles(g) {
+  if (!isObj(g)) return []
+  const files = []
+  const out = (name, type, title, intro, tables) => {
+    const parts = [front(type), `# ${title}`, '', intro, '']
+    for (const [h, lines] of tables) parts.push(...(h ? [`## ${h}`, ''] : []), ...lines, '')
+    files.push({ relPath: `SychBoard/Gaming/${name}.md`, content: parts.join('\n') })
+  }
+
+  const changes = rowsOf(g.changes)
+  if (changes.length) {
+    out('Change Log', 'gaming-changes', 'Gaming change log',
+      'One setting changed at a time, with the PresentMon captures taken before and after. Verdict: testing, keep or revert.',
+      [[null, table(['Date', 'Change', 'Before', 'After', 'Felt', 'Verdict', 'Notes'], changes.map(c => [
+        cell(dayOf(c.date)), cell(c.what), captureSummary(c, 'b'), captureSummary(c, 'a'),
+        Number.isInteger(c.felt) ? `${c.felt}/5` : '–', cell(c.verdict), cell(c.notes)]))]])
+  }
+
+  const caps = rowsOf(g.captures)
+  if (caps.length) {
+    out('Captures', 'gaming-captures', 'Frametime captures',
+      'Saved PresentMon captures (newest first). Lows are the average of the slowest 1% / 0.1% of frames; spikes are frames slower than 2x the median.',
+      [[null, table(['Saved', 'Label', 'App', 'Avg FPS', '1% low', '0.1% low', 'Spikes', 'Worst frame (ms)', 'Presentation'], caps.map(c => [
+        cell(dayOf(c.created_at)), cell(c.label), cell(c.app), fnum(c.avg_fps), fnum(c.low1_fps), fnum(c.low01_fps),
+        Number.isInteger(c.spikes) ? String(c.spikes) : '–', fnum(c.max_ms), cell(pathLabel(c.present_kind))]))]])
+  }
+
+  const sessions = rowsOf(g.sessions), aim = rowsOf(g.aim_scores)
+  if (sessions.length || aim.length) {
+    const tables = []
+    if (sessions.length) tables.push(['Sessions', table(['Date', 'Game', 'Mode', 'Result', 'Score', 'Rank change', 'Felt smooth', 'Notes'], sessions.map(s => [
+      cell(dayOf(s.date) + (s.start_time ? ' ' + s.start_time : '')), cell(s.game), cell(s.mode), cell(s.result), fnum(s.score, 0),
+      Number.isInteger(s.rank_change) ? (s.rank_change > 0 ? '+' : '') + s.rank_change : '–', Number.isInteger(s.smoothness) ? `${s.smoothness}/5` : '–', cell(s.notes)]))])
+    if (aim.length) tables.push(['Aim trainer scores', table(['Date', 'Scenario', 'Score', 'Notes'], aim.map(a => [
+      cell(dayOf(a.date)), cell(a.scenario), fnum(a.score, 0), cell(a.notes)]))])
+    out('Sessions and Aim', 'gaming-sessions', 'Gaming sessions and aim scores', 'Logged in SychBoard (newest first).', tables)
+  }
+
+  const profiles = rowsOf(g.sens_profiles)
+  if (profiles.length) {
+    out('Sens Profiles', 'gaming-sens', 'Sensitivity profiles',
+      'Saved sensitivity settings. Converting between games keeps the same cm/360 (the yaw table is in SychBoard).',
+      [[null, table(['Name', 'Game', 'Sens', 'DPI'], profiles.map(p => [cell(p.name), cell(p.game), fnum(p.sens, 3).replace(/\.?0+$/, ''), Number.isFinite(p.dpi) ? String(p.dpi) : '–']))]])
+  }
+  return files
+}
+
 // state: { journals, goals, setupTodos, genTodos, devTodos, secTodos, todayFocus, uniNotes, fitnessNotes }
-function buildFiles(state) {
+// gaming (optional): { sens_profiles, sessions, aim_scores, captures, changes } from the main process
+function buildFiles(state, gaming) {
   const s = isObj(state) ? state : {}
   const files = [...journalFiles(s.journals)]
   for (const f of [goalsFile(s.goals), todosFile(s), notesFile(s)]) if (f) files.push(f)
+  files.push(...gamingFiles(gaming))
   const index = [
     front('index'), '# SychBoard export', '',
     'These files are written by **SychBoard** (one-way: SychBoard to Obsidian). Edit them in SychBoard;',

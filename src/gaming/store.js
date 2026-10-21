@@ -183,10 +183,95 @@ function createStore(getDb, awardXp) {
     return { deleted: db().prepare('DELETE FROM gaming_captures WHERE id=?').run(id).changes > 0 }
   }
 
+  // ── Change journal ─────────────────────────────────────────────────────────
+  const VERDICTS = ['testing', 'keep', 'revert']
+
+  function optCaptureId(v, label) {
+    if (v == null || v === '') return null
+    const id = Number(v)
+    if (!Number.isInteger(id) || id <= 0 || !db().prepare('SELECT 1 FROM gaming_captures WHERE id=?').get(id)) throw new RangeError(`${label} capture does not exist`)
+    return id
+  }
+
+  // Validates the fields shared by add and update. `p` may be partial when `partial` is true.
+  function changeFields(p, partial) {
+    const out = {}
+    const has = k => !partial || p[k] !== undefined
+    if (has('date')) out.date = reqDate(p.date)
+    if (has('what')) {
+      const w = optText(p.what, 200, 'Change')
+      if (!w) throw new RangeError('Describe the change (e.g. "turned DP overclock off")')
+      out.what = w
+    }
+    if (has('before_capture_id')) out.before_capture_id = optCaptureId(p.before_capture_id, 'Before')
+    if (has('after_capture_id')) out.after_capture_id = optCaptureId(p.after_capture_id, 'After')
+    if (has('felt')) {
+      const f = optNum(p.felt, 'Felt')
+      if (f !== null && (!Number.isInteger(f) || f < 1 || f > 5)) throw new RangeError('Felt must be 1-5')
+      out.felt = f
+    }
+    if (has('verdict')) {
+      const v = p.verdict == null || p.verdict === '' ? 'testing' : p.verdict
+      if (!VERDICTS.includes(v)) throw new RangeError('Verdict must be testing, keep or revert')
+      out.verdict = v
+    }
+    if (has('notes')) out.notes = optText(p.notes, 1000, 'Notes')
+    return out
+  }
+
+  function addChange(p) {
+    const c = changeFields({ verdict: 'testing', ...p }, false)
+    const info = db().prepare(`INSERT INTO gaming_changes (date,what,before_capture_id,after_capture_id,felt,verdict,notes) VALUES (?,?,?,?,?,?,?)`)
+      .run(c.date, c.what, c.before_capture_id, c.after_capture_id, c.felt, c.verdict, c.notes)
+    return { id: Number(info.lastInsertRowid) }
+  }
+
+  // The capture's headline numbers ride along so the UI can show a before / after delta
+  // without fetching every frametime series.
+  function listChanges(limit = 500) {
+    const cols = alias => ['label', 'avg_fps', 'low1_fps', 'low01_fps', 'spikes', 'median_ms', 'p99_ms', 'max_ms', 'present_kind'].map(c => `${alias}.${c} AS ${alias}_${c}`).join(', ')
+    return db().prepare(`SELECT c.id, c.date, c.what, c.before_capture_id, c.after_capture_id, c.felt, c.verdict, c.notes, c.created_at, ${cols('b')}, ${cols('a')}
+      FROM gaming_changes c
+      LEFT JOIN gaming_captures b ON b.id = c.before_capture_id
+      LEFT JOIN gaming_captures a ON a.id = c.after_capture_id
+      ORDER BY c.date DESC, c.id DESC LIMIT ?`).all(Math.min(Math.max(1, limit | 0), 5000))
+  }
+
+  // Only the fields present in `patch` change, so marking "keep" can't blank the notes.
+  function updateChange(id, patch) {
+    if (!Number.isInteger(id) || id <= 0) throw new RangeError('Invalid change id')
+    if (!db().prepare('SELECT 1 FROM gaming_changes WHERE id=?').get(id)) throw new Error('Change not found')
+    const allowed = ['date', 'what', 'before_capture_id', 'after_capture_id', 'felt', 'verdict', 'notes']
+    const given = {}
+    for (const k of allowed) if (patch && patch[k] !== undefined) given[k] = patch[k]
+    const c = changeFields(given, true)
+    const keys = Object.keys(c)
+    if (!keys.length) return { updated: false }
+    db().prepare(`UPDATE gaming_changes SET ${keys.map(k => k + '=?').join(', ')} WHERE id=?`).run(...keys.map(k => c[k]), id)
+    return { updated: true }
+  }
+
+  function deleteChange(id) {
+    if (!Number.isInteger(id) || id <= 0) throw new RangeError('Invalid change id')
+    return { deleted: db().prepare('DELETE FROM gaming_changes WHERE id=?').run(id).changes > 0 }
+  }
+
+  // Everything the Obsidian export needs, in summary form (no frametime series).
+  function exportSummary() {
+    return {
+      sens_profiles: listSensProfiles(),
+      sessions: listSessions(300),
+      aim_scores: listAimScores(300),
+      captures: db().prepare(`SELECT ${CAPTURE_COLS} FROM gaming_captures ORDER BY id DESC LIMIT 300`).all(),
+      changes: listChanges(500)
+    }
+  }
+
   return {
     listSensProfiles, saveSensProfile, deleteSensProfile,
     addSession, listSessions, deleteSession, addAimScore, listAimScores, deleteAimScore,
-    getPresentMonPath, setPresentMonPath, saveCapture, listCaptures, getCapture, deleteCapture
+    getPresentMonPath, setPresentMonPath, saveCapture, listCaptures, getCapture, deleteCapture,
+    addChange, listChanges, updateChange, deleteChange, exportSummary
   }
 }
 

@@ -25,6 +25,11 @@ function registerGamingIpc(ipcMain, deps) {
   handle('gaming:aim:list', () => store.listAimScores())
   handle('gaming:aim:delete', id => store.deleteAimScore(id))
 
+  handle('gaming:change:add', p => store.addChange(p || {}))
+  handle('gaming:change:list', () => store.listChanges())
+  handle('gaming:change:update', (id, patch) => store.updateChange(id, patch || {}))
+  handle('gaming:change:delete', id => store.deleteChange(id))
+
   // Read-only system checks (see healthcheck.ps1). Never changes a setting.
   handle('gaming:health:run', () => runHealthCheck())
 

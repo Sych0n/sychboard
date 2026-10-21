@@ -6,7 +6,7 @@ const { isVault, syncToVault } = require('./vault')
 
 const KEY = 'obsidian_vault_path'
 
-// deps: { dialog, getWindow, getSetting, setSetting }
+// deps: { dialog, getWindow, getSetting, setSetting, getGaming? }  (getGaming returns the Gaming tab's summary data)
 function registerObsidianIpc(ipcMain, deps) {
   const handle = (channel, fn) => ipcMain.handle(channel, async (_, ...args) => {
     try { return { ok: true, data: await fn(...args) } }
@@ -30,7 +30,10 @@ function registerObsidianIpc(ipcMain, deps) {
   handle('obsidian:sync', state => {
     const vault = current()
     if (!vault) throw new Error('No Obsidian vault connected')
-    return syncToVault(vault, buildFiles(pickState(state)))
+    let gaming = null
+    // A problem reading gaming data must not stop the journal / goals / notes from syncing.
+    try { gaming = deps.getGaming ? deps.getGaming() : null } catch (e) { console.error('[obsidian] gaming data:', e.message) }
+    return syncToVault(vault, buildFiles(pickState(state), gaming))
   })
 
   handle('obsidian:disconnect', () => { deps.setSetting(KEY, ''); return { path: null, valid: false } })

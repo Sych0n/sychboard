@@ -157,13 +157,85 @@ test('never deletes: entries removed from SychBoard stay in the vault', () => {
   assert.ok(fs.existsSync(path.join(v, 'SychBoard', 'Journal', '2026-10-20.md')))
 })
 
+// ── gaming tab export ────────────────────────────────────────────────────────
+const GAMING = () => ({
+  sens_profiles: [{ id: 1, name: 'Valorant main', game: 'valorant', sens: 0.4, dpi: 800 }],
+  sessions: [{ id: 1, date: '2026-10-20', start_time: '21:00', game: 'Valorant', mode: 'Comp', result: 'win', score: 230, rank_change: 21, smoothness: 4, notes: 'felt | heavy\nsecond line' }],
+  aim_scores: [{ id: 1, date: '2026-10-20', scenario: 'Gridshot', score: 81234.5, notes: null }],
+  captures: [{ id: 2, created_at: '2026-10-21 12:00:00', label: '300 Hz', app: 'VALORANT.exe', avg_fps: 295.04, low1_fps: 180, low01_fps: 90, spikes: 3, max_ms: 20.5, present_kind: 'direct' }],
+  changes: [
+    { id: 1, date: '2026-10-21', what: 'DP overclock off [[Secret Note]]', before_capture_id: 1, after_capture_id: 2, felt: 4, verdict: 'keep', notes: null,
+      b_label: '320 Hz', b_avg_fps: 313.9, b_low1_fps: 182.7, b_present_kind: 'direct', a_label: '300 Hz', a_avg_fps: 295.04, a_low1_fps: 180, a_present_kind: 'composed-flip' },
+    { id: 2, date: '2026-10-20', what: 'second | change', before_capture_id: null, after_capture_id: null, felt: null, verdict: 'testing', notes: 'n', b_label: null, a_label: null }
+  ]
+})
+
+test('gaming export: change log, captures, sessions + aim and sens profiles become owned notes with tables', () => {
+  const files = buildFiles({}, GAMING())
+  const paths = files.map(f => f.relPath).sort()
+  assert.deepEqual(paths, ['SychBoard/00 SychBoard.md', 'SychBoard/Gaming/Captures.md', 'SychBoard/Gaming/Change Log.md', 'SychBoard/Gaming/Sens Profiles.md', 'SychBoard/Gaming/Sessions and Aim.md'])
+  for (const f of files) assert.ok(f.content.startsWith('---\nsource: sychboard\n'), f.relPath)
+  const log = by(files, 'SychBoard/Gaming/Change Log.md').content
+  assert.match(log, /\| 2026-10-21 \| DP overclock off \[ \[Secret Note\]\] \| 320 Hz \(313\.9 fps, 1% low 182\.7, Direct flip\) \| 300 Hz \(295\.0 fps, 1% low 180\.0, Composed flip\) \| 4\/5 \| keep \|/)
+  assert.match(log, /\| 2026-10-20 \| second \\\| change \| – \| – \| – \| testing \| n \|/)
+  assert.match(by(files, 'SychBoard/Gaming/Captures.md').content, /\| 2026-10-21 \| 300 Hz \| VALORANT\.exe \| 295\.0 \| 180\.0 \| 90\.0 \| 3 \| 20\.5 \| Direct flip \|/)
+  const sess = by(files, 'SychBoard/Gaming/Sessions and Aim.md').content
+  assert.match(sess, /\| 2026-10-20 21:00 \| Valorant \| Comp \| win \| 230 \| \+21 \| 4\/5 \| felt \\\| heavy second line \|/)
+  assert.match(sess, /\| 2026-10-20 \| Gridshot \| 8123[45] \|/)
+  assert.match(by(files, 'SychBoard/Gaming/Sens Profiles.md').content, /\| Valorant main \| valorant \| 0\.4 \| 800 \|/)
+  assert.match(by(files, 'SychBoard/00 SychBoard.md').content, /\[\[Gaming\/Change Log\]\]/)
+})
+
+test('gaming export: every table row has the same number of cells even with pipes and newlines in the text', () => {
+  const g = GAMING()
+  g.changes[0].what = 'a | b | c\nd'
+  const log = by(buildFiles({}, g), 'SychBoard/Gaming/Change Log.md').content
+  const rows = log.split('\n').filter(l => l.startsWith('|'))
+  const cells = l => l.replace(/\\\|/g, '').split('|').length
+  assert.ok(rows.length >= 4)
+  for (const r of rows) assert.equal(cells(r), cells(rows[0]), r)
+})
+
+test('gaming export: nothing to export, or junk input, adds no gaming files and never throws', () => {
+  const plain = buildFiles({}, null).map(f => f.relPath)
+  assert.deepEqual(plain, ['SychBoard/00 SychBoard.md'])
+  assert.deepEqual(buildFiles({}, { sessions: 'x', changes: [null, 5, 'a'], captures: {} }).map(f => f.relPath), ['SychBoard/00 SychBoard.md'])
+  assert.deepEqual(buildFiles({}, { changes: [] }).map(f => f.relPath), ['SychBoard/00 SychBoard.md'])
+})
+
+test('gaming export is deterministic (so unchanged notes are not rewritten)', () => {
+  assert.deepEqual(buildFiles(STATE(), GAMING()), buildFiles(STATE(), GAMING()))
+})
+
+test('gaming data comes from the main process, not the renderer: a renderer-supplied `gaming` key is ignored', async () => {
+  const v = mkVault()
+  const h = ipcHarness({ canceled: false, filePaths: [v] }, { getGaming: () => GAMING() })
+  await h.call('obsidian:pick')
+  const s = await h.call('obsidian:sync', { ...STATE(), gaming: { changes: [{ id: 9, date: '2099-01-01', what: 'INJECTED' }] } })
+  assert.equal(s.ok, true)
+  const log = fs.readFileSync(path.join(v, 'SychBoard', 'Gaming', 'Change Log.md'), 'utf8')
+  assert.match(log, /DP overclock off/)
+  assert.ok(!log.includes('INJECTED'))
+})
+
+test('a failure reading gaming data does not stop the rest of the sync', async () => {
+  const v = mkVault()
+  const h = ipcHarness({ canceled: false, filePaths: [v] }, { getGaming: () => { throw new Error('db closed') } })
+  await h.call('obsidian:pick')
+  const s = await h.call('obsidian:sync', STATE())
+  assert.equal(s.ok, true)
+  assert.ok(fs.existsSync(path.join(v, 'SychBoard', 'Journal', '2026-10-20.md')))
+  assert.ok(!fs.existsSync(path.join(v, 'SychBoard', 'Gaming')))
+})
+
 // ── ipc ──────────────────────────────────────────────────────────────────────
-function ipcHarness(pickResult) {
+function ipcHarness(pickResult, extraDeps = {}) {
   const handlers = {}, settings = {}
   registerObsidianIpc({ handle: (ch, fn) => { handlers[ch] = fn } }, {
     dialog: { showOpenDialog: async () => pickResult },
     getWindow: () => null,
-    getSetting: k => settings[k], setSetting: (k, v) => { settings[k] = v }
+    getSetting: k => settings[k], setSetting: (k, v) => { settings[k] = v },
+    ...extraDeps
   })
   return { call: (ch, ...a) => handlers[ch]({}, ...a), settings }
 }

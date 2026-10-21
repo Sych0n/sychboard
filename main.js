@@ -404,19 +404,21 @@ if (gotSingleInstanceLock) {
   })
 }
 
-require('./src/obsidian/ipc').registerObsidianIpc(ipcMain, {
-  dialog,
-  getWindow: () => mainWindow,
-  getSetting: key => { try { return db.getSetting(key) } catch (_) { return null } },
-  setSetting: (key, value) => db.setSetting(key, value)
-})
-
-require('./src/gaming/ipc').registerGamingIpc(ipcMain, {
+const gamingStore = require('./src/gaming/ipc').registerGamingIpc(ipcMain, {
   getDb: () => db.getDb(),
   awardXp: db.awardXp,
   dialog,
   getWindow: () => mainWindow,
   tempDir: () => app.getPath('temp')
+})
+
+require('./src/obsidian/ipc').registerObsidianIpc(ipcMain, {
+  dialog,
+  getWindow: () => mainWindow,
+  getSetting: key => { try { return db.getSetting(key) } catch (_) { return null } },
+  setSetting: (key, value) => db.setSetting(key, value),
+  // Gaming data is read here in the main process, never accepted from the renderer.
+  getGaming: () => gamingStore.exportSummary()
 })
 
 // ── Gamification IPC ──

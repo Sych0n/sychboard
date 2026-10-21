@@ -204,6 +204,80 @@ test('captures: the presentation path is saved, listed as a kind, and returned i
   assert.equal(store.getCapture(withPath.id).present_json, undefined)
 })
 
+// ── Change journal ───────────────────────────────────────────────────────────
+test('changes: add with and without linked captures; list shows the captures\' headline numbers, newest first', () => {
+  const store = freshWithSettings()
+  const before = store.saveCapture('320 Hz', mkCapture(Array(100).fill(3.2)))
+  const after = store.saveCapture('300 Hz', mkCapture(Array(100).fill(3.4)))
+  store.addChange({ date: '2026-10-20', what: 'DP overclock off', notes: 'first test' })
+  const { id } = store.addChange({ date: '2026-10-21', what: '  Max FPS 315 -> 295  ', before_capture_id: before.id, after_capture_id: after.id, felt: 4, verdict: 'keep' })
+  const list = store.listChanges()
+  assert.deepEqual(list.map(c => c.what), ['Max FPS 315 -> 295', 'DP overclock off'])
+  assert.equal(list[0].id, id)
+  assert.equal(list[0].verdict, 'keep')
+  assert.equal(list[0].felt, 4)
+  assert.equal(list[0].b_label, '320 Hz')
+  assert.equal(list[0].a_label, '300 Hz')
+  assert.ok(Math.abs(list[0].b_avg_fps - 312.5) < 0.1)
+  assert.equal(list[1].verdict, 'testing')   // default
+  assert.equal(list[1].b_label, null)
+  assert.equal(list[1].felt, null)
+})
+
+test('changes: validation', () => {
+  const store = freshWithSettings()
+  const ok = { date: '2026-10-21', what: 'x' }
+  assert.throws(() => store.addChange({ ...ok, what: '  ' }), /Describe the change/)
+  assert.throws(() => store.addChange({ ...ok, what: 'x'.repeat(201) }), /too long/)
+  assert.throws(() => store.addChange({ ...ok, date: '21/10/2026' }), /YYYY-MM-DD/)
+  assert.throws(() => store.addChange({ ...ok, felt: 6 }), /1-5/)
+  assert.throws(() => store.addChange({ ...ok, felt: 2.5 }), /1-5/)
+  assert.throws(() => store.addChange({ ...ok, verdict: 'maybe' }), /testing, keep or revert/)
+  assert.throws(() => store.addChange({ ...ok, before_capture_id: 99 }), /Before capture does not exist/)
+  assert.throws(() => store.addChange({ ...ok, after_capture_id: 'abc' }), /After capture does not exist/)
+  assert.equal(store.listChanges().length, 0)
+})
+
+test('changes: update touches only the fields given; delete; deleting a capture unlinks it instead of failing', () => {
+  const store = freshWithSettings()
+  const cap = store.saveCapture('c', mkCapture(Array(50).fill(3)))
+  const { id } = store.addChange({ date: '2026-10-21', what: 'thing', notes: 'keep this note', before_capture_id: cap.id })
+  assert.deepEqual(store.updateChange(id, { verdict: 'revert', felt: 2 }), { updated: true })
+  let c = store.listChanges()[0]
+  assert.equal(c.verdict, 'revert'); assert.equal(c.felt, 2)
+  assert.equal(c.notes, 'keep this note')   // untouched
+  assert.equal(c.what, 'thing')
+  assert.deepEqual(store.updateChange(id, {}), { updated: false })
+  assert.deepEqual(store.updateChange(id, { bogus: 1 }), { updated: false })
+  assert.throws(() => store.updateChange(id, { verdict: 'nope' }), /testing, keep or revert/)
+  assert.throws(() => store.updateChange(id, { what: '' }), /Describe the change/)
+  assert.throws(() => store.updateChange(999, { verdict: 'keep' }), /not found/)
+  assert.throws(() => store.updateChange('1', { verdict: 'keep' }), RangeError)
+  store.updateChange(id, { felt: null })
+  assert.equal(store.listChanges()[0].felt, null)
+  store.deleteCapture(cap.id)
+  c = store.listChanges()[0]
+  assert.equal(c.before_capture_id, null)
+  assert.equal(c.b_label, null)
+  assert.deepEqual(store.deleteChange(id), { deleted: true })
+  assert.deepEqual(store.deleteChange(id), { deleted: false })
+  assert.throws(() => store.deleteChange(-1), RangeError)
+})
+
+test('exportSummary: everything the Obsidian export needs, with no frametime series', () => {
+  const store = freshWithSettings()
+  store.saveSensProfile({ name: 'main', game: 'valorant', sens: 0.4, dpi: 800 })
+  store.addSession({ date: '2026-10-20', game: 'Valorant' })
+  store.addAimScore({ date: '2026-10-20', scenario: 'Gridshot', score: 5 })
+  store.saveCapture('c', mkCapture(Array(50).fill(3)))
+  store.addChange({ date: '2026-10-21', what: 'w' })
+  const s = store.exportSummary()
+  assert.deepEqual(Object.keys(s).sort(), ['aim_scores', 'captures', 'changes', 'sens_profiles', 'sessions'])
+  assert.equal(s.captures[0].frametimes, undefined)
+  assert.equal(s.captures[0].present_json, undefined)
+  assert.equal(s.changes.length, 1)
+})
+
 test('captures: validation', () => {
   const store = freshWithSettings()
   assert.throws(() => store.saveCapture('', mkCapture([5, 5])), RangeError)
