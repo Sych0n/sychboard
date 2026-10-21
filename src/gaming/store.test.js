@@ -190,6 +190,20 @@ test('captures: save, list without frametimes, get with frametimes, delete', () 
   assert.throws(() => store.getCapture(saved.id), /not found/)
 })
 
+test('captures: the presentation path is saved, listed as a kind, and returned in full by get', () => {
+  const store = freshWithSettings()
+  const Present = require('./presentpath')
+  const present = Present.summarize(Array(20).fill(0).map(() => ({ mode: 'Composed: Flip', tearing: false, syncInterval: 1, displayLatency: 5, clickToPhoton: null, displayed: 3 })))
+  const withPath = store.saveCapture('with path', { ...mkCapture(Array(50).fill(3)), present })
+  const without = store.saveCapture('old style', mkCapture(Array(50).fill(3)))
+  assert.equal(withPath.present_kind, 'composed-flip')
+  assert.equal(without.present_kind, null)
+  assert.equal(store.listCaptures()[0].present_json, undefined) // the JSON stays out of the list
+  assert.deepEqual(store.getCapture(withPath.id).present, present)
+  assert.equal(store.getCapture(without.id).present, null)
+  assert.equal(store.getCapture(withPath.id).present_json, undefined)
+})
+
 test('captures: validation', () => {
   const store = freshWithSettings()
   assert.throws(() => store.saveCapture('', mkCapture([5, 5])), RangeError)

@@ -43,6 +43,26 @@ test('export → clear → import round-trips everything, keeping session → pr
   assert.equal(store.listSessions().find(s => s.notes === 'tired').sens_profile_name, 'main')
 })
 
+test('a capture\'s presentation path survives a backup round-trip; a tampered one is cleaned', () => {
+  const { db, store } = seeded()
+  const Present = require('./presentpath')
+  const present = Present.summarize(Array(40).fill(0).map(() => ({ mode: 'Hardware Composed: Independent Flip', tearing: true, syncInterval: 0, displayLatency: 4, clickToPhoton: 3, displayed: 3 })))
+  const fts = Array(60).fill(3)
+  const saved = store.saveCapture('with path', { app: 'game.exe', frametimes: fts, metrics: Frames.computeMetrics(fts), present })
+  const dump = JSON.parse(JSON.stringify(B.exportGaming(db)))
+  const before = store.getCapture(saved.id)
+  inTx(db, () => B.importGaming(db, dump, NOW))
+  assert.deepEqual(store.getCapture(saved.id), before)
+  assert.equal(store.getCapture(saved.id).present_kind, 'direct')
+
+  const tampered = JSON.parse(JSON.stringify(dump))
+  const t = tampered.captures.find(c => c.id === saved.id)
+  t.present.kind = 'evil'
+  inTx(db, () => B.importGaming(db, tampered, NOW))
+  assert.equal(store.getCapture(saved.id).present, null)
+  assert.equal(store.getCapture(saved.id).present_kind, null)
+})
+
 test('import replaces existing gaming data rather than merging', () => {
   const { db, store } = seeded()
   const dump = B.exportGaming(db)

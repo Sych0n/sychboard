@@ -2,6 +2,7 @@
 // Gaming-tab data in SychBoard's backup / restore / clear-all flows. These take a
 // db handle and do NOT open their own transaction: db.js calls them from inside its
 // own export/import/clear transactions so a restore is all-or-nothing.
+const Present = require('./presentpath')
 
 // Settings that describe this machine, not the user's data. Never exported, never
 // restored from a file (a crafted backup must not be able to point SychBoard at an
@@ -15,8 +16,15 @@ function exportGaming(db) {
     sens_profiles: db.prepare('SELECT id, name, game, sens, dpi, created_at, updated_at FROM gaming_sens_profiles').all(),
     sessions: db.prepare('SELECT id, date, start_time, end_time, game, mode, result, score, rank_change, notes, smoothness, sens_profile_id, created_at FROM gaming_sessions').all(),
     aim_scores: db.prepare('SELECT id, date, scenario, score, notes, created_at FROM gaming_aim_scores').all(),
-    captures: db.prepare('SELECT id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, frametimes FROM gaming_captures').all()
-      .map(c => { try { return { ...c, frametimes: JSON.parse(c.frametimes) } } catch (_) { return null } }).filter(Boolean)
+    captures: db.prepare('SELECT id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, frametimes, present_json FROM gaming_captures').all()
+      .map(c => {
+        try {
+          const { present_json, ...rest } = c
+          let present = null
+          try { present = present_json ? JSON.parse(present_json) : null } catch (_) { /* damaged: leave out */ }
+          return { ...rest, frametimes: JSON.parse(c.frametimes), present }
+        } catch (_) { return null }
+      }).filter(Boolean)
   }
 }
 
@@ -78,7 +86,7 @@ function importGaming(db, g, nowStr) {
   }
 
   const insC = db.prepare(`INSERT OR IGNORE INTO gaming_captures
-    (id,created_at,label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    (id,created_at,label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes,present_kind,present_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
   for (const c of g.captures) {
     if (!isObj(c) || !Array.isArray(c.frametimes)) continue
     const id = posInt(c.id), label = str(c.label, 80)
@@ -88,8 +96,9 @@ function importGaming(db, g, nowStr) {
     const ft = c.frametimes.map(Number).filter(v => Number.isFinite(v) && v > 0)
     if (!id || !label || [dur, avg, low1, low01, median, p99, max, spikeThr].some(n => n === null) ||
         !frames || spikes === null || spikes < 0 || !ft.length) continue
+    const present = Present.sanitize(c.present)
     insC.run(id, ts(c.created_at) || nowStr, label, str(c.app, 120), dur, frames, avg, low1, low01, median, p99, max, spikes, spikeThr,
-      JSON.stringify(ft.map(v => Math.round(v * 100) / 100)))
+      JSON.stringify(ft.map(v => Math.round(v * 100) / 100)), present ? present.kind : null, present ? JSON.stringify(present) : null)
   }
 }
 

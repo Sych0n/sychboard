@@ -79,6 +79,13 @@ const migrations = [
       ('fortnight_gaming','Fortnight Flame','14-day Gaming streak','⚡',5),
       ('monthly_gaming','Monthly Master','30-day Gaming streak','🏆',5),
       ('centurion_gaming','Centurion','100-day Gaming streak','👑',5);
+  `},
+  { version: 12, sql: `
+    -- How frames reached the screen (presentpath.js summary as JSON) and its dominant kind,
+    -- so the capture list can show a badge without parsing every row. NULL for captures
+    -- saved before this version.
+    ALTER TABLE gaming_captures ADD COLUMN present_kind TEXT;
+    ALTER TABLE gaming_captures ADD COLUMN present_json TEXT;
   `}
 ]
 

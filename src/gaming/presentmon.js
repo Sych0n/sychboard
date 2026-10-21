@@ -12,6 +12,7 @@ const fs = require('fs')
 const path = require('path')
 const { spawn: nodeSpawn } = require('child_process')
 const Frames = require('./framemetrics')
+const Present = require('./presentpath')
 
 const MIN_SECONDS = 5
 const MAX_SECONDS = 120
@@ -69,11 +70,12 @@ function splitCsvLine(line) {
   return out
 }
 
-// Returns { app, frametimes, apps:[{app,frames}] }. With no processName the
+// Returns { app, frametimes, present, apps:[{app,frames}] }. `present` is the presentation-path
+// summary (see presentpath.js), or null when the CSV has no PresentMode column. With no processName the
 // application with the most frames is used (a desktop has many presenting apps).
 function parseCsv(text, processName) {
   const lines = text.split(/\r?\n/).filter(l => l.trim())
-  if (lines.length < 2) return { app: null, frametimes: [], apps: [] }
+  if (lines.length < 2) return { app: null, frametimes: [], present: null, apps: [] }
   const header = splitCsvLine(lines[0]).map(h => h.trim())
   const iApp = header.indexOf('Application')
   // 1.x calls it MsBetweenPresents, 2.x FrameTime.
@@ -81,8 +83,18 @@ function parseCsv(text, processName) {
   if (iFt < 0) iFt = header.indexOf('FrameTime')
   const iType = header.indexOf('FrameType')
   if (iApp < 0 || iFt < 0) throw new Error('Unrecognised PresentMon CSV (no Application / FrameTime columns) — is this PresentMon 2.x?')
+  // Optional columns (2.x): how each frame reached the screen, and latency figures.
+  const iMode = header.indexOf('PresentMode')
+  const iTear = header.indexOf('AllowsTearing')
+  const iSync = header.indexOf('SyncInterval')
+  const iDispLat = header.indexOf('DisplayLatency')
+  const iC2p = header.indexOf('ClickToPhotonLatency')
+  const iShown = header.indexOf('DisplayedTime')
+  const cell = (c, i) => (i >= 0 && c[i] != null ? c[i].trim() : '')
+  const numCell = (c, i) => { const v = parseFloat(cell(c, i)); return Number.isFinite(v) ? v : null }
 
   const byApp = new Map()
+  const presentByApp = new Map()
   for (let i = 1; i < lines.length; i++) {
     const c = splitCsvLine(lines[i])
     // Generated frames (frame generation: AFMF etc.) are not rendered frames.
@@ -90,8 +102,16 @@ function parseCsv(text, processName) {
     const ft = parseFloat(c[iFt])
     if (!Number.isFinite(ft) || ft <= 0) continue
     const app = (c[iApp] || '').trim()
-    if (!byApp.has(app)) byApp.set(app, [])
+    if (!byApp.has(app)) { byApp.set(app, []); presentByApp.set(app, []) }
     byApp.get(app).push(ft)
+    if (iMode >= 0) presentByApp.get(app).push({
+      mode: cell(c, iMode),
+      tearing: iTear >= 0 ? cell(c, iTear) === '1' : null,
+      syncInterval: numCell(c, iSync),
+      displayLatency: numCell(c, iDispLat),
+      clickToPhoton: numCell(c, iC2p),
+      displayed: numCell(c, iShown)
+    })
   }
   const apps = [...byApp.entries()].map(([app, f]) => ({ app, frames: f.length })).sort((a, b) => b.frames - a.frames)
   let chosen = null
@@ -103,7 +123,12 @@ function parseCsv(text, processName) {
     const NOISE = new Set(['<unknown>', 'dwm.exe'])
     chosen = apps.find(a => !NOISE.has(a.app.toLowerCase())) || apps[0] || null
   }
-  return { app: chosen ? chosen.app : null, frametimes: chosen ? byApp.get(chosen.app) : [], apps }
+  return {
+    app: chosen ? chosen.app : null,
+    frametimes: chosen ? byApp.get(chosen.app) : [],
+    present: chosen && iMode >= 0 ? Present.summarize(presentByApp.get(chosen.app)) : null,
+    apps
+  }
 }
 
 // Returns { promise, cancel }. The promise resolves to
@@ -150,7 +175,7 @@ function startCapture({ exe, seconds, processName, tempDir, spawn = nodeSpawn })
           ? `No frames captured for ${proc}. Is it running and presenting frames?`
           : 'No frames captured. Make sure a game or app is actively presenting frames during the capture.'))
       }
-      resolve({ app: parsed.app, apps: parsed.apps.slice(0, 8), frametimes: parsed.frametimes, metrics, seconds: secs })
+      resolve({ app: parsed.app, apps: parsed.apps.slice(0, 8), frametimes: parsed.frametimes, present: parsed.present, metrics, seconds: secs })
     })
   })
 

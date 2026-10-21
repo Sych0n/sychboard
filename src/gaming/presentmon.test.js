@@ -71,7 +71,29 @@ test('parseCsv: quoted fields, bad rows, bad header', () => {
   assert.equal(r.app, 'my, game.exe')
   assert.deepEqual(r.frametimes, [5])
   assert.throws(() => P.parseCsv('Foo,Bar\n1,2'), /Unrecognised/)
-  assert.deepEqual(P.parseCsv('Application,FrameTime'), { app: null, frametimes: [], apps: [] })
+  assert.deepEqual(P.parseCsv('Application,FrameTime'), { app: null, frametimes: [], present: null, apps: [] })
+})
+
+test('parseCsv: presentation path, tearing, sync interval and latency columns (PresentMon 2.x)', () => {
+  const H = 'Application,FrameType,FrameTime,PresentMode,AllowsTearing,SyncInterval,DisplayLatency,ClickToPhotonLatency,DisplayedTime'
+  const r = P.parseCsv([H,
+    'game.exe,Application,3.1,Hardware Composed: Independent Flip,1,0,4.2,NA,3.1',
+    'game.exe,Application,3.2,Hardware Composed: Independent Flip,1,0,4.0,3.3,3.2',
+    'game.exe,Application,3.0,Composed: Flip,0,1,6.0,NA,6.3',
+    'dwm.exe,Application,16,Composed: Flip,0,1,9,NA,16'].join('\n'), 'game.exe')
+  assert.equal(r.present.kind, 'direct')
+  assert.equal(r.present.frames, 3)
+  assert.equal(Math.round(r.present.tearingPct), 67)
+  assert.equal(r.present.syncInterval, 0)
+  assert.equal(r.present.displayLatency.count, 3)
+  assert.equal(r.present.displayLatency.median, 4.2)
+  assert.deepEqual(r.present.clickToPhoton, { median: 3.3, p95: 3.3, max: 3.3, count: 1 })
+  // Only the chosen app's frames count: dwm.exe's composed frame is not in the summary.
+  assert.equal(r.present.modes.find(m => m.mode === 'Composed: Flip').frames, 1)
+})
+
+test('parseCsv: no PresentMode column means no presentation summary', () => {
+  assert.equal(P.parseCsv(csv([row('game.exe', 3)])).present, null)
 })
 
 // A stand-in for child_process.spawn: writes the CSV that PresentMon would, then exits.

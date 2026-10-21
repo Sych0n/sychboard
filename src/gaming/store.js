@@ -147,18 +147,20 @@ function createStore(getDb, awardXp) {
     return valid
   }
 
-  const CAPTURE_COLS = 'id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms'
+  const CAPTURE_COLS = 'id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, present_kind'
 
-  // `capture` = the result of a PresentMon run ({app, seconds, frametimes, metrics}).
+  // `capture` = the result of a PresentMon run ({app, seconds, frametimes, metrics, present}).
   function saveCapture(label, capture) {
     const l = typeof label === 'string' ? label.trim() : ''
     if (!l || l.length > 80) throw new RangeError('Label must be 1-80 characters (e.g. "baseline", "polling 2000Hz")')
     if (!capture || !capture.metrics || !Array.isArray(capture.frametimes) || !capture.frametimes.length) throw new Error('No capture to save — run one first')
     const m = capture.metrics
     const ft = JSON.stringify(capture.frametimes.map(v => Math.round(v * 100) / 100))
+    const present = capture.present || null
     const info = db().prepare(`INSERT INTO gaming_captures
-      (label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(l, capture.app || null, m.durationSec, m.frames, m.avgFps, m.low1Fps, m.low01Fps, m.medianMs, m.p99Ms, m.maxMs, m.spikes, m.spikeThresholdMs, ft)
+      (label,app,duration_s,frames,avg_fps,low1_fps,low01_fps,median_ms,p99_ms,max_ms,spikes,spike_threshold_ms,frametimes,present_kind,present_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(l, capture.app || null, m.durationSec, m.frames, m.avgFps, m.low1Fps, m.low01Fps, m.medianMs, m.p99Ms, m.maxMs, m.spikes, m.spikeThresholdMs, ft,
+        present ? present.kind : null, present ? JSON.stringify(present) : null)
     return db().prepare(`SELECT ${CAPTURE_COLS} FROM gaming_captures WHERE id=?`).get(Number(info.lastInsertRowid))
   }
 
@@ -168,9 +170,12 @@ function createStore(getDb, awardXp) {
 
   function getCapture(id) {
     if (!Number.isInteger(id) || id <= 0) throw new RangeError('Invalid capture id')
-    const r = db().prepare(`SELECT ${CAPTURE_COLS}, frametimes FROM gaming_captures WHERE id=?`).get(id)
+    const r = db().prepare(`SELECT ${CAPTURE_COLS}, frametimes, present_json FROM gaming_captures WHERE id=?`).get(id)
     if (!r) throw new Error('Capture not found')
-    return { ...r, frametimes: JSON.parse(r.frametimes) }
+    let present = null
+    try { present = r.present_json ? JSON.parse(r.present_json) : null } catch (_) { /* damaged: treat as none */ }
+    const { present_json, ...rest } = r
+    return { ...rest, frametimes: JSON.parse(r.frametimes), present }
   }
 
   function deleteCapture(id) {

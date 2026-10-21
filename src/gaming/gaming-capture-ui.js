@@ -4,6 +4,7 @@
   'use strict'
   const G = window.Gaming
   const F = window.GamingFrames
+  const P = window.GamingPresent
   const esc = G.esc
 
   const api = () => window.sychboard && window.sychboard.gaming
@@ -19,6 +20,26 @@
   const f2 = v => (Math.round(v * 100) / 100).toFixed(2)
   const tile = (label, value) => `<div class="metric"><div class="ml">${label}</div><div class="mv">${value}</div></div>`
 
+  const badgeLevel = kind => (kind === 'direct' ? 'good' : kind && kind !== 'unknown' ? 'warn' : '')
+  const kindBadge = kind => kind ? `<span class="gm-pathbadge ${badgeLevel(kind)}">${esc(P.KIND_LABEL[kind] || kind)}</span>` : ''
+
+  // "How frames reach the screen" — what PresentMon reports about the presentation path.
+  function pathHtml(s) {
+    if (!s) return ''
+    const v = P.verdict(s)
+    const ms = x => (x ? `${f1(x.median)} ms (95th ${f1(x.p95)})` : null)
+    const facts = [
+      s.modes.map(m => `${esc(m.mode)} ${m.pct.toFixed(0)}%`).join(' · '),
+      s.tearingPct >= 0.5 ? `tearing allowed on ${s.tearingPct.toFixed(0)}% of frames` : 'tearing not allowed',
+      s.syncInterval != null ? `sync interval ${s.syncInterval}` : null,
+      s.displayLatency ? `display latency ${ms(s.displayLatency)}` : null,
+      s.clickToPhoton ? `click-to-photon ${ms(s.clickToPhoton)} over ${s.clickToPhoton.count} clicks` : null
+    ].filter(Boolean)
+    return `<div class="gm-path ${v.level}"><div class="gm-path-title">${esc(v.title)}</div>
+      <div class="gm-path-text">${esc(v.text)}</div>
+      <div class="gm-path-facts">${facts.join('<br>')}</div></div>`
+  }
+
   function resultHtml(r) {
     const m = r.metrics
     const others = r.apps.filter(a => a.app !== r.app).slice(0, 4).map(a => a.app)
@@ -28,6 +49,7 @@
         ${tile('Avg FPS', f1(m.avgFps))}${tile('1% low', f1(m.low1Fps))}${tile('0.1% low', f1(m.low01Fps))}
         ${tile('Spikes', m.spikes)}${tile('99th pct ms', f2(m.p99Ms))}${tile('Worst frame ms', f1(m.maxMs))}
       </div>
+      ${pathHtml(r.present)}
       ${G.charts.multi([{ label: 'frametime', color: 'var(--gm)', values: F.downsampleMax(r.frametimes, 600) }],
         { hline: { y: m.spikeThresholdMs, label: `spike > ${f1(m.spikeThresholdMs)} ms (2× median)` }, label: 'Frametime graph' })}
       <div class="gm-note">Lows are the average of the slowest 1% / 0.1% of frames. Spikes are frames slower than 2× the median.</div>
@@ -45,8 +67,19 @@
       return `<tr><td>${esc(r.label)}</td><td>${fmt(r.a)}</td><td>${fmt(r.b)}</td><td ${cls(r.better)}>${d}${r.better === 'same' ? ' · same' : r.better === 'b' ? ' · better' : ' · worse'}</td></tr>`
     }).join('')
     const A = esc(c.a.label), B = esc(c.b.label)
+    // Path rows are text, not numbers: they say whether the two captures even used the same route.
+    const kindOf = x => (x.present ? P.KIND_LABEL[x.present.kind] : '—')
+    const lat = (x, key) => (x.present && x.present[key] ? f1(x.present[key].median) : '—')
+    const la = c.a.present && c.a.present.displayLatency, lb = c.b.present && c.b.present.displayLatency
+    // Under 1 ms is within run-to-run noise for a 30 s capture.
+    const latDiff = la && lb ? lb.median - la.median : null
+    const latDelta = latDiff == null ? '' : Math.abs(latDiff) < 1 ? 'same'
+      : `<span style="color:var(--${latDiff < 0 ? 'green' : 'red'})">${latDiff > 0 ? '+' : ''}${latDiff.toFixed(1)} ms · ${latDiff < 0 ? 'better' : 'worse'}</span>`
+    const pathRows = (c.a.present || c.b.present) ? `
+      <tr><td>Presentation path</td><td>${esc(kindOf(c.a))}</td><td>${esc(kindOf(c.b))}</td><td>${c.a.present && c.b.present && c.a.present.kind !== c.b.present.kind ? 'different path' : ''}</td></tr>
+      <tr><td>Display latency (ms, median)</td><td>${lat(c.a, 'displayLatency')}</td><td>${lat(c.b, 'displayLatency')}</td><td>${latDelta}</td></tr>` : ''
     return `
-      <table class="gm-table"><thead><tr><th>Metric</th><th>A: ${A}</th><th>B: ${B}</th><th>B vs A</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="gm-table"><thead><tr><th>Metric</th><th>A: ${A}</th><th>B: ${B}</th><th>B vs A</th></tr></thead><tbody>${rows}${pathRows}</tbody></table>
       ${G.charts.multi([
         { label: 'A: ' + c.a.label, color: '#22d3ee', values: F.downsampleMax(c.a.frametimes, 300) },
         { label: 'B: ' + c.b.label, color: '#f472b6', values: F.downsampleMax(c.b.frametimes, 300) }
@@ -58,7 +91,7 @@
     if (!st.saved.length) return '<div class="gm-note">No saved captures yet. Capture, give it a label, and save it to compare before/after.</div>'
     const rows = st.saved.map(c => `<tr>
       <td><input type="checkbox" data-cap-pick="${c.id}"${st.picked.includes(c.id) ? ' checked' : ''}></td>
-      <td><b>${esc(c.label)}</b><div class="gm-note" style="margin:2px 0 0">${esc(c.created_at)} UTC · ${esc(c.app || '')}</div></td>
+      <td><b>${esc(c.label)}</b>${kindBadge(c.present_kind)}<div class="gm-note" style="margin:2px 0 0">${esc(c.created_at)} UTC · ${esc(c.app || '')}</div></td>
       <td>${f1(c.avg_fps)}</td><td>${f1(c.low1_fps)}</td><td>${f1(c.low01_fps)}</td><td>${c.spikes}</td>
       <td style="text-align:right"><button class="btn btn-sm btn-d" data-cap-del="${c.id}">✕</button></td></tr>`).join('')
     return `<table class="gm-table"><thead><tr><th></th><th>Capture</th><th>Avg</th><th>1%</th><th>0.1%</th><th>Spikes</th><th></th></tr></thead><tbody>${rows}</tbody></table>
