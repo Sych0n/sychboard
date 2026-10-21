@@ -124,7 +124,7 @@
 
     body.querySelectorAll('[data-ch-verdict]').forEach(sel => sel.addEventListener('change', async () => {
       const res = await a.changes.update(Number(sel.dataset.chVerdict), { verdict: sel.value })
-      if (!res.ok) return showMsg(res.error)
+      if (!res.ok) { showMsg(res.error); return G.refreshCard('changes') } // reload so the dropdown shows what is stored
       changed()
     }))
 

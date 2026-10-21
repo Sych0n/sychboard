@@ -189,11 +189,12 @@ test('memory: dual channel at rated speed is ok; single stick, below rated, mixe
   const raw = GOOD()
   let c = by(H.evaluate(raw, { now: NOW }), 'memory')
   assert.equal(c.status, 'ok')
-  assert.equal(c.value, '2 sticks (16 + 16 GB = 32 GB) · 6000 MT/s (rated 6000)')
+  assert.equal(c.value, '2 sticks (16 + 16 GB = 32 GB) · 6000 MT/s')
   raw.memory = { modules: [{ gb: 32, rated: 6000, configured: 6000 }] }
   c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /single channel/)
   raw.memory = { modules: [{ gb: 16, rated: 6000, configured: 4800 }, { gb: 16, rated: 6000, configured: 4800 }] }
   c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /below its rated speed/)
+  assert.match(c.value, /4800 MT\/s \(module rating 6000\)/)
   raw.memory = { modules: [{ gb: 16, rated: 6000, configured: 6000 }, { gb: 16, rated: 5600, configured: 5600 }] }
   c = by(H.evaluate(raw, { now: NOW }), 'memory'); assert.equal(c.status, 'warn'); assert.match(c.why, /different speeds/)
   raw.memory = { modules: [] }

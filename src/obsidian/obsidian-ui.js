@@ -6,7 +6,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
   let status = { path: null, valid: false }
-  let timer = null, busy = false, last = null, error = ''
+  let timer = null, busy = false, pending = false, last = null, error = ''
 
   // Only note-like data is sent; the main process allowlists it again and never sees finances or keys.
   function snapshot() {
@@ -24,14 +24,17 @@
 
   async function syncNow() {
     const a = api()
-    if (!a || !status.valid || busy) return
-    busy = true; error = ''
+    if (!a || !status.valid) return
+    // A change made while a sync is running must not be lost: run once more when this one ends.
+    if (busy) { pending = true; return }
+    busy = true; pending = false; error = ''
     try {
       const r = await a.sync(snapshot())
       if (r.ok) last = { at: new Date(), ...r.data }; else error = r.error
     } catch (e) { error = e.message }
     busy = false
     paint()
+    if (pending) schedule()
   }
 
   // Called from save(): wait for typing to settle, then copy.
@@ -55,7 +58,7 @@
     if (!api()) { el.innerHTML = '<div class="sl">Obsidian</div><div class="ss">Needs the desktop app.</div>'; return }
     el.innerHTML = `
       <div class="sl">Obsidian</div>
-      <div class="ss">Copies your journal, goals, todos and notes into your Obsidian vault, in a <b>SychBoard</b> folder. One-way: edit in SychBoard. It never overwrites a file you wrote yourself, never deletes anything, and never sends finances or API keys.</div>
+      <div class="ss">Copies your journal, goals, todos and notes, plus your Gaming tab data (sessions and their notes, aim scores, frametime captures, change journal, sens profiles), into your Obsidian vault, in a <b>SychBoard</b> folder. One-way: edit in SychBoard. It never overwrites a file you wrote yourself, never deletes anything, and never sends finances or API keys.</div>
       <div class="ss" style="margin-top:6px">${status.valid ? 'Vault: <b>' + esc(status.path) + '</b>' : (status.path ? 'Saved vault not found: ' + esc(status.path) : 'No vault connected.')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="btn btn-sm" data-ob="pick">${status.valid ? 'Change vault…' : 'Choose vault…'}</button>

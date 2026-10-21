@@ -175,7 +175,7 @@ function evaluate(raw, { now = Date.now() } = {}) {
 
   // ── Memory ────────────────────────────────────────────────────────────────
   const mem = raw.memory
-  const memWhy = 'On Ryzen, memory speed sets how fast the CPU\'s memory controller runs and two sticks run in dual channel. A kit running below its rated speed usually means the EXPO / XMP profile is off; an aggressive profile can also be unstable, so errors in a memory test matter.'
+  const memWhy = 'On Ryzen, memory speed sets how fast the CPU\'s memory controller runs and two sticks run in dual channel. A kit running below its rated speed usually means the EXPO / XMP profile is off; an aggressive profile can also be unstable, so errors in a memory test matter. Windows can report the active profile as the rating, so confirm EXPO / XMP in the BIOS if unsure.'
   const mods = bad(mem) ? [] : asArray(mem.modules)
   if (bad(mem) || !mods.length) checks.push(unreadable('memory', 'Memory', bad(mem) ? mem : null, memWhy))
   else {
@@ -186,8 +186,11 @@ function evaluate(raw, { now = Date.now() } = {}) {
     if (mods.length === 1) notes.push('a single stick runs in single channel')
     if (below) notes.push('running below its rated speed')
     if (speeds.length > 1) notes.push('sticks run at different speeds')
+    // Windows may report the active profile's speed as the module's rating, so a rating is only
+    // shown when it differs from what the sticks are running at.
+    const differs = mods.filter(m => m.rated && m.configured && m.rated !== m.configured)
     const value = `${mods.length} stick${mods.length === 1 ? '' : 's'} (${mods.map(m => m.gb).join(' + ')} GB = ${total} GB) · ${speeds.join(' / ')} MT/s` +
-      (mods.every(m => m.rated === mods[0].rated) && mods[0].rated ? ` (rated ${mods[0].rated})` : '')
+      (differs.length ? ` (module rating ${[...new Set(differs.map(m => m.rated))].join(' / ')})` : '')
     checks.push((notes.length ? warn : ok)('memory', 'Memory', value, memWhy + (notes.length ? ' Found: ' + notes.join('; ') + '.' : '')))
   }
 
