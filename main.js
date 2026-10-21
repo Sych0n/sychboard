@@ -404,6 +404,13 @@ if (gotSingleInstanceLock) {
   })
 }
 
+require('./src/obsidian/ipc').registerObsidianIpc(ipcMain, {
+  dialog,
+  getWindow: () => mainWindow,
+  getSetting: key => { try { return db.getSetting(key) } catch (_) { return null } },
+  setSetting: (key, value) => db.setSetting(key, value)
+})
+
 require('./src/gaming/ipc').registerGamingIpc(ipcMain, {
   getDb: () => db.getDb(),
   awardXp: db.awardXp,
@@ -489,7 +496,9 @@ ipcMain.handle('settings:set', (_, key, value) => {
   // here would let anyone forge ownership of a paid cosmetic and then equip
   // it for free through the legitimate shop:equip path, since equipItem()
   // trusts shop_owned as its source of truth.
-  if (key.startsWith('equip_') || key === 'shop_owned') return
+  // Machine-specific paths (PresentMon exe, Obsidian vault) are only ever set through their own
+  // native-dialog handlers, never by a renderer-supplied string.
+  if (key.startsWith('equip_') || key === 'shop_owned' || require('./src/gaming/backup').MACHINE_SETTINGS.includes(key)) return
   try { db.setSetting(key, value) } catch(e) { console.error('[db]',e.message) }
 })
 ipcMain.handle('data:export-game', () => {

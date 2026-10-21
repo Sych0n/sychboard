@@ -163,6 +163,7 @@ function load(){
 function save(){
   const keys=['onboarded','gameIntroSeen','userName','accentColor','accentGlow','focusAreas','sections','groqKey','defaultWage','balances','holidays','trips','shifts','examDate','uniNotes','yt','dev','devTodos','habits','fitnessGoals','fitnessNotes','goals','secTodos','setupTodos','genTodos','todayFocus','journals','customSecs','chatHistory','lastHabitReset','scheduleEvents','sleep','notifSettings','notifLastSent','apiKeys','habitHistory','subscriptions','pomodoro','fxEnabled','lastAppDate','dayRolloverHour'];
   keys.forEach(k=>S.set(k,st[k]));
+  if(window.ObsidianSync)ObsidianSync.schedule();
 }
 
 // ── ENV HELPERS ──
@@ -1798,6 +1799,7 @@ async function setLaunchOnStartup(enabled){
 
 // ═══ SETTINGS ═══
 function rSettings(){
+  if(window.ObsidianSync)ObsidianSync.renderCard();
   const ni=document.getElementById('name-in');if(ni)ni.value=st.userName||'';
   const wi=document.getElementById('wage-in');if(wi)wi.value=st.defaultWage||10;
   const fxt=document.getElementById('fx-toggle');if(fxt)fxt.checked=st.fxEnabled!==false;

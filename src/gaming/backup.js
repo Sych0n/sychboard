@@ -6,7 +6,7 @@
 // Settings that describe this machine, not the user's data. Never exported, never
 // restored from a file (a crafted backup must not be able to point SychBoard at an
 // arbitrary executable), and kept across import / clear.
-const MACHINE_SETTINGS = ['gaming_presentmon_path']
+const MACHINE_SETTINGS = ['gaming_presentmon_path', 'obsidian_vault_path']
 
 const TABLES = ['sens_profiles', 'sessions', 'aim_scores', 'captures']
 

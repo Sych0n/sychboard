@@ -103,5 +103,5 @@ test('a failure mid-import rolls back (transaction owned by the caller)', () => 
 })
 
 test('machine-specific settings are never exported or restored', () => {
-  assert.deepEqual(B.MACHINE_SETTINGS, ['gaming_presentmon_path'])
+  assert.deepEqual(B.MACHINE_SETTINGS, ['gaming_presentmon_path', 'obsidian_vault_path'])
 })

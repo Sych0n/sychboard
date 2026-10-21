@@ -31,6 +31,12 @@ contextBridge.exposeInMainWorld('sychboard', {
     listTools: () => ipcRenderer.invoke('mcp:list-tools'),
     callTool: (name, args, approved) => ipcRenderer.invoke('mcp:call-tool', name, args, approved)
   },
+  obsidian: {
+    status: () => ipcRenderer.invoke('obsidian:status'),
+    pick: () => ipcRenderer.invoke('obsidian:pick'),
+    sync: (state) => ipcRenderer.invoke('obsidian:sync', state),
+    disconnect: () => ipcRenderer.invoke('obsidian:disconnect')
+  },
   gaming: {
     sens: {
       list: () => ipcRenderer.invoke('gaming:sens:list'),
