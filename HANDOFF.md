@@ -41,7 +41,7 @@ Invariants worth keeping: migrations are append-only (never edit a shipped one; 
 
 ## 4. Needs Daniel (do NOT do these; log questions here, don't guess)
 1. **Netlify key exposure (CRITICAL, in ROADMAP.md).** The `inject-env` edge function on `main` puts API keys in every page. Only Daniel can check whether the Netlify site is public and rotate the Groq / YouTube / Trading 212 keys. The uncommitted working-tree changes remove the edge function but do nothing for keys already exposed, and the deployed site builds from `main`.
-2. **Push `game-rebuild` to GitHub?** Needed before any cloud routine can see the Gaming work. Pushing a non-main branch does not trigger the release workflow, but it is outward-facing: ask first.
+2. ~~Push `game-rebuild` to GitHub?~~ **DECIDED 2026-10-23: Daniel approved.** Pushed `b1ef7ce..9dcd960` (fast-forward; `main` untouched; the diff was scanned and held no secrets; `release.yml` only triggers on `main`). The cloud routine now pushes to `game-rebuild` too, so **local chats must `git fetch origin && git pull --rebase --autostash` before working** (the 9 pre-existing uncommitted changes make a plain pull refuse).
 3. **Merging to `main` / releasing 1.1.** The checklist is in ROADMAP "v1.1 path to merging". A routine may prepare a merge-readiness report (see B1), never do the merge.
 4. **300 Hz vs 320 Hz test result** for the grainy feel (he is on 320 Hz, Valorant Max FPS 315). Hardware settings are his to change; record outcomes in the vault `Change Log` and the in-app Change Journal.
 5. **Mouse card**: still a "coming in a later phase" placeholder. Options: remove it, or build a polling-rate test. A polling test must use a **focused foreground window** (Windows throttles background raw input to ~125 Hz, which produced a false "125 Hz" finding once) and can only be validated with his real mouse on his PC.
@@ -76,6 +76,8 @@ Commit style: short lowercase messages, no Co-Authored-By. Commit the code and o
 "Run log" below together, then push to game-rebuild only.
 ```
 
+**Done 2026-10-23 (at Daniel's request, by the Smart Home chat):** routine `trig_01RiiStMDYq8sosAtYxQfZcE` was updated in place (same id), renamed "SychBoard - HANDOFF backlog (daily)", enabled, cron `0 4 * * *` (UTC, i.e. once a day about 05:00 UK time), with the prompt above (lightly shortened). The Chuck Bird routine was not touched. It runs in Anthropic's cloud from the pushed code; it does not use Daniel's PC or home server.
+
 ## 7. Definition of done for any item
 - `npm test` green (114 tests at time of writing; the count should only go up).
 - New behaviour has a test; new DB columns/tables have a **new** migration version and are covered by backup export/import in `src/gaming/backup.js` (+ a round-trip test).
@@ -84,3 +86,4 @@ Commit style: short lowercase messages, no Co-Authored-By. Commit the code and o
 
 ## 8. Run log (append-only: date, who, what, result)
 - 2026-10-23 Claude (Gaming tab chat): wrote this handoff. Branch state: `game-rebuild` 18 local commits not pushed, 114 tests passing, real-Electron smoke test of the Gaming tab passed in a throwaway profile.
+- 2026-10-23 Claude (Smart Home chat, Daniel's go-ahead): pushed `game-rebuild` (`b1ef7ce..9dcd960`), updated and enabled the routine (daily 04:00 UTC), recorded both here. Next: the routine's first run (B1 merge-readiness report).
