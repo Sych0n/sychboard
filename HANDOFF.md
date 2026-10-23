@@ -87,3 +87,4 @@ Commit style: short lowercase messages, no Co-Authored-By. Commit the code and o
 ## 8. Run log (append-only: date, who, what, result)
 - 2026-10-23 Claude (Gaming tab chat): wrote this handoff. Branch state: `game-rebuild` 18 local commits not pushed, 114 tests passing, real-Electron smoke test of the Gaming tab passed in a throwaway profile.
 - 2026-10-23 Claude (Smart Home chat, Daniel's go-ahead): pushed `game-rebuild` (`b1ef7ce..9dcd960`), updated and enabled the routine (daily 04:00 UTC), recorded both here. Next: the routine's first run (B1 merge-readiness report).
+- 2026-10-23 Claude (routine, first run): did B1 — wrote `docs/MERGE_READINESS.md` (diff vs `main`, migrations 1-13, version conflict 1.0.16 vs 1.0.17, data-migration verdict, open risks incl. the still-unrotated Netlify key leak). No app code touched. `npm test` 114/114 green. Next: B2 (review leftovers).
