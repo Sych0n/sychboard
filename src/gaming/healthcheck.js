@@ -204,8 +204,14 @@ function evaluate(raw, { now = Date.now() } = {}) {
       discord: 'Discord (overlay)', crosshairx: 'Crosshair X (overlay)', rtss: 'RivaTuner (overlay)', msiafterburner: 'MSI Afterburner',
       gamebarpresencewriter: 'Xbox Game Bar', overwolf: 'Overwolf (overlay)'
     }
-    const names = [...new Set(asArray(apps).map(n => NICE[String(n).toLowerCase()] || String(n)))]
-    checks.push((names.length ? warn : ok)('apps', 'Capture / overlay programs',
+    // Discord's overlay and Medal/Game Bar's always-on clip buffer sit in the background by
+    // design — seeing them running isn't a sign anything is actively capturing. Only an app
+    // the user deliberately opens to record (OBS, Streamlabs) is worth a warning.
+    const RECORDERS = new Set(['obs64', 'obs32', 'streamlabs obs'])
+    const list = asArray(apps)
+    const names = [...new Set(list.map(n => NICE[String(n).toLowerCase()] || String(n)))]
+    const recording = list.some(n => RECORDERS.has(String(n).toLowerCase()))
+    checks.push((recording ? warn : ok)('apps', 'Capture / overlay programs',
       names.length ? 'Running now: ' + names.join(', ') : 'None running', appsWhy))
   }
 

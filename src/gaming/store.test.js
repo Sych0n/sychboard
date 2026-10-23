@@ -278,6 +278,17 @@ test('exportSummary: everything the Obsidian export needs, with no frametime ser
   assert.equal(s.changes.length, 1)
 })
 
+test('exportSummary: skips re-reading when nothing gaming-related changed, picks it up again once it does', () => {
+  const store = freshWithSettings()
+  store.addSession({ date: '2026-10-20', game: 'Valorant' })
+  const first = store.exportSummary()
+  assert.strictEqual(store.exportSummary(), first) // same cached object: no change, no re-read
+  store.addAimScore({ date: '2026-10-20', scenario: 'Gridshot', score: 5 })
+  const second = store.exportSummary()
+  assert.notStrictEqual(second, first)
+  assert.equal(second.aim_scores.length, 1)
+})
+
 test('captures: validation', () => {
   const store = freshWithSettings()
   assert.throws(() => store.saveCapture('', mkCapture([5, 5])), RangeError)

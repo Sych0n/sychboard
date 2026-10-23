@@ -12,6 +12,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict'
 
+  const Stats = (typeof module === 'object' && module.exports)
+    ? require('./stats-math')
+    : (typeof self !== 'undefined' ? self : this).GamingStatsMath
+
   const SPIKE_FACTOR = 2
 
   function meanOfWorst(sortedDesc, fraction) {
@@ -26,9 +30,10 @@
     const ft = frametimes.filter(v => Number.isFinite(v) && v > 0)
     if (!ft.length) return null
     const desc = ft.slice().sort((a, b) => b - a)
+    const asc = desc.slice().reverse()
     const total = ft.reduce((s, v) => s + v, 0)
     const n = ft.length
-    const median = n % 2 ? desc[(n - 1) / 2] : (desc[n / 2 - 1] + desc[n / 2]) / 2
+    const median = Stats.median(asc)
     const spikeThresholdMs = median * SPIKE_FACTOR
     return {
       frames: n,
@@ -37,7 +42,7 @@
       low1Fps: 1000 / meanOfWorst(desc, 0.01),
       low01Fps: 1000 / meanOfWorst(desc, 0.001),
       medianMs: median,
-      p99Ms: desc[Math.min(n - 1, Math.floor(n * 0.01))],
+      p99Ms: Stats.percentile(asc, 0.99),
       maxMs: desc[0],
       spikeThresholdMs,
       spikes: ft.filter(v => v > spikeThresholdMs).length

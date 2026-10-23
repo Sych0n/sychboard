@@ -15,6 +15,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict'
 
+  const Stats = (typeof module === 'object' && module.exports)
+    ? require('./stats-math')
+    : (typeof self !== 'undefined' ? self : this).GamingStatsMath
+
   const KIND_LABEL = {
     direct: 'Direct flip',
     'composed-flip': 'Composed flip',
@@ -32,17 +36,10 @@
     return 'unknown'
   }
 
-  function percentile(sortedAsc, p) {
-    if (!sortedAsc.length) return null
-    return sortedAsc[Math.min(sortedAsc.length - 1, Math.floor(sortedAsc.length * p))]
-  }
-
   function stat(values) {
     const v = values.filter(x => Number.isFinite(x) && x >= 0).sort((a, b) => a - b)
     if (!v.length) return null
-    const n = v.length
-    const median = n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2
-    return { median, p95: percentile(v, 0.95), max: v[n - 1], count: n }
+    return { median: Stats.median(v), p95: Stats.percentile(v, 0.95), max: v[v.length - 1], count: v.length }
   }
 
   // rows: [{ mode, tearing, syncInterval, displayLatency, clickToPhoton, displayed }] for the

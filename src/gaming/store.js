@@ -3,6 +3,12 @@
 // so this file has no dependency on db.js and can be tested with an in-memory DB.
 const Sens = require('./sens')
 
+// The public columns of gaming_captures (everything but the big `frametimes` series and the
+// `present_json` blob, which callers that need them select and parse separately). Shared with
+// backup.js so both build their "everything except those two" result the same way.
+const CAPTURE_COLUMNS = ['id', 'created_at', 'label', 'app', 'duration_s', 'frames', 'avg_fps', 'low1_fps',
+  'low01_fps', 'median_ms', 'p99_ms', 'max_ms', 'spikes', 'spike_threshold_ms', 'present_kind']
+
 // `awardXp` is db.awardXp (optional: tests pass a stub).
 function createStore(getDb, awardXp) {
   const db = () => {
@@ -147,7 +153,7 @@ function createStore(getDb, awardXp) {
     return valid
   }
 
-  const CAPTURE_COLS = 'id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, present_kind'
+  const CAPTURE_COLS = CAPTURE_COLUMNS.join(', ')
 
   // `capture` = the result of a PresentMon run ({app, seconds, frametimes, metrics, present}).
   function saveCapture(label, capture) {
@@ -174,7 +180,7 @@ function createStore(getDb, awardXp) {
     if (!r) throw new Error('Capture not found')
     let present = null
     try { present = r.present_json ? JSON.parse(r.present_json) : null } catch (_) { /* damaged: treat as none */ }
-    const { present_json, ...rest } = r
+    const rest = Object.fromEntries(CAPTURE_COLUMNS.map(k => [k, r[k]]))
     return { ...rest, frametimes: JSON.parse(r.frametimes), present }
   }
 
@@ -256,15 +262,38 @@ function createStore(getDb, awardXp) {
     return { deleted: db().prepare('DELETE FROM gaming_changes WHERE id=?').run(id).changes > 0 }
   }
 
-  // Everything the Obsidian export needs, in summary form (no frametime series).
+  // Cheap stand-in for "did anything gaming-related change since the last export": counts and
+  // the newest id/timestamp per table. Catches new/deleted rows and sens-profile edits (which
+  // bump updated_at); an edit to an existing session/aim-score/capture/change row (none of
+  // those have an updated_at column) won't change this — accepted, since hashing full table
+  // content on every save would defeat the point of skipping the read.
+  let exportCache = null // { signature, summary }
+  function gamingSignature() {
+    const row = db().prepare(`SELECT
+      (SELECT count(*) FROM gaming_sens_profiles) a, (SELECT max(updated_at) FROM gaming_sens_profiles) b,
+      (SELECT count(*) FROM gaming_sessions) c, (SELECT max(id) FROM gaming_sessions) d,
+      (SELECT count(*) FROM gaming_aim_scores) e, (SELECT max(id) FROM gaming_aim_scores) f,
+      (SELECT count(*) FROM gaming_captures) g, (SELECT max(id) FROM gaming_captures) h,
+      (SELECT count(*) FROM gaming_changes) i, (SELECT max(id) FROM gaming_changes) j`).get()
+    return JSON.stringify(row)
+  }
+
+  // Everything the Obsidian export needs, in summary form (no frametime series). Reuses the
+  // last result when the signature above hasn't moved, so a save that touched nothing
+  // gaming-related skips re-reading five tables; the output is the same cached object, so it
+  // stays byte-identical.
   function exportSummary() {
-    return {
+    const signature = gamingSignature()
+    if (exportCache && exportCache.signature === signature) return exportCache.summary
+    const summary = {
       sens_profiles: listSensProfiles(),
       sessions: listSessions(300),
       aim_scores: listAimScores(300),
       captures: db().prepare(`SELECT ${CAPTURE_COLS} FROM gaming_captures ORDER BY id DESC LIMIT 300`).all(),
       changes: listChanges(500)
     }
+    exportCache = { signature, summary }
+    return summary
   }
 
   return {
@@ -275,4 +304,4 @@ function createStore(getDb, awardXp) {
   }
 }
 
-module.exports = { createStore }
+module.exports = { createStore, CAPTURE_COLUMNS }

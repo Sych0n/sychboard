@@ -201,15 +201,17 @@ test('memory: dual channel at rated speed is ok; single stick, below rated, mixe
   assert.match(by(H.evaluate(raw, { now: NOW }), 'memory').value, /Could not read/)
 })
 
-test('capture / overlay programs: none is ok; running ones are named in plain words (a lone name from PowerShell works too)', () => {
+test('capture / overlay programs: none is ok; always-on overlay/buffer apps are informational, deliberate recorders warn (named in plain words; a lone name from PowerShell works too)', () => {
   const raw = GOOD()
   assert.equal(by(H.evaluate(raw, { now: NOW }), 'apps').status, 'ok')
   raw.apps = ['Discord', 'Medal', 'MedalEncoder']
   let c = by(H.evaluate(raw, { now: NOW }), 'apps')
-  assert.equal(c.status, 'warn')
+  assert.equal(c.status, 'ok') // background overlay + always-on clip buffer, not a deliberate capture
   assert.equal(c.value, 'Running now: Discord (overlay), Medal (clip recorder)') // Medal + its encoder are one program
   raw.apps = 'obs64'
-  assert.equal(by(H.evaluate(raw, { now: NOW }), 'apps').value, 'Running now: OBS')
+  c = by(H.evaluate(raw, { now: NOW }), 'apps')
+  assert.equal(c.status, 'warn') // the user deliberately opened a recorder
+  assert.equal(c.value, 'Running now: OBS')
   delete raw.apps
   assert.match(by(H.evaluate(raw, { now: NOW }), 'apps').value, /Could not read/)
 })

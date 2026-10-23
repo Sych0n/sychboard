@@ -3,6 +3,7 @@
 // db handle and do NOT open their own transaction: db.js calls them from inside its
 // own export/import/clear transactions so a restore is all-or-nothing.
 const Present = require('./presentpath')
+const { CAPTURE_COLUMNS } = require('./store')
 
 // Settings that describe this machine, not the user's data. Never exported, never
 // restored from a file (a crafted backup must not be able to point SychBoard at an
@@ -17,12 +18,12 @@ function exportGaming(db) {
     sessions: db.prepare('SELECT id, date, start_time, end_time, game, mode, result, score, rank_change, notes, smoothness, sens_profile_id, created_at FROM gaming_sessions').all(),
     aim_scores: db.prepare('SELECT id, date, scenario, score, notes, created_at FROM gaming_aim_scores').all(),
     changes: db.prepare('SELECT id, date, what, before_capture_id, after_capture_id, felt, verdict, notes, created_at FROM gaming_changes').all(),
-    captures: db.prepare('SELECT id, created_at, label, app, duration_s, frames, avg_fps, low1_fps, low01_fps, median_ms, p99_ms, max_ms, spikes, spike_threshold_ms, frametimes, present_json FROM gaming_captures').all()
+    captures: db.prepare(`SELECT ${CAPTURE_COLUMNS.join(', ')}, frametimes, present_json FROM gaming_captures`).all()
       .map(c => {
         try {
-          const { present_json, ...rest } = c
           let present = null
-          try { present = present_json ? JSON.parse(present_json) : null } catch (_) { /* damaged: leave out */ }
+          try { present = c.present_json ? JSON.parse(c.present_json) : null } catch (_) { /* damaged: leave out */ }
+          const rest = Object.fromEntries(CAPTURE_COLUMNS.map(k => [k, c[k]]))
           return { ...rest, frametimes: JSON.parse(c.frametimes), present }
         } catch (_) { return null }
       }).filter(Boolean)
