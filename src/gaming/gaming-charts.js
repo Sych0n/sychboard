@@ -1,8 +1,14 @@
 // Tiny SVG chart helpers for the Gaming tab (no dependencies). Return markup strings.
-(function () {
+// Pure functions (renderer: window.Gaming.charts / window.GamingCharts, node: require).
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory()
+  else root.GamingCharts = factory()
+})(typeof self !== 'undefined' ? self : this, function () {
   'use strict'
-  const G = window.Gaming
-  const esc = G.esc
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  }
 
   const W = 600, H = 160, L = 44, R = 12, T = 12, B = 24
 
@@ -85,5 +91,7 @@
       ${h}${paths}${legend}</svg>`
   }
 
-  G.charts = { line, bars, multi }
-})()
+  return { line, bars, multi }
+})
+
+if (typeof window !== 'undefined' && window.Gaming) window.Gaming.charts = window.GamingCharts
