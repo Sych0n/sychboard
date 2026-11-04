@@ -2,7 +2,7 @@
 (function () {
   'use strict'
   const G = window.Gaming
-  const S = window.GamingSens
+  const Fmt = window.GamingSensFmt
   const esc = G.esc
 
   // Survives card re-renders (e.g. after saving a profile).
@@ -10,46 +10,18 @@
 
   const api = () => window.sychboard && window.sychboard.gaming && window.sychboard.gaming.sens
 
-  const fmt = (n, d) => Number(n.toFixed(d)).toString()
-
-  function resultsHtml() {
-    let r
-    try { r = S.convertAll(state.game, state.sens, state.dpi) } catch (e) {
-      return `<div class="gm-err">${esc(e.message)}</div>`
-    }
-    const rows = r.games.map(g =>
-      `<tr class="${g.key === state.game ? 'gm-src' : ''}"><td>${esc(g.name)}</td><td>${fmt(g.sens, 4)}</td><td>${fmt(g.eDpi, 1)}</td></tr>`).join('')
-    return `
-      <div class="gm-grid">
-        <div class="metric"><div class="ml">cm / 360°</div><div class="mv">${fmt(r.cmPer360, 2)}</div></div>
-        <div class="metric"><div class="ml">in / 360°</div><div class="mv">${fmt(r.inchesPer360, 2)}</div></div>
-        <div class="metric"><div class="ml">eDPI</div><div class="mv">${fmt(r.eDpi, 1)}</div></div>
-      </div>
-      <table class="gm-table"><thead><tr><th>Game</th><th>Equivalent sens</th><th>eDPI</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="gm-note">Same DPI in every game. Equivalent sens = sens × yaw(source) ÷ yaw(target), so cm/360 is identical across the table.</div>`
-  }
+  const resultsHtml = () => Fmt.resultsHtml(state.game, state.sens, state.dpi)
 
   async function profilesHtml() {
     const a = api()
     if (!a) return `<div class="gm-note">Saved profiles need the desktop app.</div>`
     const res = await a.list()
     if (!res.ok) return `<div class="gm-err">${esc(res.error)}</div>`
-    if (!res.data.length) return `<div class="gm-note">No saved profiles yet. Name the current values and hit Save.</div>`
-    return `<table class="gm-table"><tbody>${res.data.map(p => {
-      let cm = ''
-      try { cm = fmt(S.cmPer360(p.game, p.sens, p.dpi), 2) + ' cm/360' } catch (_) { /* unknown game: skip */ }
-      return `<tr>
-        <td><b>${esc(p.name)}</b><div class="gm-note" style="margin:2px 0 0">${esc((S.GAMES[p.game] || {}).name || p.game)} · ${p.sens} @ ${p.dpi} DPI · ${cm}</div></td>
-        <td style="text-align:right;white-space:nowrap">
-          <button class="btn btn-sm" data-gm-load="${p.id}">Load</button>
-          <button class="btn btn-sm btn-d" data-gm-del="${p.id}">Delete</button>
-        </td></tr>`
-    }).join('')}</tbody></table>`
+    return Fmt.profilesTableHtml(res.data)
   }
 
   async function render(body) {
-    const gameOpts = Object.keys(S.GAMES).map(k =>
-      `<option value="${k}"${k === state.game ? ' selected' : ''}>${esc(S.GAMES[k].name)}</option>`).join('')
+    const gameOpts = Fmt.gameOptionsHtml(state.game)
     const profiles = await profilesHtml()
     body.innerHTML = `
       <div class="gm-row">
