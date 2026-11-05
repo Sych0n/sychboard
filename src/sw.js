@@ -1,7 +1,7 @@
-const CACHE = 'sychboard-v11';
+const CACHE = 'sychboard-v12';
 const SHELL = ['./', './manifest.json', './styles.css', './renderer.js', './gaming/gaming.css', './gaming/gaming-ui.js',
   './gaming/gaming-cards-stub.js', './gaming/sens.js', './gaming/sens-fmt.js', './gaming/gaming-sens-ui.js',
-  './gaming/stats.js', './gaming/gaming-charts.js', './gaming/gaming-sessions-ui.js',
+  './gaming/stats.js', './gaming/gaming-charts.js', './gaming/sessions-fmt.js', './gaming/gaming-sessions-ui.js',
   './obsidian/obsidian-ui.js', './gaming/stats-math.js', './gaming/framemetrics.js', './gaming/presentpath.js', './gaming/gaming-capture-ui.js', './gaming/health-fmt.js', './gaming/gaming-health-ui.js', './gaming/changes-fmt.js', './gaming/gaming-changes-ui.js',
   './icons/icon-72.png', './icons/icon-96.png', './icons/icon-128.png',
   './icons/icon-144.png', './icons/icon-180.png', './icons/icon-192.png',

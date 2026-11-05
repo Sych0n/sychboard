@@ -2,7 +2,7 @@
 (function () {
   'use strict'
   const G = window.Gaming
-  const St = window.GamingStats
+  const Fmt = window.GamingSessionsFmt
   const esc = G.esc
 
   const api = () => window.sychboard && window.sychboard.gaming
@@ -14,57 +14,13 @@
   const aim = { date: '', scenario: '', score: '' }
   const view = { metric: 'score', scenario: '' }
 
-  const METRICS = {
-    score: { label: 'Avg score', pick: b => b.avgScore, fmt: v => String(Math.round(v * 10) / 10) },
-    win: { label: 'Win rate', pick: b => b.winRate == null ? null : b.winRate * 100, fmt: v => Math.round(v) + '%', max: 100 },
-    smooth: { label: 'Avg smoothness', pick: b => b.avgSmooth, fmt: v => (Math.round(v * 10) / 10).toFixed(1), max: 5 }
-  }
-
-  const opt = (v, cur, label) => `<option value="${esc(v)}"${String(v) === String(cur) ? ' selected' : ''}>${esc(label)}</option>`
+  const opt = Fmt.opt
 
   function notify(res, what) {
     const x = res.data && res.data.xp
     if (x && x.awarded && typeof showXpToast === 'function') showXpToast(`+${x.awarded} XP · ${what} logged`)
     else if (typeof toast === 'function') toast(x && x.capped ? `${what} logged (daily XP cap reached)` : `${what} logged`)
     if (x && x.leveledUp && typeof toast === 'function') toast(`Level up! You are now level ${x.newLevel}`)
-  }
-
-  function chartsHtml(sessions, aimRows) {
-    const tod = St.byTimeOfDay(sessions)
-    const m = METRICS[view.metric]
-    const scenarios = [...new Set(aimRows.map(a => a.scenario))].sort((a, b) => a.localeCompare(b))
-    if (!scenarios.includes(view.scenario)) view.scenario = scenarios[0] || ''
-    return `
-      <div class="gm-sub">Score over time</div>
-      ${G.charts.line(St.scoreSeries(sessions), { label: 'Score over time', empty: 'Log sessions with a score to see this chart.' })}
-      <div class="gm-sub">Smoothness over time (1–5)</div>
-      ${G.charts.line(St.smoothSeries(sessions), { label: 'Smoothness over time', min: 1, max: 5, empty: 'Rate how smooth the game felt to see this chart.' })}
-      <div class="gm-sub">Performance by time of day
-        <select data-gs-metric style="margin-left:10px;padding:4px 8px;font-size:11px">${Object.entries(METRICS).map(([k, v]) => opt(k, view.metric, v.label)).join('')}</select></div>
-      ${G.charts.bars(tod.map(b => ({ label: b.label, value: m.pick(b), n: b.sessions })), { fmt: m.fmt, max: m.max, label: 'Performance by time of day', empty: 'Log sessions with a start time and ' + m.label.toLowerCase() + ' data.' })}
-      <div class="gm-note">Based on session start time, 3-hour buckets. Hover a bar for the session count — small buckets are noisy.</div>
-      <div class="gm-sub">Aim trainer
-        ${scenarios.length ? `<select data-gs-scenario style="margin-left:10px;padding:4px 8px;font-size:11px">${scenarios.map(s => opt(s, view.scenario, s)).join('')}</select>` : ''}</div>
-      ${G.charts.line(St.aimSeries(aimRows, view.scenario), { label: 'Aim trainer scores', empty: 'Log an Aim Lab score to see this chart.' })}`
-  }
-
-  function historyHtml(sessions, aimRows) {
-    const sRows = sessions.slice(0, 12).map(s => `<tr>
-      <td>${esc(s.date)}${s.start_time ? ' <span style="color:var(--text3)">' + esc(s.start_time) + '</span>' : ''}</td>
-      <td>${esc(s.game)}${s.mode ? ' · ' + esc(s.mode) : ''}</td>
-      <td>${s.result ? esc(s.result) : '–'}</td>
-      <td>${s.score != null ? s.score : '–'}</td>
-      <td>${s.rank_change != null ? (s.rank_change > 0 ? '+' : '') + s.rank_change : '–'}</td>
-      <td>${s.smoothness != null ? s.smoothness + '/5' : '–'}</td>
-      <td style="text-align:right"><button class="btn btn-sm btn-d" data-gs-del-session="${s.id}" title="${s.notes ? esc(s.notes) : 'Delete'}">✕</button></td></tr>`).join('')
-    const aRows = aimRows.slice(0, 8).map(a => `<tr>
-      <td>${esc(a.date)}</td><td>${esc(a.scenario)}</td><td>${a.score}</td>
-      <td style="text-align:right"><button class="btn btn-sm btn-d" data-gs-del-aim="${a.id}">✕</button></td></tr>`).join('')
-    return `
-      <div class="gm-sub">Recent sessions</div>
-      ${sRows ? `<table class="gm-table"><thead><tr><th>When</th><th>Game</th><th>Result</th><th>Score</th><th>Rank Δ</th><th>Smooth</th><th></th></tr></thead><tbody>${sRows}</tbody></table>` : '<div class="gm-note">No sessions logged yet.</div>'}
-      <div class="gm-sub">Recent aim scores</div>
-      ${aRows ? `<table class="gm-table"><thead><tr><th>Date</th><th>Scenario</th><th>Score</th><th></th></tr></thead><tbody>${aRows}</tbody></table>` : '<div class="gm-note">No aim scores logged yet.</div>'}`
   }
 
   async function render(body) {
@@ -103,12 +59,12 @@
       </div>
       <datalist id="gm-scenarios">${[...new Set(aimRows.map(x => x.scenario))].map(s => `<option value="${esc(s)}">`).join('')}</datalist>
       <div class="gm-err" id="gm-sess-msg" style="display:none"></div>
-      <div id="gm-sess-charts">${chartsHtml(sessions, aimRows)}</div>
-      ${historyHtml(sessions, aimRows)}`
+      <div id="gm-sess-charts">${Fmt.chartsHtml(sessions, aimRows, view.metric, view.scenario)}</div>
+      ${Fmt.historyHtml(sessions, aimRows)}`
 
     const msg = body.querySelector('#gm-sess-msg')
     const showMsg = t => { msg.textContent = t; msg.style.display = t ? '' : 'none' }
-    const redraw = () => { body.querySelector('#gm-sess-charts').innerHTML = chartsHtml(sessions, aimRows); bindChartControls() }
+    const redraw = () => { body.querySelector('#gm-sess-charts').innerHTML = Fmt.chartsHtml(sessions, aimRows, view.metric, view.scenario); bindChartControls() }
 
     body.querySelectorAll('[data-gs]').forEach(el => el.addEventListener('input', () => { form[el.dataset.gs] = el.value }))
     body.querySelectorAll('[data-ga]').forEach(el => el.addEventListener('input', () => { aim[el.dataset.ga] = el.value }))
